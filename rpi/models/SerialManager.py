@@ -1,5 +1,5 @@
 import asyncio, serial_asyncio
-from . import SerialProtocol
+from .SerialProtocol import SerialProtocol
 
 
 class SerialManager:

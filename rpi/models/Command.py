@@ -42,3 +42,5 @@ class Command(BaseModel):
         )
         
         ser.send(command)
+    
+    

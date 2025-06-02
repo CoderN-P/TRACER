@@ -1,5 +1,7 @@
-import time
+import time, threading
 from . import SerialManager, SensorData, Command, CommandType, MotorCommand
+from ..ai.get_commands import text_to_command
+
 
 class Robot:
     def __init__(self, serial_manager: SerialManager, socketio):
@@ -53,13 +55,16 @@ class Robot:
         right_x = data.get('right_x', 0)
 
         Command.send_from_joystick(left_y, right_x, self.serial)
+
+    def handle_query(self, query):
+        commands = text_to_command(query)
+
+        def run_command_sequence():
+            for command in commands.commands:
+                self.serial.send(command)
+                time.sleep(command.duration)
+                if command.pause_duration and command.command_type == CommandType.MOTOR:
+                    Command.send_from_joystick(0, 0, self.serial)
+                    time.sleep(command.pause_duration)
     
-    def handle_query(self):
-        """
-        Handle a text query command to the robot.
-        """
-        pass
-    
-        
-        
-        
+        threading.Thread(target=run_command_sequence).start()

@@ -11,7 +11,7 @@ def setup_routes(robot):
         
     @socketio.on('query')
     def on_query(data):
-        robot.handle_query(data)
+        robot.handle_query(data["query"])
         
 
 def run_socket_server(robot):

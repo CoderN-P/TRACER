@@ -3,12 +3,12 @@ import pygame, threading, time
 class Controller:
     def __init__(self, controller, socketio):
         self.controller = controller
-        self.socketio = socketio
+        self.socketio = socketio # socketio client
         self.last_send_time = 0
         self.send_interval = 0.05  # seconds = 20Hz
 
     @classmethod
-    def initialize(cls):
+    def initialize(cls, socketio) -> 'Controller':
         pygame.joystick.init()
 
         if pygame.joystick.get_count() == 0:
@@ -17,7 +17,7 @@ class Controller:
         controller = pygame.joystick.Joystick(0)
         controller.init()
 
-        return cls(controller)
+        return cls(controller, socketio)
 
     def read_input(self) -> tuple:
         pygame.event.pump()
@@ -37,7 +37,7 @@ class Controller:
     
     def send_update(self):
         """
-        Send the current motor command to the specified URL.
+        Send the current joystick data to the specified URL.
         """
 
         if not self.should_send_update():
@@ -51,12 +51,12 @@ class Controller:
         }
         
         try:
-            self.socketio.emit('joystick_update', data)
+            self.socketio.emit('joystick_input', data)
         except Exception as e:
             raise RuntimeError(f"Failed to send controller update: {e}")
 
 
-    def update_vibration(self, low, high, duration_ms):
+    def rumble(self, low, high, duration_ms):
         self.controller.rumble(low, high, duration_ms)
     
         # Stop after duration using a background timer

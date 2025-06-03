@@ -20,6 +20,8 @@ def setup_routes(robot):
 
 import uvicorn
 
-def run_socket_server(robot):
+async def run_socket_server(robot):
     setup_routes(robot)
-    uvicorn.run(app, host='0.0.0.0', port=8080)
+    config = uvicorn.Config(app, host="0.0.0.0", port=8080)
+    server = uvicorn.Server(config)
+    await server.serve()

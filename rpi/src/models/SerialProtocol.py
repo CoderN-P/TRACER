@@ -19,4 +19,4 @@ class SerialProtocol(asyncio.Protocol):
             self.robot.process_sensor_data(decoded)
 
     def send(self, message):
-        self.transport.write(message.encode())
+        self.transport.write(message)

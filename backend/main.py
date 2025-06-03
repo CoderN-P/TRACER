@@ -1,7 +1,11 @@
+import time
+
+import pygame.time
 from flask import Flask
 from flask_socketio import SocketIO
 import socketio
 from Controller import Controller
+import threading
 
 
 app = Flask(__name__)
@@ -23,10 +27,30 @@ def setup_routes(controller: Controller):
         
     @sio_client.on('sensor_data')
     def handle_sensor_update(data):
+        print(data)
         socket.emit('sensor_update', data)
 
-if __name__ == '__main__':
+def start_socket_server():
+    """
+    Start the Flask-SocketIO server.
+    """
+    socket.run(app, host='0.0.0.0', port=8080)
+
+if __name__ == "__main__":
+    # Init joystick
     controller = Controller.initialize(sio_client)
     setup_routes(controller)
+
+    # Connect to RPi backend
     sio_client.connect('http://192.168.4.119:8080')
-    socket.run(app, host='0.0.0.0', port=8080)
+
+    # Start socket server in a background thread
+    threading.Thread(target=start_socket_server, daemon=True).start()
+
+    # Main loop for joystick input (main thread = avoids macOS issues)
+    try:
+        while True:
+            controller.send_update()
+            time.sleep(0.05)  # 20 Hz
+    except KeyboardInterrupt:
+        print("Shutting down.")

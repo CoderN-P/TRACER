@@ -12,6 +12,7 @@ class Robot:
         self.rumble_cooldown = 1.0  # seconds between rumbles
         self.rumble_active = False
         self.socketio = socketio
+        self.cliff_detected = False
 
     def process_sensor_data(self, data: str):
         sensor_data = SensorData.model_validate_json(data)
@@ -36,6 +37,25 @@ class Robot:
                 self.rumble_active = True
         else:
             self.rumble_active = False  # Reset so future detections can trigger rumble again
+            
+        # Check for cliff detection
+        if sensor_data.check_cliff() and not self.cliff_detected:
+            self.cliff_detected = True
+            threading.Timer(0.5, lambda: setattr(self, 'cliff_detected', False)).start()  # Reset cliff detection after 5 seconds, basically halting commands
+            Command.send_from_joystick(0, 0, self.serial)  # Stop motors if cliff is detected
+            
+            if (not self.rumble_active) or (current_time - self.last_rumble_time > self.rumble_cooldown):
+                self.socketio.emit(
+                    'rumble',
+                    {
+                        "low": 0.5,
+                        "high": 0.5,
+                        "duration": 1000,
+                    }
+                )
+                self.last_rumble_time = current_time
+                self.rumble_active = True
+            
 
         # Emit sensor data at a fixed interval
         if current_time - self.last_emit_time >= self.emit_interval:
@@ -53,8 +73,9 @@ class Robot:
         
         left_y = data.get('left_y', 0)
         right_x = data.get('right_x', 0)
-
-        Command.send_from_joystick(left_y, right_x, self.serial)
+        
+        if not self.cliff_detected:
+            Command.send_from_joystick(left_y, right_x, self.serial)
 
     def handle_query(self, query):
         commands = text_to_command(query)

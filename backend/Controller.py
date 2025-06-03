@@ -1,14 +1,14 @@
-import pygame, threading, time
+import pygame, threading
 
 class Controller:
     def __init__(self, controller, socketio):
         self.controller = controller
         self.socketio = socketio # socketio client
-        self.last_send_time = 0
-        self.send_interval = 0.05  # seconds = 20Hz
+        self.reset_motor = False
 
     @classmethod
     def initialize(cls, socketio) -> 'Controller':
+        pygame.init()
         pygame.joystick.init()
 
         if pygame.joystick.get_count() == 0:
@@ -20,7 +20,7 @@ class Controller:
         return cls(controller, socketio)
 
     def read_input(self) -> tuple:
-        pygame.event.pump()
+        pygame.event.pump()  # Process events to update joystick state
         left_y = self.controller.get_axis(1)
         right_x = self.controller.get_axis(2)
 
@@ -32,8 +32,7 @@ class Controller:
         """
         left_y, right_x = self.read_input()
         moved_enough = abs(left_y) > 0.1 or abs(right_x) > 0.1
-        enough_time = (time.time() - self.last_send_time) > self.send_interval
-        return moved_enough and enough_time
+        return moved_enough
     
     def send_update(self):
         """
@@ -41,14 +40,24 @@ class Controller:
         """
 
         if not self.should_send_update():
-            return 
+            if self.reset_motor:
+                # If no significant input, reset motors
+                self.reset_motor = False
+                data = {
+                    "left_y": 0,
+                    "right_x": 0
+                }
+                
+        else: 
+            left_y, right_x = self.read_input()
         
-        left_y, right_x = self.read_input()
-        
-        data = {
-            "left_y": left_y,
-            "right_x": right_x
-        }
+            data = {
+                "left_y": left_y,
+                "right_x": right_x
+            }
+            
+            self.reset_motor = True  # Set flag to reset motors next time if no input
+    
         
         try:
             self.socketio.emit('joystick_input', data)

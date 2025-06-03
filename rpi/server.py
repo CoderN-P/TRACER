@@ -7,7 +7,7 @@ socketio = SocketIO(app)
 def setup_routes(robot):
     @socketio.on('joystick_input')
     def on_joystick(data):
-        robot.handle_joystick(data)
+        robot.handle_joystick_input(data)
         
     @socketio.on('query')
     def on_query(data):

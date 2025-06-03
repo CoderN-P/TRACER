@@ -23,7 +23,7 @@ class Command(BaseModel):
 
 
     @classmethod
-    def send_from_joystick(cls, left_y: float, right_x: float, ser: SerialManager):
+    async def send_from_joystick(cls, left_y: float, right_x: float, ser: SerialManager):
         """
         Calculate the differential drive values based on the controller input.
         """
@@ -49,6 +49,6 @@ class Command(BaseModel):
             duration=0
         )
 
-        ser.send(command)
+        await ser.send(command)
     
     

@@ -1,4 +1,5 @@
 import time, threading
+import asyncio
 from . import SerialManager, SensorData, Command, CommandType, MotorCommand
 from ..ai.get_commands import text_to_command
 
@@ -14,7 +15,11 @@ class Robot:
         self.socketio = socketio
         self.cliff_detected = False
 
-    def process_sensor_data(self, data: str):
+    async def _reset_cliff_detected(self):
+        await asyncio.sleep(0.5)
+        self.cliff_detected = False
+
+    async def process_sensor_data(self, data: str):
         try:
             sensor_data = SensorData.model_validate_json(data)
 
@@ -30,7 +35,7 @@ class Robot:
                 low = distance / 10
                 high = 1 - low
 
-                self.socketio.emit(
+                await self.socketio.emit(
                     'rumble',
                     {
                         "low": low,
@@ -46,11 +51,11 @@ class Robot:
         # Check for cliff detection
         if sensor_data.check_cliff() and not self.cliff_detected:
             self.cliff_detected = True
-            threading.Timer(0.5, lambda: setattr(self, 'cliff_detected', False)).start()  # Reset cliff detection after 5 seconds, basically halting commands
-            Command.send_from_joystick(0, 0, self.serial)  # Stop motors if cliff is detected
+            asyncio.create_task(self._reset_cliff_detected())  # Reset cliff detection after 0.5 seconds, basically halting commands
+            await Command.send_from_joystick(0, 0, self.serial)  # Stop motors if cliff is detected
 
             if (not self.rumble_active) or (current_time - self.last_rumble_time > self.rumble_cooldown):
-                self.socketio.emit(
+                await self.socketio.emit(
                     'rumble',
                     {
                         "low": 0.5,
@@ -65,13 +70,13 @@ class Robot:
         # Emit sensor data at a fixed interval
         if current_time - self.last_emit_time >= self.emit_interval:
             self.last_emit_time = current_time
-            self.socketio.emit(
+            await self.socketio.emit(
                 'sensor_data',
                 sensor_data.model_dump(),
             )
 
 
-    def handle_joystick_input(self, data):
+    async def handle_joystick_input(self, data):
         """
         Handle joystick input and send motor commands.
         """
@@ -80,20 +85,18 @@ class Robot:
         right_x = data.get('right_x', 0)
 
         if not self.cliff_detected:
-            Command.send_from_joystick(left_y, right_x, self.serial)
+            await Command.send_from_joystick(left_y, right_x, self.serial)
 
-    def _run_command_sequence(self, commands):
+    async def _run_command_sequence(self, commands):
         for command in commands.commands:
             self.serial.send(command)
-            time.sleep(command.duration)
+            await asyncio.sleep(command.duration)
             if command.pause_duration and command.command_type == CommandType.MOTOR:
                 Command.send_from_joystick(0, 0, self.serial)
-                time.sleep(command.pause_duration)
+                await asyncio.sleep(command.pause_duration)
 
     def handle_query(self, query):
         commands = text_to_command(query)
 
-        command_thread = threading.Thread(target=self._run_command_sequence, args=(commands,))
-        command_thread.daemon = True  # Ensure thread exits when main program exits
-        command_thread.start()
-        return command_thread
+        command_task = asyncio.create_task(self._run_command_sequence(commands))
+        return command_task

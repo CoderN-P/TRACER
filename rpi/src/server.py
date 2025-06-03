@@ -1,23 +1,25 @@
-from flask import Flask
-from flask_socketio import SocketIO
+import socketio
+from fastapi import FastAPI
 
-app = Flask(__name__)
-socketio = SocketIO(app, cors_allowed_origins='*')
+sio = socketio.AsyncServer(cors_allowed_origins='*', async_mode='asgi')
+app = FastAPI()
+app = socketio.ASGIApp(sio, other_asgi_app=app)
 
 def setup_routes(robot):
-    @socketio.on('joystick_input')
-    def on_joystick(data):
-        robot.handle_joystick_input(data)
-        
-    @socketio.on('query')
-    def on_query(data):
-        robot.handle_query(data["query"])
-        
-    @socketio.on('connect')
-    def on_connect():
-        print("Client connected")
-        
+    @sio.on('joystick_input')
+    async def on_joystick(sid, data):
+        await robot.handle_joystick_input(data)
+
+    @sio.on('query')
+    async def on_query(sid, data):
+        await robot.handle_query(data["query"])
+
+    @sio.event
+    async def connect(sid, environ):
+        print("Client connected:", sid)
+
+import uvicorn
 
 def run_socket_server(robot):
     setup_routes(robot)
-    socketio.run(app, host='0.0.0.0', port=8080)
+    uvicorn.run(app, host='0.0.0.0', port=8080)

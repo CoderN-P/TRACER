@@ -1,6 +1,7 @@
 from .LCDCommand import LCDCommand
 from .MotorCommand import MotorCommand
 from .CommandTypeEnum import CommandType
+from .SerialProtocol import SerialProtocol
 from .SerialManager import SerialManager
 from .Command import Command
 from .UltrasonicSensor import UltrasonicSensor

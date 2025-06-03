@@ -21,8 +21,8 @@ class Controller:
 
     def read_input(self) -> tuple:
         pygame.event.pump()  # Process events to update joystick state
-        left_y = self.controller.get_axis(1)
-        right_x = self.controller.get_axis(2)
+        left_y = -self.controller.get_axis(1)
+        right_x = -self.controller.get_axis(2)
 
         return left_y, right_x
 

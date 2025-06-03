@@ -1,8 +1,0 @@
-{
-      "files.associations": {
-            "*.swift": "swift",
-            "coolwieirdidk": "python",
-            ".env": "plaintext",
-            "cstddef": "cpp"
-      }
-}

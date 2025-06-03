@@ -20,6 +20,7 @@ pydantic==2.11.5
 pydantic_core==2.33.2
 pyserial==3.5
 pyserial-asyncio==0.6
+python-dotenv==1.1.0
 python-engineio==4.12.1
 python-socketio==5.13.0
 simple-websocket==1.1.0

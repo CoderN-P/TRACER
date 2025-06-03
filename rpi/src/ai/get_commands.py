@@ -1,4 +1,6 @@
 from openai import OpenAI
+from dotenv import load_dotenv
+load_dotenv()
 from ..models import CommandResponse
 
 

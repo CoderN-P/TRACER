@@ -14,6 +14,7 @@ class SerialManager:
         self.transport, self.protocol = await serial_asyncio.create_serial_connection(
             loop, lambda: SerialProtocol(robot), self.port, baudrate=self.baudrate
         )
+        self.protocol.connection_made(self.transport)
 
     def send(self, data):
         # Check if data is a string or pydantic model

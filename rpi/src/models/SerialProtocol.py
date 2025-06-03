@@ -4,6 +4,7 @@ class SerialProtocol(asyncio.Protocol):
     def __init__(self, robot):
         self.robot = robot
         self.buffer = b''
+        self.transport = None
 
     def connection_made(self, transport):
         self.transport = transport

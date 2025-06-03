@@ -1,6 +1,5 @@
 import asyncio
-from models import Robot, SerialManager
-from server import run_socket_server, socketio
+from src import Robot, SerialManager, run_socket_server, socketio
 
 async def main():
     serial_manager = SerialManager('/dev/ttyUSB0', 9600)

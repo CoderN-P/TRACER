@@ -1,6 +1,6 @@
 import time, threading
 from . import SerialManager, SensorData, Command, CommandType, MotorCommand
-from ..ai.get_commands import text_to_command
+from ..ai import text_to_command
 
 
 class Robot:

@@ -17,26 +17,20 @@ class SerialManager:
             self.connected = True
             print(f"Connected to {self.port} at {self.baudrate} baud")
 
-            buffer = ''
-
             while self.connected:
                 if self.serial.in_waiting > 0:
                     try:
-                        incoming = self.serial.read(self.serial.in_waiting).decode('utf-8')
-                        buffer += incoming
-            
-                        while '\n' in buffer:
-                            line, buffer = buffer.split('\n', 1)
-                            line = line.strip()
-                            if line:
-                                try:
-                                    robot.process_sensor_data(line)
-                                except Exception as e:
-                                    print(f"❌ Error processing sensor data: {e}")
-                                    print(f"➡️  Raw data: {line!r}")
+                        incoming = self.serial.readline().decode('utf-8')
+                        line = incoming.strip()
+                        print(line)
+                        if line:
+                            try:
+                                robot.process_sensor_data(line)
+                            except Exception as e:
+                                print(f"❌ Error processing sensor data: {e}")
+                                print(f"➡️  Raw data: {line!r}")
                     except UnicodeDecodeError as e:
                         print(f"❌ Decode error: {e}")
-                        
                 eventlet.sleep(0.01)
                         
         except Exception as e:

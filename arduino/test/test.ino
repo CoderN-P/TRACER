@@ -47,6 +47,7 @@ void setup()
 
     Wire.begin();
     Serial.begin(115200);
+    Serial.setTimeout(50);
     
 
     lcd.init();
@@ -139,9 +140,9 @@ StaticJsonDocument<200> getMPUData()
     return doc;
 }
 
-StaticJsonDocument<512> getSensorData()
+StaticJsonDocument<1024> getSensorData()
 {
-    StaticJsonDocument<512> doc;
+    StaticJsonDocument<1024> doc;
 
     // Get ultrasonic data
     StaticJsonDocument<200> ultrasonicData = getUltrasonicData();
@@ -166,7 +167,7 @@ void processJsonMessage()
     jsonBuffer.trim();
 
     // Parse JSON
-    StaticJsonDocument<512> doc;
+    StaticJsonDocument<1024> doc;
     DeserializationError error = deserializeJson(doc, jsonBuffer);
 
     if (error)
@@ -174,6 +175,8 @@ void processJsonMessage()
         lcd.clear();
         lcd.setCursor(0, 0);
         lcd.println("JSON Error");
+        Serial.print("JSON Error: ");
+        Serial.println(error.c_str());
         return;
     }
 
@@ -189,6 +192,18 @@ void processJsonMessage()
         float leftSpeed = command["left_motor"];
         float rightSpeed = command["right_motor"];
         handleMovement(leftSpeed, rightSpeed);
+    } else if (commandType == "SENSOR")
+    {
+        lcd.clear();
+        lcd.setCursor(0, 0);
+        lcd.println("Sensor Data");
+        sendSensorData();
+    } 
+    else
+    {
+        lcd.clear();
+        lcd.setCursor(0, 0);
+        lcd.println("Unknown Cmd");
     }
 }
 
@@ -237,19 +252,12 @@ void handleMovement(float leftSpeed, float rightSpeed)
 
 void sendSensorData()
 {
-    // Example sensor data
-    StaticJsonDocument<512> doc = getSensorData();
-    String output;
-    serializeJson(doc, output);
-    Serial.println(output);
+    StaticJsonDocument<1024> doc = getSensorData();
+    serializeJson(doc, Serial);
+    Serial.println();
 }
 
 void loop()
 {
     handleIncomingData();
-    if (millis() - lastSensorSendTime >= sensorInterval)
-    {
-        sendSensorData();
-        lastSensorSendTime = millis();
-    }
 }

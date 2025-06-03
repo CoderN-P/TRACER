@@ -14,6 +14,45 @@ class Robot:
         self.rumble_active = False
         self.socketio = socketio
         self.cliff_detected = False
+        self.sending_command = False # Flag to prevent requesting sensor data while sending a command
+        self.sensor_request_interval = 0.1  # 10Hz = 0.1 seconds
+        self.sensor_request_task = None
+        self.running = False
+
+    async def start(self):
+        """Start the robot's background tasks"""
+        self.running = True
+        self.sensor_request_task = asyncio.create_task(self._sensor_request_loop())
+
+    async def stop(self):
+        """Stop the robot's background tasks"""
+        self.running = False
+        if self.sensor_request_task:
+            self.sensor_request_task.cancel()
+            try:
+                await self.sensor_request_task
+            except asyncio.CancelledError:
+                pass
+
+    async def _sensor_request_loop(self):
+        """Background task to request sensor data at 10Hz"""
+        while self.running:
+            try:
+                if not self.sending_command:
+                    # Send "SENSOR" command to Arduino to request sensor data
+                    sensor_request_command = Command(
+                        command_type=CommandType.SENSOR,
+                        command=None,
+                        pause_duration=0,
+                        duration=0
+                    )
+                    self.serial.send(sensor_request_command)
+                await asyncio.sleep(self.sensor_request_interval)
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                print(f"Error in sensor request loop: {e}")
+                await asyncio.sleep(self.sensor_request_interval)
 
     async def _reset_cliff_detected(self):
         await asyncio.sleep(0.5)
@@ -85,15 +124,20 @@ class Robot:
         right_x = data.get('right_x', 0)
 
         if not self.cliff_detected:
+            self.sending_command = True
             await Command.send_from_joystick(left_y, right_x, self.serial)
 
     async def _run_command_sequence(self, commands):
-        for command in commands.commands:
-            self.serial.send(command)
-            await asyncio.sleep(command.duration)
-            if command.pause_duration and command.command_type == CommandType.MOTOR:
-                Command.send_from_joystick(0, 0, self.serial)
-                await asyncio.sleep(command.pause_duration)
+        self.sending_command = True
+        try:
+            for command in commands.commands:
+                self.serial.send(command)
+                await asyncio.sleep(command.duration)
+                if command.pause_duration and command.command_type == CommandType.MOTOR:
+                    await Command.send_from_joystick(0, 0, self.serial)
+                    await asyncio.sleep(command.pause_duration)
+        finally:
+            self.sending_command = False
 
     def handle_query(self, query):
         commands = text_to_command(query)

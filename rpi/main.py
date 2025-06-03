@@ -7,7 +7,8 @@ async def main():
 
     await asyncio.gather(
         serial_manager.start(robot),   # or .run_loop(robot)
-        run_socket_server(robot)
+        run_socket_server(robot),
+        robot.start()  # Start the robot's background tasks
     )
 
 if __name__ == "__main__":

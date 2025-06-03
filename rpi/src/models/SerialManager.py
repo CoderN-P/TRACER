@@ -3,7 +3,7 @@ from . import SerialProtocol
 
 
 class SerialManager:
-    def __init__(self, port='/dev/ttyUSB0', baudrate=9600):
+    def __init__(self, port='/dev/ttyUSB0', baudrate=115200):
         self.port = port
         self.baudrate = baudrate
         self.transport = None
@@ -14,6 +14,7 @@ class SerialManager:
         self.transport, self.protocol = await serial_asyncio.create_serial_connection(
             loop, lambda: SerialProtocol(robot), self.port, baudrate=self.baudrate
         )
+        
 
     def send(self, data):
         # Check if data is a string or pydantic model

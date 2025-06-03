@@ -11,7 +11,9 @@ class SerialProtocol(asyncio.Protocol):
     def data_received(self, data):
         decoded = data.decode().strip()
         print(f"[Serial] Received: {decoded}")
-        self.robot.process_sensor_data(decoded)
+        result = self.robot.process_sensor_data(decoded)
+        if asyncio.iscoroutine(result):
+            asyncio.create_task(result)
 
     def send(self, message):
-        self.transport.write(message.encode())
+        self.transport.write(message)

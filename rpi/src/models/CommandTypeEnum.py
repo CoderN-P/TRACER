@@ -5,8 +5,9 @@ class CommandType(Enum):
     MOTOR = "MOTOR"
     LED = "LED"
     BUZZER = "BUZZER"
-    SENSOR = "SENSOR",
+    SENSOR = "SENSOR", # GET SENSOR DATA
     STOP = "STOP"
+    
 
     def __str__(self):
         return self.value

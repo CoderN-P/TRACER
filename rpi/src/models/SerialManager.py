@@ -3,7 +3,7 @@ from .SerialProtocol import SerialProtocol
 
 
 class SerialManager:
-    def __init__(self, port='/dev/ttyUSB0', baudrate=9600):
+    def __init__(self, port='/dev/ttyUSB0', baudrate=115200):
         self.port = port
         self.baudrate = baudrate
         self.transport = None

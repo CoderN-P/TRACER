@@ -14,7 +14,7 @@ class SerialProtocol(asyncio.Protocol):
         self.buffer += data
         while b'\n' in self.buffer:
             line, self.buffer = self.buffer.split(b'\n', 1)
-            decoded = line.decode().stripe
+            decoded = line.decode().strip()
             print(f"[Serial] Received: {decoded}")
             self.robot.process_sensor_data(decoded)
 

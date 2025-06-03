@@ -67,7 +67,7 @@ class Robot:
             self.last_emit_time = current_time
             self.socketio.emit(
                 'sensor_data',
-                sensor_data.model_dump_json(),
+                sensor_data.model_dump(),
             )
 
 

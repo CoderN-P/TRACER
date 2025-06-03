@@ -6,7 +6,6 @@ class UltrasonicSensor(BaseModel):
     Represents the data from an ultrasonic sensor.
     """
     distance: float = Field(..., description="Distance measured by the ultrasonic sensor in centimeters")
-    timestamp: str = Field(..., description="Timestamp of when the measurement was taken")
     
     def is_obstacle_detected(self, threshold: float = 10.0) -> bool:
         """

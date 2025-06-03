@@ -1,19 +1,16 @@
 import eventlet
-import eventlet.wsgi  # This ensures eventlet is properly imported
 eventlet.monkey_patch()
-import asyncio, threading
 from src import Robot, SerialManager, run_socket_server, socketio
 
-async def main():
+def main():
     serial_manager = SerialManager('/dev/ttyUSB0', 115200)
     robot = Robot(serial_manager, socketio)
-    await serial_manager.start(robot)
-
-    # If run_socket_server is blocking, run it in a thread or separately
-    server_thread = threading.Thread(target=run_socket_server, args=(robot,))
-    server_thread.start()
-
-    await serial_manager.start(robot)
+    
+    # Use eventlet's green threads instead of Python's threading
+    eventlet.spawn(serial_manager.run_loop, robot)
+    
+    # Run socket server (should be your Flask-SocketIO app)
+    run_socket_server(robot)
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()

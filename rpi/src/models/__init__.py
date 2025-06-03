@@ -5,7 +5,6 @@ from .SerialManager import SerialManager
 from .Command import Command
 from .UltrasonicSensor import UltrasonicSensor
 from .IMU import IMUData
-from .SerialProtocol import SerialProtocol
 from .SensorData import SensorData
 from .CommandResponse import AICommand
 from .Robot import Robot

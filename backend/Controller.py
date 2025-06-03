@@ -64,6 +64,7 @@ class Controller:
         
         try:
             self.socketio.emit('joystick_input', data)
+            print(data)
         except Exception as e:
             raise RuntimeError(f"Failed to send controller update: {e}")
 

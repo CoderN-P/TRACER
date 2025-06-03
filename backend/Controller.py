@@ -47,6 +47,9 @@ class Controller:
                     "left_y": 0,
                     "right_x": 0
                 }
+            else:
+                # If no significant input and not resetting, do nothing
+                return
                 
         else: 
             left_y, right_x = self.read_input()
@@ -71,17 +74,3 @@ class Controller:
         # Stop after duration using a background timer
         duration_sec = duration_ms / 1000
         threading.Timer(duration_sec, self.controller.stop_rumble).start()
-        
-        
-        
-            
-            
-        
-        
-        
-        
-        
-        
-
-        
-        

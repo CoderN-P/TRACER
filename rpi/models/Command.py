@@ -16,12 +16,12 @@ class Command(BaseModel):
     command: LCDCommand | MotorCommand | None = Field(description="Command to be executed, can be LCDCommand or MotorCommand, or None for stop command")
     pause_duration: int = Field(default=0, description="Pause duration in seconds after executing the command (AI Command ONLY)")
     duration: int = Field(default=0, description="Duration in seconds for which the command should be executed (AI Command ONLY)")
-
+    
     def __init__(self, **data):
         super().__init__(**data)
         self.ID = str(uuid.uuid4())
-
-
+        
+    
     @classmethod
     def send_from_joystick(cls, left_y: float, right_x: float, ser: SerialManager):
         """
@@ -29,11 +29,11 @@ class Command(BaseModel):
         """
         if abs(left_y) < 0.1: left_y = 0
         if abs(right_x) < 0.1: right_x = 0
-
+        
         # Calculate motor values (arcade drive)
         left_motor = int(255 * (left_y - right_x))
         right_motor = int(255 * (left_y + right_x))
-
+        
         # Clamp values
         left_motor = max(-255, min(255, left_motor))
         right_motor = max(-255, min(255, right_motor))
@@ -48,7 +48,7 @@ class Command(BaseModel):
             pause_duration=0,
             duration=0
         )
-
+        
         ser.send(command)
     
     

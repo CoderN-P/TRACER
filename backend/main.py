@@ -1,6 +1,4 @@
 import time
-
-import pygame.time
 from flask import Flask
 from flask_socketio import SocketIO
 import socketio
@@ -29,6 +27,11 @@ def setup_routes(controller: Controller):
     def handle_sensor_update(data):
         print(data)
         socket.emit('sensor_update', data)
+        
+    @sio_client.event
+    def connect():
+        print("Connected to RPi backend")
+    
 
 def start_socket_server():
     """

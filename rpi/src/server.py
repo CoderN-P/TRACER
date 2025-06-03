@@ -2,7 +2,7 @@ from flask import Flask
 from flask_socketio import SocketIO
 
 app = Flask(__name__)
-socketio = SocketIO(app)
+socketio = SocketIO(app, cors_allowed_origins='*')
 
 def setup_routes(robot):
     @socketio.on('joystick_input')
@@ -13,7 +13,11 @@ def setup_routes(robot):
     def on_query(data):
         robot.handle_query(data["query"])
         
+    @socketio.on('connect')
+    def on_connect():
+        print("Client connected")
+        
 
 def run_socket_server(robot):
     setup_routes(robot)
-    socketio.run(app, host='0.0.0.0', port=8080, allow_unsafe_werkzeug=True)
+    socketio.run(app, host='0.0.0.0', port=8080)

@@ -16,4 +16,4 @@ def setup_routes(robot):
 
 def run_socket_server(robot):
     setup_routes(robot)
-    socketio.run(app, host='0.0.0.0', port=8080)
+    socketio.run(app, host='0.0.0.0', port=8080, allow_unsafe_werkzeug=True)

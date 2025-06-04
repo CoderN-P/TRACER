@@ -1,5 +1,6 @@
-import asyncio, serial_asyncio
-from . import SerialProtocol
+import asyncio, serial_asyncio, struct
+from . import SerialProtocol, Command
+from .. import CommandType
 
 
 class SerialManager:
@@ -16,14 +17,25 @@ class SerialManager:
         )
         
 
-    def send(self, data):
+    def send(self, data: Command):
         # Check if data is a string or pydantic model
-
-        if isinstance(data, str):
-            # If it's a string, encode it to bytes
-            data = data.encode('utf-8')
-        elif hasattr(data, 'model_dump_json'):
-            # If it's a pydantic model, convert it to JSON and then encode
-            data = data.model_dump_json().encode('utf-8')
-
-        self.protocol.send(data + b'\n')
+        if data.command_type == CommandType.MOTOR:
+            packet = struct.pack("<Bhh", 0x01, data.command.left_motor, data.command.right_motor)
+            checksum = sum(packet) & 0xFF
+            self.protocol.send(packet + bytes([checksum]))
+        elif data.command_type == CommandType.LCD:
+            if len(data.command.line_1) > 16:
+                data.command.line_1 = data.command.line_1[:16]
+            if len(data.command.line_2) > 16:
+                data.command.line_2 = data.command.line_2[:16]
+            
+            l1 = data.command.line_1.ljust(16)[:16].encode('utf-8')
+            l2 = data.command.line_2.ljust(16)[:16].encode('utf-8')
+            
+            packet = struct.pack("<B16s16s", 0x02, l1, l2)
+            checksum = sum(packet) & 0xFF
+            self.protocol.send(packet + bytes([checksum]))
+        elif data.command_type == CommandType.SENSOR:
+            packet = struct.pack("<B", 0x03)
+            checksum = sum(packet) & 0xFF
+            self.protocol.send(packet + bytes([checksum]))

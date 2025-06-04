@@ -1,5 +1,3 @@
-#include <SoftwareSerial.h>
-#include <ArduinoJson.h>
 #include <LiquidCrystal_I2C.h>
 #include <Wire.h>
 
@@ -15,11 +13,15 @@ const int TRIGGER = 2; // Trigger pin for ultrasonic sensor
 const int ECHO = 11;   // Echo pin for ultrasonic sensor
 const int MAX_BUFFER_SIZE = 512;
 const int MPUAddress = 0x68; // I2C address for MPU6050
-
-unsigned long lastSensorSendTime = 0;
-const unsigned long sensorInterval = 100;
-
-String jsonBuffer = "";
+unsigned long lastUltrasonicSampleTime = 0;
+unsigned long lastMPUSampleTime = 0;
+unsigned long lastLCDUpdateTime = 0;
+int ax, ay, az, gx, gy, gz;
+float lastDistance, tempC;
+char lastLine1[17] = "";
+char lastLine2[17] = "";
+char lcdLine1[17] = "Init...";
+char lcdLine2[17] = "";
 
 LiquidCrystal_I2C lcd(0x27, 16, 2);
 
@@ -48,41 +50,63 @@ void setup()
     Wire.begin();
     Serial.begin(115200);
     Serial.setTimeout(50);
-    
 
     lcd.init();
     lcd.backlight();
     lcd.setCursor(0, 0);
     if (initMPU6050())
     {
-        lcd.println("MPU OK");
+        strncpy(lcdLine1, "MPU OK", sizeof(lcdLine1));
+        lcdLine1[16] = '\0';
     }
     else
     {
-        lcd.print("MPU ERROR");
+        strncpy(lcdLine1, "MPU Error", sizeof(lcdLine1));
+        lcdLine1[16] = '\0';
     }
+}
+
+uint8_t expected_command_length(uint8_t cmd)
+{
+    if (cmd == 0x01)
+        return 6;
+    if (cmd == 0x02)
+        return 34;
+    if (cmd == 0x03)
+        return 2;
+    return 255; // invalid
 }
 
 void handleIncomingData()
 {
     if (Serial.available() > 0)
     {
-        jsonBuffer = Serial.readStringUntil('\n'); // Read until newline
-        processJsonMessage();
+        static byte buf[64];
+        static size_t idx = 0;
+
+        while (Serial.available())
+        {
+            buf[idx++] = Serial.read();
+            if (idx == expected_command_length(buf[0]))
+            {
+                handleCommand(buf, idx);
+                idx = 0;
+            }
+        }
     }
 }
 
-bool getIRFront()
+uint8_t getIRFront()
 {
-    return digitalRead(IR_FRONT) == HIGH;
+    return digitalRead(IR_FRONT);
 }
 
-bool getIRBack()
+uint8_t getIRBack()
 {
-    return digitalRead(IR_BACK) == HIGH;
+    return digitalRead(IR_BACK);
 }
 
-StaticJsonDocument<200> getUltrasonicData()
+void getUltrasonicData(float &distance)
 {
     // Trigger the ultrasonic sensor
     digitalWrite(TRIGGER, LOW);
@@ -95,119 +119,138 @@ StaticJsonDocument<200> getUltrasonicData()
     long duration = pulseIn(ECHO, HIGH, 30000); // 30ms timeout
 
     // Calculate distance in cm
-    float distance = (duration == 0) ? -1 : (duration / 2.0) * 0.0343; // -1 indicates timeout
-    StaticJsonDocument<200> doc;
-    doc["distance"] = distance;
-    return doc;
+    distance = (duration == 0) ? -1 : (duration / 2.0) * 0.0343; // -1 indicates timeout
 }
 
-StaticJsonDocument<200> getMPUData()
+void getMPUData(int &ax, int &ay, int &az, int &gx, int &gy, int &gz, float &tempC)
 {
     Wire.beginTransmission(MPUAddress);
     Wire.write(0x3B); // Starting register for accelerometer data
     Wire.endTransmission(false);
     Wire.requestFrom(MPUAddress, 14); // Request 14 bytes (6 for accelerometer, 6 for gyroscope, 2 for temperature)
 
-    StaticJsonDocument<200> doc;
-
     if (Wire.available() < 14)
     {
-        doc["error"] = "Incomplete data";
-        return doc;
+        return;
     }
 
-    int16_t ax = (Wire.read() << 8) | Wire.read();
-    int16_t ay = (Wire.read() << 8) | Wire.read();
-    int16_t az = (Wire.read() << 8) | Wire.read();
+    ax = (Wire.read() << 8) | Wire.read();
+    ay = (Wire.read() << 8) | Wire.read();
+    az = (Wire.read() << 8) | Wire.read();
 
     int16_t tempRaw = (Wire.read() << 8) | Wire.read();
-    float tempC = tempRaw / 340.0 + 36.53;
+    tempC = tempRaw / 340.0 + 36.53;
 
-    int16_t gx = (Wire.read() << 8) | Wire.read();
-    int16_t gy = (Wire.read() << 8) | Wire.read();
-    int16_t gz = (Wire.read() << 8) | Wire.read();
-
-    doc["acceleration_x"] = ax;
-    doc["acceleration_y"] = ay;
-    doc["acceleration_z"] = az;
-
-    doc["temperature"] = tempC;
-
-    doc["gyroscope_x"] = gx;
-    doc["gyroscope_y"] = gy;
-    doc["gyroscope_z"] = gz;
-
-    return doc;
+    gx = (Wire.read() << 8) | Wire.read();
+    gy = (Wire.read() << 8) | Wire.read();
+    gz = (Wire.read() << 8) | Wire.read();
 }
 
-StaticJsonDocument<1024> getSensorData()
+void sendSensorData()
 {
-    StaticJsonDocument<1024> doc;
 
     // Get ultrasonic data
-    StaticJsonDocument<200> ultrasonicData = getUltrasonicData();
-    doc["ultrasonic"] = ultrasonicData;
+    float distance = lastDistance;
 
-    // Get MPU data
-    StaticJsonDocument<200> mpuData = getMPUData();
-    doc["imu"] = mpuData;
+    uint8_t ir_front = getIRFront();
+    uint8_t ir_back = getIRBack();
+    uint8_t ir_flags = (ir_front << 0) | (ir_back << 1); // bit 0 = front, bit 1 = back
 
-    doc["ir_front"] = getIRFront();
-    doc["ir_back"] = getIRBack();
+    byte buffer[20];
+    int i = 0;
 
-    return doc;
+    buffer[i++] = 0xAA; // Start byte
+    memcpy(&buffer[i], &distance, 4); // Store distance as float
+    i += 4; // Store distance as float
+    memcpy(&buffer[i], &ax, 2);
+    i += 2;
+    memcpy(&buffer[i], &ay, 2);
+    i += 2;
+    memcpy(&buffer[i], &az, 2);
+    i += 2;
+    memcpy(&buffer[i], &gx, 2);
+    i += 2;
+    memcpy(&buffer[i], &gy, 2);
+    i += 2;
+    memcpy(&buffer[i], &gz, 2);
+    i += 2;
+    memcpy(&buffer[i], &tempC, 4);
+    i += 4;                 // Store temperature as float
+    buffer[i++] = ir_flags; // Store IR flags
+
+    uint8_t checksum = 0;
+    for (int j = 1; j < i; j++)
+        checksum += buffer[j];
+    buffer[i++] = checksum;
+
+    Serial.write(buffer, i); // Send the data over Serial
 }
 
-void processJsonMessage()
+
+void handleCommand(byte *buffer, size_t length)
 {
-    if (jsonBuffer.length() == 0)
-        return;
+    uint8_t cmd = buffer[0];
 
-    // Remove any trailing whitespace/newlines
-    jsonBuffer.trim();
-
-    // Parse JSON
-    StaticJsonDocument<1024> doc;
-    DeserializationError error = deserializeJson(doc, jsonBuffer);
-
-    if (error)
+    uint8_t checksum = 0;
+    for (size_t i = 0; i < length - 1; i++)
     {
-        lcd.clear();
-        lcd.setCursor(0, 0);
-        lcd.println("JSON Error");
-        Serial.print("JSON Error: ");
-        Serial.println(error.c_str());
+        checksum += buffer[i];
+    }
+    if (checksum != buffer[length - 1])
+    {
+        // Checksum error
+        strncpy(lcdLine1, "Checksum Err", sizeof(lcdLine1));
+        lcdLine1[16] = '\0';
+       
+        strncpy(lcdLine2, "Invalid Data", sizeof(lcdLine2));
+        lcdLine2[16] = '\0';
         return;
     }
 
-    // Process the command
-    String commandType = doc["command_type"];
-    JsonObject command = doc["command"];
+    if (cmd == 0x01 && length == 6)
+    {
+        // Command 0x01: Handle movement
+        int16_t left, right;
+        memcpy(&left, &buffer[1], 2);
+        memcpy(&right, &buffer[3], 2);
+        handleMovement(left, right);
+        char lcd_buffer[17];
+        sprintf(lcd_buffer, "L:%d R:%d", left, right);
 
-    if (commandType == "MOTOR")
-    {
-        lcd.clear();
-        lcd.setCursor(0, 0);
-        lcd.println("Motor Command");
-        float leftSpeed = command["left_motor"];
-        float rightSpeed = command["right_motor"];
-        handleMovement(leftSpeed, rightSpeed);
-    } else if (commandType == "SENSOR")
-    {
-        lcd.clear();
-        lcd.setCursor(0, 0);
-        lcd.println("Sensor Data");
+        strncpy(lcdLine1, lcd_buffer, sizeof(lcdLine1));
+        lcdLine1[16] = '\0';
+        
+        strncpy(lcdLine2, "Moving", sizeof(lcdLine2));
+        lcdLine2[16] = '\0';
         sendSensorData();
-    } 
+    }
+    else if (cmd == 0x02 && length == 34)
+    {
+        // Command 0x02: Update LCD with two lines of text
+        sendSensorData();
+        memcpy(lcdLine1, &buffer[1], 16);
+        memcpy(lcdLine2, &buffer[17], 16);
+        
+    }
+    else if (cmd == 0x03 && length == 2)
+    {
+        // Command 0x03: Request sensor data
+        sendSensorData();
+        strncpy(lcdLine1, "Sending Data", sizeof(lcdLine1));
+        lcdLine1[16] = '\0';
+        strncpy(lcdLine2, "Check Serial", sizeof(lcdLine2));
+        lcdLine2[16] = '\0';
+    }
     else
     {
-        lcd.clear();
-        lcd.setCursor(0, 0);
-        lcd.println("Unknown Cmd");
+        strncpy(lcdLine1, "Invalid Cmd", sizeof(lcdLine1));
+        lcdLine1[16] = '\0';
+        strncpy(lcdLine2, "Check Serial", sizeof(lcdLine2));
+        lcdLine2[16] = '\0';
     }
 }
 
-void handleMovement(float leftSpeed, float rightSpeed)
+void handleMovement(int16_t leftSpeed, int16_t rightSpeed)
 {
     // Values already mapped between -255 and 255
 
@@ -250,14 +293,32 @@ void handleMovement(float leftSpeed, float rightSpeed)
     }
 }
 
-void sendSensorData()
-{
-    StaticJsonDocument<1024> doc = getSensorData();
-    serializeJson(doc, Serial);
-    Serial.println();
-}
-
 void loop()
 {
+
     handleIncomingData();
+
+    if (millis() - lastUltrasonicSampleTime >= 30){
+      getUltrasonicData(lastDistance);
+      lastUltrasonicSampleTime = millis();
+    }
+
+    if (millis() - lastMPUSampleTime >= 10){
+      getMPUData(ax, ay, az, gx, gy, gx, tempC);
+      lastMPUSampleTime = millis();
+    }
+
+    if (millis() - lastLCDUpdateTime >= 500){
+        // Update LCD only if the content has changed'
+       if (strncmp(lcdLine1, lastLine1, sizeof(lcdLine1)) != 0 || strncmp(lcdLine2, lastLine2, sizeof(lcdLine2)) != 0) {
+            strncpy(lastLine1, lcdLine1, sizeof(lastLine1));
+            strncpy(lastLine2, lcdLine2, sizeof(lastLine2));
+            lcd.clear();
+            lcd.setCursor(0, 0);
+            lcd.print(lcdLine1);
+            lcd.setCursor(0, 1);
+            lcd.print(lcdLine2);
+        }
+       lastLCDUpdateTime = millis();  
+    }
 }

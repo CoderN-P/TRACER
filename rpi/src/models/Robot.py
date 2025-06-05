@@ -36,11 +36,13 @@ class Robot:
 
     async def _sensor_request_loop(self):
         """Background task to request sensor data at 10Hz"""
+        await asyncio.sleep(1)  # Allow time for the connection to stabilize
         while self.running:
             try:
                 if not self.waiting_for_sensor:
                     # Send "SENSOR" command to Arduino to request sensor data
                     sensor_request_command = Command(
+                        ID="",
                         command_type=CommandType.SENSOR,
                         command=None,
                         pause_duration=0,

@@ -3,7 +3,6 @@ import uuid
 from .LCDCommand import LCDCommand
 from .MotorCommand import MotorCommand
 from .CommandTypeEnum import CommandType
-from .SerialManager import SerialManager
 
 
 
@@ -23,7 +22,7 @@ class Command(BaseModel):
 
 
     @classmethod
-    async def send_from_joystick(cls, left_y: float, right_x: float, ser: SerialManager):
+    async def send_from_joystick(cls, left_y: float, right_x: float, ser: 'SerialManager'):
         """
         Calculate the differential drive values based on the controller input.
         """
@@ -49,6 +48,6 @@ class Command(BaseModel):
             duration=0
         )
 
-        await ser.send(command)
+        ser.send(command)
     
     

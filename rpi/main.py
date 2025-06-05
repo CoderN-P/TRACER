@@ -2,7 +2,7 @@ import asyncio
 from src import Robot, SerialManager, run_socket_server, socketio
 
 async def main():
-    serial_manager = SerialManager('/dev/ttyUSB0', 115200)
+    serial_manager = SerialManager('/dev/ttyUSB1', 115200)
     robot = Robot(serial_manager, socketio)
     
     loop = asyncio.get_running_loop()

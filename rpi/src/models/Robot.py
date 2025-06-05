@@ -94,7 +94,7 @@ class Robot:
 
         if not valid:
             print(f"Invalid checksum: calculated={calculated_checksum}, received={received_checksum}")
-            raise ValueError("Invalid checksum")
+            # raise ValueError("Invalid checksum")
         
 
         # Extract IR flags
@@ -152,6 +152,7 @@ class Robot:
         if sensor_data.check_cliff() and not self.cliff_detected:
             self.cliff_detected = True
             asyncio.create_task(self._reset_cliff_detected())  # Reset cliff detection after 0.5 seconds, basically halting commands
+            self.waiting_for_sensor = True
             await Command.send_from_joystick(0, 0, self.serial)  # Stop motors if cliff is detected
 
             if (not self.rumble_active) or (current_time - self.last_rumble_time > self.rumble_cooldown):

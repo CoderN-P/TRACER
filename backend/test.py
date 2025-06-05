@@ -2,7 +2,7 @@ import time, struct
 import serial
 
 # Open serial port
-arduino = serial.Serial('/dev/cu.usbserial-1120', 115200, timeout=1)
+arduino = serial.Serial('/dev/ttyUSB1', 115200, timeout=1)
 print("Connected to Arduino")
 
 while True:

@@ -27,7 +27,9 @@ class SerialManager:
         START_BYTE = 0xAA
         while self.running:
             if self.serial.in_waiting >= 23:
+                print(f"[Serial] in_waiting: {self.serial.in_waiting}")
                 data = self.serial.read(23)
+                print(f"[Serial] Raw packet: {data.hex()} len={len(data)}")
                 if data[0] == START_BYTE:
                     future = asyncio.run_coroutine_threadsafe(
                         self.robot.process_sensor_data(data), self.loop

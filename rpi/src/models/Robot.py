@@ -18,6 +18,7 @@ class Robot:
         self.sensor_request_interval = 0.1  # 10Hz = 0.1 seconds
         self.sensor_request_task = None
         self.running = False
+        self.distance_history = []  # Store last 10 distances
 
     async def start(self):
         """Start the robot's background tasks"""
@@ -61,8 +62,8 @@ class Robot:
         await asyncio.sleep(0.5)
         self.cliff_detected = False
         
-    @staticmethod
-    def bytes_to_sensor_data(data: bytes):
+        
+    def bytes_to_sensor_data(self, data: bytes):
         """Convert bytes to SensorData model."""
 
 
@@ -101,7 +102,11 @@ class Robot:
         ir_front = not bool(ir_flags & 0b00000001)
         ir_back = not bool(ir_flags & 0b00000010)
 
-
+        if len(self.distance_history) >= 10:
+            self.distance_history.pop(0)
+        
+        self.distance_history.append(distance)
+        
         return SensorData(
             ultrasonic={
                 "distance": distance
@@ -118,22 +123,31 @@ class Robot:
             ir_front=ir_front,
             ir_back=ir_back,
         )
-            
-    async def process_sensor_data(self, data: bytes):
-        self.waiting_for_sensor = False  # Reset flag when processing sensor data
-        try:
-            sensor_data = self.bytes_to_sensor_data(data)
-        except Exception as e:
-            print(f"Error processing sensor data: {e}")
-            return
-
-        current_time = time.time()
-
+    
+    async def handle_obstacle(self, sensor_data: SensorData, current_time: float):
         if sensor_data.is_obstacle_detected():
             if (not self.rumble_active) or (current_time - self.last_rumble_time > self.rumble_cooldown):
                 distance = sensor_data.ultrasonic.distance
                 low = distance / 10
-                high = 1 - low
+
+                # check if distance is -1 and if so determine if it means too far or too close
+
+                if distance == -1:
+                    # find the average of the last 10 distances
+                    if len(self.distance_history) > 0:
+                        avg_distance = sum(self.distance_history) / len(self.distance_history)
+                        
+                        if avg_distance <= 10: # prev data suggests too close
+                            low = 0.5 
+                        else:
+                            return # -1 likely means too far away, so we don't rumble
+                    else:
+                        return 
+                    
+                # clamp low and high to be between 0 and 1
+                low = max(0.0, min(low, 1.0))
+                high = 1 - low  # Ensure high is always the complement of low
+
 
                 await self.socketio.emit(
                     'rumble',
@@ -147,13 +161,23 @@ class Robot:
                 self.rumble_active = True
         else:
             self.rumble_active = False  # Reset so future detections can trigger rumble again
+            
+    async def process_sensor_data(self, data: bytes):
+        self.waiting_for_sensor = False  # Reset flag when processing sensor data
+        try:
+            sensor_data = self.bytes_to_sensor_data(data)
+        except Exception as e:
+            print(f"Error processing sensor data: {e}")
+            return
 
+        current_time = time.time()
+        await self.handle_obstacle(sensor_data, current_time)
         # Check for cliff detection
         if sensor_data.check_cliff() and not self.cliff_detected:
             self.cliff_detected = True
             asyncio.create_task(self._reset_cliff_detected())  # Reset cliff detection after 0.5 seconds, basically halting commands
-            self.waiting_for_sensor = True
-            await Command.send_from_joystick(0, 0, self.serial)  # Stop motors if cliff is detected
+            #self.waiting_for_sensor = True
+            #await Command.send_from_joystick(0, 0, self.serial)  # Stop motors if cliff is detected
 
             if (not self.rumble_active) or (current_time - self.last_rumble_time > self.rumble_cooldown):
                 await self.socketio.emit(

@@ -64,9 +64,20 @@ class Controller:
         
         try:
             self.socketio.emit('joystick_input', data)
-            print(data)
         except Exception as e:
             raise RuntimeError(f"Failed to send controller update: {e}")
+        
+    def handle_joystick_input(self, data):
+        """
+        Handle joystick input from the UI.
+        """
+        left_y = data.get('left_y', 0)
+        right_x = data.get('right_x', 0)
+
+        self.socketio.emit('joystick_input', {
+            "left_y": left_y,
+            "right_x": right_x
+        })
 
 
     def rumble(self, low, high, duration_ms):

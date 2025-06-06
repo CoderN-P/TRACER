@@ -20,11 +20,15 @@
     import KeyboardHandler from "$lib/components/KeyboardHandler.svelte";
     import TemperatureDisplay from "$lib/components/TemperatureDisplay.svelte";
     import QueryInput from "$lib/components/QueryInput.svelte";
+    import ObstructionStatus from "$lib/components/ObstructionStatus.svelte";
     
     let sensorData = $state<SensorData | null>(null);
     let previousSensorData = $state<SensorData | null>(null);
     let logs = $state<LogEntry[]>([]);
-    let joystickInput = $state<Joystick | null>(null);
+    let joystickInput = $state<Joystick>({
+        left_y: 0,
+        right_x: 0,
+    });
     let uiJoystick = $state<Joystick>({
         left_y: 0,
         right_x: 0,
@@ -101,7 +105,7 @@
     }
     
     function obstacleDetected(data: SensorData): boolean {
-        return data.ultrasonic.distance < 20;
+        return data.ultrasonic.distance < 10;
     }
     
     function updateLogs(){
@@ -182,6 +186,6 @@
         
     </div>
     <div class="w-full flex flex-row items-center gap-2 justify-between">
-        
+        <ObstructionStatus {sensorData} {lastSensorUpdate}/>
     </div>
 </div>

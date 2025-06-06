@@ -12,7 +12,6 @@
         switch (direction) {
             case 'up':
                 joystick.left_y = -1;
-                console.log(`Joystick updated: left_y=${joystick.left_y}, right_x=${joystick.right_x}`);
                 break;
             case 'down':
                 joystick.left_y = 1;

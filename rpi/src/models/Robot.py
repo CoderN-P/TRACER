@@ -125,29 +125,31 @@ class Robot:
     
     async def handle_obstacle(self, sensor_data: SensorData, current_time: float):
         if sensor_data.is_obstacle_detected():
-            if current_time - self.last_rumble_time > self.rumble_cooldown:
-                distance = sensor_data.ultrasonic.distance
-                low = distance / 10
+            distance = sensor_data.ultrasonic.distance
+            low = distance / 10
 
-                # check if distance is -1 and if so determine if it means too far or too close
-
-                if distance == -1:
-                    # find the average of the last 10 distances
-                    if len(self.distance_history) > 0:
-                        avg_distance = sum(self.distance_history) / len(self.distance_history)
-                        
-                        if avg_distance <= 10: # prev data suggests too close
-                            low = 0.5 
-                        else:
-                            return # -1 likely means too far away, so we don't rumble
-                    else:
-                        return 
+            # check if distance is -1 and if so determine if it means too far or too close
+            
+            if distance == -1:
+                # find the average of the last 10 distances
+        
+                if len(self.distance_history) > 0:
+                    avg_distance = sum(self.distance_history) / len(self.distance_history)
                     
-                # clamp low and high to be between 0 and 1
-                low = max(0.0, min(low, 1.0))
-                high = 1 - low  # Ensure high is always the complement of low
+                    if avg_distance <= 5: # prev data suggests too close
+                        low = 0.5 
+                    else:
+                        return avg_distance # -1 likely means too far away, so we don't rumble
+                else:
+                    return 0
+            else:
+                avg_distance = distance
+                
+            # clamp low and high to be between 0 and 1
+            low = max(0.0, min(low, 1.0))
+            high = 1 - low  # Ensure high is always the complement of low
 
-
+            if current_time - self.last_rumble_time < self.rumble_cooldown:
                 await self.socketio.emit(
                     'rumble',
                     {
@@ -157,6 +159,12 @@ class Robot:
                     }
                 )
                 self.last_rumble_time = current_time
+                
+            return avg_distance  # Return the average distance for further processing if needed
+        else:
+            return sensor_data.ultrasonic.distance  # No obstacle detected, return the current distance
+                
+            
             
     async def process_sensor_data(self, data: bytes):
         self.waiting_for_sensor = False  # Reset flag when processing sensor data
@@ -167,7 +175,7 @@ class Robot:
             return
 
         current_time = time.time()
-        await self.handle_obstacle(sensor_data, current_time)
+        sensor_data.ultrasonic.distance = await self.handle_obstacle(sensor_data, current_time)
         # Check for cliff detection
         if sensor_data.check_cliff() and not self.cliff_detected:
             self.cliff_detected = True

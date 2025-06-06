@@ -64,7 +64,6 @@ class Controller:
     
         
         try:
-            print('Sending controller update:', data)
             self.socketio_server.emit('joystick_input', data)
             # self.socketio.emit('joystick_input', data)
         except Exception as e:

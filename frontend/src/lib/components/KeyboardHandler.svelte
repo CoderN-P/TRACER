@@ -22,8 +22,6 @@
                 event.preventDefault();
                 joystick.right_x = 1;
             }
-            
-            console.log(`Joystick updated: left_y=${joystick.left_y}, right_x=${joystick.right_x}`);
         };
 
         const handleKeyUp = (event: KeyboardEvent) => {

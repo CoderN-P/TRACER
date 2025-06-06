@@ -6,6 +6,16 @@
     
     
     let { logs }: { logs: LogEntry[] } = $props();
+    let logElement = null;
+    
+    $effect(() => {
+        // Scroll up to the latest log entry when logs change, to the top
+        logs;
+        console.log('Logs updated:', logs);
+        if (logElement) {
+            logElement.scrollTop = logElement.scrollHeight;
+        }
+    });
 </script>
 
 {#if !logs || logs.length === 0}
@@ -15,7 +25,7 @@
         <Card.Header class="h-min">
             <Card.Title>Logs</Card.Title>
         </Card.Header>
-        <Card.Content class=" flex last:pb-6 flex-col-reverse overflow-y-scroll overflow-x-hidden w-full gap-2">
+        <Card.Content bind:this={logElement} class=" flex last:pb-6 flex-col-reverse overflow-y-scroll overflow-x-hidden w-full gap-2">
             {#each logs as log (log.timestamp)}
                 <LogEntryDisplay {log} />
             {/each}

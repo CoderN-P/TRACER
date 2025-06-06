@@ -30,7 +30,7 @@ def setup_routes(controller: Controller):
     @sio_client.on('rumble')
     def handle_rumble(data):
         print(f"Rumble command received: {data}")
-        #controller.rumble(data['low'], data['high'], data['duration'])
+        controller.rumble(data['low'], data['high'], data['duration'])
         
     @sio_client.on('sensor_data')
     def handle_sensor_update(data):

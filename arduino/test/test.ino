@@ -119,7 +119,16 @@ void getUltrasonicData(float &distance)
     long duration = pulseIn(ECHO, HIGH, 30000); // 30ms timeout
 
     // Calculate distance in cm
-    distance = (duration == 0) ? -1 : (duration / 2.0) * 0.0343; // -1 indicates timeout
+    if (duration == 0) {
+      // No echo (too far or object not detected)
+      distance = -1;
+    } else if (duration < 100) {
+      // Too close or invalid reading
+      distance = -2;
+    } else {
+      // Normal
+      distance = duration * 0.034 / 2; // in cm
+    }
 }
 
 void getMPUData(int &ax, int &ay, int &az, int &gx, int &gy, int &gz, float &tempC)

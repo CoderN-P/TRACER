@@ -101,10 +101,6 @@ class Robot:
         ir_front = not bool(ir_flags & 0b00000001)
         ir_back = not bool(ir_flags & 0b00000010)
 
-        if len(self.distance_history) >= 10:
-            self.distance_history.pop(0)
-        
-        self.distance_history.append(distance)
         
         return SensorData(
             ultrasonic={
@@ -130,18 +126,22 @@ class Robot:
 
             # check if distance is -1 and if so determine if it means too far or too close
             
-            if distance == -1:
+            if distance == -1: # -1 is used to indicate that the distance is too far away
                 # find the average of the last 10 distances
         
                 if len(self.distance_history) > 0:
                     avg_distance = sum(self.distance_history) / len(self.distance_history)
                     
-                    if avg_distance <= 5: # prev data suggests too close
-                        low = 0.5 
-                    else:
-                        return avg_distance # -1 likely means too far away, so we don't rumble
+                    return avg_distance 
                 else:
-                    return 0
+                    return 300
+            elif distance == -2:  # -2 is used to indicate that the distance is too close
+                # find the average of the last 10 distances
+                if len(self.distance_history) > 0:
+                    avg_distance = sum(self.distance_history) / len(self.distance_history)
+                    low = avg_distance / 10
+                else:
+                    avg_distance = 0
             else:
                 avg_distance = distance
                 
@@ -176,6 +176,9 @@ class Robot:
 
         current_time = time.time()
         sensor_data.ultrasonic.distance = await self.handle_obstacle(sensor_data, current_time)
+        self.distance_history.append(sensor_data.ultrasonic.distance)  # Store the distance for history
+        if len(self.distance_history) >= 10:
+            self.distance_history.pop(0)
         # Check for cliff detection
         if sensor_data.check_cliff() and not self.cliff_detected:
             self.cliff_detected = True

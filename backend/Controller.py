@@ -1,13 +1,14 @@
 import pygame, threading
 
 class Controller:
-    def __init__(self, controller, socketio):
+    def __init__(self, controller, socketio, socketio_server):
         self.controller = controller
         self.socketio = socketio # socketio client
+        self.socketio_server = socketio_server # socketio server
         self.reset_motor = False
 
     @classmethod
-    def initialize(cls, socketio) -> 'Controller':
+    def initialize(cls, socketio, socketio_server) -> 'Controller':
         pygame.init()
         pygame.joystick.init()
 
@@ -17,7 +18,7 @@ class Controller:
         controller = pygame.joystick.Joystick(0)
         controller.init()
 
-        return cls(controller, socketio)
+        return cls(controller, socketio, socketio_server)
 
     def read_input(self) -> tuple:
         pygame.event.pump()  # Process events to update joystick state
@@ -63,7 +64,9 @@ class Controller:
     
         
         try:
-            self.socketio.emit('joystick_input', data)
+            print('Sending controller update:', data)
+            self.socketio_server.emit('joystick_input', data)
+            # self.socketio.emit('joystick_input', data)
         except Exception as e:
             raise RuntimeError(f"Failed to send controller update: {e}")
         

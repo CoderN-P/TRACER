@@ -29,7 +29,8 @@ def setup_routes(controller: Controller):
         
     @sio_client.on('rumble')
     def handle_rumble(data):
-        controller.rumble(data['low'], data['high'], data['duration'])
+        print(f"Rumble command received: {data}")
+        #controller.rumble(data['low'], data['high'], data['duration'])
         
     @sio_client.on('sensor_data')
     def handle_sensor_update(data):
@@ -48,7 +49,7 @@ def start_socket_server():
 
 if __name__ == "__main__":
     # Init joystick
-    controller = Controller.initialize(sio_client)
+    controller = Controller.initialize(sio_client, socket)
     setup_routes(controller)
 
     # Connect to RPi backend

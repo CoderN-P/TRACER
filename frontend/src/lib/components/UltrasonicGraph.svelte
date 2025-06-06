@@ -15,19 +15,19 @@
     } satisfies Chart.ChartConfig;
 </script>
 {#if distanceHistory.length === 0 }
-    <Skeleton class="w-full h-48 rounded-sm" />
+    <Skeleton class="w-full h-[400px] rounded-sm" />
 {:else}
-    <Card.Root class="w-full h-full ">
+    <Card.Root class="w-full h-[400px] ">
         <Card.Header>
-            <Card.Title>Sensors</Card.Title>
-            <Card.Description>Showing total visitors for the last 6 months</Card.Description>
+            <Card.Title>Ultrasonic Sensor</Card.Title>
+            <Card.Description>Showing distance to walls/obstacles</Card.Description>
         </Card.Header>
         <Card.Content class="pl-12">
             <Chart.Container config={chartConfig}>
                 <AreaChart
                         data={distanceHistory.map((entry) => ({
                             date: new Date(entry.timestamp),
-                            value: entry.distance,
+                            value: Math.min(entry.distance, 50),
                         }))}
                         x="date"
                         y="value"
@@ -46,18 +46,13 @@
                         ]}
                         xScale={scaleUtc()}
                         yPadding={[0, 25]}
-                        series={[{
-                            key: "value",
-                            label: "Distance",
-                        }]}
                         axis="y"
-                        seriesLayout="stack"
                         props={{
                             xAxis: {
                                 format: (v: Date) => v.toLocaleTimeString(),
                             },
                             yAxis: {
-                                format: (v: number) => `${v} cm`,
+                                format: (v: number) => v === 50 ? "50+ cm" : `${v} cm`,
                             },
                         }}
                 >
@@ -75,13 +70,13 @@
                                 vertical
                             >
                             {#snippet children( { gradient } )}
+                                
                                 <Area 
                                     y0={(d) => thresholdValue}
-                                    line={{ stroke: "url(#gradient)" }}
+                                    line={{ stroke: gradient }}
                                     fill={gradient}
                                     fillOpacity={0.4}
                                     curve={curveNatural}
-                                    motion="tween"
                                 />
                             {/snippet}
                             </LinearGradient>
@@ -91,7 +86,7 @@
                         {@const value = context.tooltip?.data && context.y(context.tooltip?.data)}
                         <Highlight
                                 lines
-                                points={{ fill: value <= 10 ? "var(--chart-2)" : "var(--chart-1)" }}
+                                points={{ fill: value <= 10 ? "var(--chart-1)" : "var(--chart-2)" }}
                         />
                     {/snippet}
                     {#snippet tooltip()}
@@ -105,17 +100,5 @@
                 </AreaChart>
             </Chart.Container>
         </Card.Content>
-        <Card.Footer>
-            <div class="flex w-full items-start gap-2 text-sm">
-                <div class="grid gap-2">
-                    <div class="flex items-center gap-2 font-medium leading-none">
-                        Trending up by 5.2% this month <TrendingUpIcon class="size-4" />
-                    </div>
-                    <div class="text-muted-foreground flex items-center gap-2 leading-none">
-                        January - June 2024
-                    </div>
-                </div>
-            </div>
-        </Card.Footer>
     </Card.Root>
 {/if}

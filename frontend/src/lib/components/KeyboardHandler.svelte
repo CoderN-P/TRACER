@@ -2,18 +2,24 @@
     import { type Joystick } from '$lib/types';
     import { onMount } from 'svelte';
     
-    let { joystick = $bindable() } : { joystick: Joystick } = $props();
+    let { joystick = $bindable(), inputFocus } : { joystick: Joystick, inputFocus: boolean } = $props();
     
     onMount(() => {
         const handleKeyDown = (event: KeyboardEvent) => {
-            event.preventDefault();
+            if (inputFocus) {
+                return; // Ignore key events if input is focused
+            }
             if (event.key === 'ArrowUp') {
+                event.preventDefault();
                 joystick.left_y = -1;
             } else if (event.key === 'ArrowDown') {
+                event.preventDefault();
                 joystick.left_y = 1;
             } else if (event.key === 'ArrowLeft') {
+                event.preventDefault();
                 joystick.right_x = -1;
             } else if (event.key === 'ArrowRight') {
+                event.preventDefault();
                 joystick.right_x = 1;
             }
             

@@ -10,8 +10,7 @@ class Robot:
         self.last_emit_time = 0
         self.emit_interval = 0.1  # for sensor data
         self.last_rumble_time = 0
-        self.rumble_cooldown = 1.0  # seconds between rumbles
-        self.rumble_active = False
+        self.rumble_cooldown = 1  # seconds between rumbles
         self.socketio = socketio
         self.cliff_detected = False
         self.waiting_for_sensor = False  # Flag to indicate if we're waiting for sensor data
@@ -126,7 +125,7 @@ class Robot:
     
     async def handle_obstacle(self, sensor_data: SensorData, current_time: float):
         if sensor_data.is_obstacle_detected():
-            if (not self.rumble_active) or (current_time - self.last_rumble_time > self.rumble_cooldown):
+            if current_time - self.last_rumble_time > self.rumble_cooldown:
                 distance = sensor_data.ultrasonic.distance
                 low = distance / 10
 
@@ -158,9 +157,6 @@ class Robot:
                     }
                 )
                 self.last_rumble_time = current_time
-                self.rumble_active = True
-        else:
-            self.rumble_active = False  # Reset so future detections can trigger rumble again
             
     async def process_sensor_data(self, data: bytes):
         self.waiting_for_sensor = False  # Reset flag when processing sensor data
@@ -179,7 +175,7 @@ class Robot:
             #self.waiting_for_sensor = True
             #await Command.send_from_joystick(0, 0, self.serial)  # Stop motors if cliff is detected
 
-            if (not self.rumble_active) or (current_time - self.last_rumble_time > self.rumble_cooldown):
+            if current_time - self.last_rumble_time > self.rumble_cooldown:
                 await self.socketio.emit(
                     'rumble',
                     {
@@ -189,10 +185,9 @@ class Robot:
                     }
                 )
                 self.last_rumble_time = current_time
-                self.rumble_active = True
         else:
             self.cliff_detected = False
-            self.rumble_active = False  # Reset rumble state if cliff is not detected
+    
 
 
         # Emit sensor data at a fixed interval

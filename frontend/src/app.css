@@ -2,7 +2,8 @@
 @source "lib/components/ui/card";
 @source "lib/components/ui/skeleton";
 @source "lib/components/";
-@source '../../node_modules/layerchart/dist';
+@source "lib/components/UltrasonicGraph.svelte";
+@source '../node_modules/layerchart/dist';
 @import "tw-animate-css";
 
 @custom-variant dark (&:is(.dark *));

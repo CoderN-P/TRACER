@@ -19,6 +19,7 @@
     import SensorRate from "$lib/components/SensorRate.svelte";
     import KeyboardHandler from "$lib/components/KeyboardHandler.svelte";
     import TemperatureDisplay from "$lib/components/TemperatureDisplay.svelte";
+    import QueryInput from "$lib/components/QueryInput.svelte";
     
     let sensorData = $state<SensorData | null>(null);
     let previousSensorData = $state<SensorData | null>(null);
@@ -33,6 +34,20 @@
     let sensorRate = $state<number>(-1);
     let lastRateUpdate = $state<number>(0);
     let distanceHistory = $state<DistanceEntry[]>([]);
+    let input = $state<string>('');
+    let inputFocus = $state<boolean>(false);
+   
+    
+    function onSubmit(e) {
+        if (input.trim() === '') return;
+        socket.emit('query', input);
+        logs.push({
+            timestamp: new Date().toISOString(),
+            message: `Query sent: ${input}`,
+            icon: 'send',
+        });
+        input = '';
+    }
     
     onMount(() => {
         socket.on('connect', () => {
@@ -141,8 +156,8 @@
 </script>
 
 
-<KeyboardHandler bind:joystick={uiJoystick} />
-<div class="w-screen h-screen max-w-screen flex flex-col bg-white gap-2 p-4">
+<KeyboardHandler bind:joystick={uiJoystick} {inputFocus} />
+<div class="w-screen h-screen max-w-screen flex flex-col bg-gray-50 gap-2 p-4">
     <div class="w-full flex flex-row items-center gap-2 justify-between">
         <Status {lastSensorUpdate} bind:logs={logs}/>
         <Uptime {lastSensorUpdate} />
@@ -150,15 +165,21 @@
     </div>
     <div class="w-full flex flex-row items-center gap-2 justify-between">
         <UltrasonicGraph {distanceHistory}/>
-        <TemperatureDisplay temperature={sensorData?.imu.temperature ?? null} />
+        <div class="flex flex-col w-1/2 shrink-0 items-start gap-2 h-[400px] "> 
+            <div class="flex flex-row w-full shrink-0 gap-2">
+                <TemperatureDisplay temperature={sensorData?.imu.temperature ?? null} />
+                <ControlPad bind:joystick={uiJoystick} lastUpdateTime={lastSensorUpdate}/>
+            </div>
+            <Logs {logs} />
+        </div>
     </div>
     <div class="w-full flex flex-row items-center gap-2 justify-between">
         <div class="flex flex-row w-1/2 gap-2">
-            <ControlPad bind:joystick={uiJoystick} lastUpdateTime={lastSensorUpdate}/>
             <JoystickStatus lastUpdateTime={lastSensorUpdate} joystick={joystickInput}  />
         </div>
+        <QueryInput {onSubmit} bind:query={input} bind:inputFocus={inputFocus}/>
         
-        <Logs {logs} />
+        
     </div>
     <div class="w-full flex flex-row items-center gap-2 justify-between">
         

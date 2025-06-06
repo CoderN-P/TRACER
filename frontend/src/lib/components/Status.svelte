@@ -1,9 +1,10 @@
 <script lang="ts">
     import { Skeleton } from '$lib/components/ui/skeleton';
     import { onMount } from 'svelte';
+    import { Clock } from 'lucide-svelte';
     import type { LogEntry } from '$lib/types';
     
-    let { lastSensorUpdate, logs } : { lastSensorUpdate: number, logs: LogEntry[] } = $props();
+    let { lastSensorUpdate, logs = $bindable() } : { lastSensorUpdate: number, logs: LogEntry[] } = $props();
     
     let status: 'Online' | 'Stale' | 'Offline' = $state('Offline');
     let prevStatus: 'Online' | 'Stale' | 'Offline' = $state('Offline');
@@ -23,6 +24,8 @@
             } else {
                 status = 'Offline';
             }
+            
+            updateLogsWithStatus();
         }, 1000); // Check every second
     });
     
@@ -35,7 +38,7 @@
                 logs.push(
                     {
                         timestamp: new Date().toISOString(),
-                        type: 'success',
+                        icon: 'check',
                         message: 'Back online!',
                     } as LogEntry
                 )
@@ -44,7 +47,7 @@
             logs.push(
                 {
                     timestamp: new Date().toISOString(),
-                    type: 'warning',
+                    icon: 'warning',
                     message: 'Going stale...',
                 } as LogEntry
             );
@@ -52,7 +55,7 @@
             logs.push(
                 {
                     timestamp: new Date().toISOString(),
-                    type: 'error',
+                    icon: 'error',
                     message: 'Robot disconnected!',
                 } as LogEntry
             );
@@ -63,7 +66,7 @@
 {#if lastSensorUpdate === 0}
     <Skeleton class="h-10 w-full rounded-sm" />
 {:else}
-    <div class="flex w-full flex-row items-center bg-white border border-gray-100 rounded-xl p-4 gap-2">
+    <div class="flex w-full flex-row items-center bg-white border border-gray-100 rounded-lg p-2 px-4 gap-2">
         {#if status === 'Online'}
             <div class="h-2 w-2 bg-green-500 rounded-full"></div>
             <span class="text-green-500">Online</span>

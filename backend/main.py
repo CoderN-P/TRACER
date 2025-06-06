@@ -24,7 +24,8 @@ def setup_routes(controller: Controller):
         """
         Handle joystick input from the UI.
         """
-        controller.handle_joystick_input(data)
+        print(data)
+        #controller.handle_joystick_input(data)
         
     @sio_client.on('rumble')
     def handle_rumble(data):
@@ -32,7 +33,6 @@ def setup_routes(controller: Controller):
         
     @sio_client.on('sensor_data')
     def handle_sensor_update(data):
-        print(data)
         socket.emit('sensor_data', data)
         
     @sio_client.event

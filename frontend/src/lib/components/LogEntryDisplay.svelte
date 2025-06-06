@@ -1,7 +1,7 @@
 <script lang="ts">
     import { Skeleton } from '$lib/components/ui/skeleton';
     import { type LogEntry } from '$lib/types';
-    import { TriangleAlert, Check, Info } from "lucide-svelte";
+    import { TriangleAlert, Check, Info,  CircleX } from "lucide-svelte";
 
     let { log }: { log: LogEntry } = $props();
     let LogIcon = $derived.by(getLogIcon);
@@ -19,6 +19,8 @@
                 return Check;
             case 'info':
                 return Info;
+            case 'error':
+                return CircleX;
             default:
                 return Info; // Fallback icon
         }
@@ -32,6 +34,8 @@
                 return 'text-green-500';
             case 'info':
                 return 'text-blue-500';
+            case 'error':
+                return 'text-red-500';
             default:
                 return 'text-gray-500'; // Fallback color
         }
@@ -44,7 +48,7 @@
         {formatTimestamp(log.timestamp)}
     </div>
     <div class="flex flex-row shrink-0 w-full items-center gap-2">
-        <LogIcon class="h-4 w-4" />
+        <LogIcon class="h-4 w-4 {getLogColor()}" />
         <span class="{getLogColor()}">{log.message}</span>
     </div>
 </div>

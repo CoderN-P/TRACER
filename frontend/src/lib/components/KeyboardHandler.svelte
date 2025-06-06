@@ -2,10 +2,11 @@
     import { type Joystick } from '$lib/types';
     import { onMount } from 'svelte';
     
-    let { joystick } : { joystick: Joystick } = $props();
+    let { joystick = $bindable() } : { joystick: Joystick } = $props();
     
     onMount(() => {
         const handleKeyDown = (event: KeyboardEvent) => {
+            event.preventDefault();
             if (event.key === 'ArrowUp') {
                 joystick.left_y = -1;
             } else if (event.key === 'ArrowDown') {
@@ -15,9 +16,12 @@
             } else if (event.key === 'ArrowRight') {
                 joystick.right_x = 1;
             }
+            
+            console.log(`Joystick updated: left_y=${joystick.left_y}, right_x=${joystick.right_x}`);
         };
 
         const handleKeyUp = (event: KeyboardEvent) => {
+            event.preventDefault();
             if (
                 event.key === 'ArrowUp' ||
                 event.key === 'ArrowDown' ||

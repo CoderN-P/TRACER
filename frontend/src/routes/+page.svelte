@@ -13,16 +13,21 @@
     import Status from '$lib/components/Status.svelte';
     import Uptime from '$lib/components/Uptime.svelte';
     import Logs from '$lib/components/Logs.svelte';
-    import {Skeleton} from "$lib/components/ui/skeleton";
+    import ControlPad from '$lib/components/ControlPad.svelte';
     import JoystickStatus from "$lib/components/JoystickStatus.svelte";
     import UltrasonicGraph from "$lib/components/UltrasonicGraph.svelte";
     import SensorRate from "$lib/components/SensorRate.svelte";
+    import KeyboardHandler from "$lib/components/KeyboardHandler.svelte";
+    import TemperatureDisplay from "$lib/components/TemperatureDisplay.svelte";
     
     let sensorData = $state<SensorData | null>(null);
     let previousSensorData = $state<SensorData | null>(null);
     let logs = $state<LogEntry[]>([]);
     let joystickInput = $state<Joystick | null>(null);
-    let uiJoystick = $state<Joystick | null>(null);
+    let uiJoystick = $state<Joystick>({
+        left_y: 0,
+        right_x: 0,
+    });
     let lastSensorUpdate = $state<number>(0);
     let packetCount = $state<number>(0);
     let sensorRate = $state<number>(-1);
@@ -55,14 +60,8 @@
             }
             lastSensorUpdate = now;
             
-            if (distanceHistory.length > 2){
-                const start = distanceHistory[0].timestamp;
-                const end = distanceHistory[distanceHistory.length - 1].timestamp;
-                
-                // Check if it covers the range of 10 seconds
-                if (new Date(end).getTime() - new Date(start).getTime() >= 10000) {
-                    distanceHistory.shift(); // Remove the oldest entry
-                }
+            if (distanceHistory.length > 50) {
+                distanceHistory.shift(); // Keep the history to a maximum of 100 entries
             }
             
             distanceHistory.push(DistanceEntrySchema.parse({
@@ -135,19 +134,33 @@
         }
         
     }
+    
+    $effect(() => {
+        socket.emit('joystick_input', $state.snapshot(uiJoystick));
+    });
 </script>
 
-<div class="w-screen h-screen flex flex-col bg-white gap-2 p-4">
+
+<KeyboardHandler bind:joystick={uiJoystick} />
+<div class="w-screen h-screen max-w-screen flex flex-col bg-white gap-2 p-4">
     <div class="w-full flex flex-row items-center gap-2 justify-between">
         <Status {lastSensorUpdate} bind:logs={logs}/>
         <Uptime {lastSensorUpdate} />
         <SensorRate rate={sensorRate} />
     </div>
     <div class="w-full flex flex-row items-center gap-2 justify-between">
-        <UltrasonicGraph/>
+        <UltrasonicGraph {distanceHistory}/>
+        <TemperatureDisplay temperature={sensorData?.imu.temperature ?? null} />
     </div>
     <div class="w-full flex flex-row items-center gap-2 justify-between">
-        <JoystickStatus lastUpdateTime={lastSensorUpdate} joystick={joystickInput}  />
+        <div class="flex flex-row w-1/2 gap-2">
+            <ControlPad bind:joystick={uiJoystick} lastUpdateTime={lastSensorUpdate}/>
+            <JoystickStatus lastUpdateTime={lastSensorUpdate} joystick={joystickInput}  />
+        </div>
+        
         <Logs {logs} />
+    </div>
+    <div class="w-full flex flex-row items-center gap-2 justify-between">
+        
     </div>
 </div>

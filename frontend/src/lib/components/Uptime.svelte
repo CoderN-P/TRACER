@@ -1,6 +1,7 @@
 <script lang="ts">
     import { onMount } from 'svelte';
     import { Skeleton } from '$lib/components/ui/skeleton';
+    import {Clock} from "lucide-svelte";
     
     let { lastSensorUpdate } : { lastSensorUpdate: number } = $props();
     
@@ -38,10 +39,12 @@
     });
     
     function formatTime() {
+        // Format: 2 num for all
+        
         return {
-            seconds: time % 60,
-            minutes: Math.floor(time / 60) % 60,
-            hours: Math.floor(time / 3600)
+            seconds: String((time % 60)).padStart(2, '0') ,
+            minutes: String(Math.floor(time / 60) % 60).padStart(2, '0'),
+            hours: String(Math.floor(time / 3600)).padStart(2, '0')
         }
     }
     
@@ -49,10 +52,10 @@
 </script>
 
 {#if lastSensorUpdate === 0}
-    
     <Skeleton class="h-10 w-full rounded-sm" />
 {:else}
-    <div class="flex flex-row w-full items-center bg-white border border-gray-100 rounded-xl p-4 gap-2">
+    <div class="flex flex-row w-full items-center bg-white border border-gray-100 rounded-lg p-2 px-4 gap-4">
+        <Clock class="text-black w-5 h-5" />
         <p class="font-semibold font-mono text-lg">
             {formattedTime.hours}:{formattedTime.minutes}:{formattedTime.seconds}
         </p>

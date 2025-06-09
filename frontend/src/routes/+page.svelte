@@ -180,12 +180,13 @@
     <div class="w-full flex flex-row items-center gap-2 justify-between">
         <div class="flex flex-row w-1/2 gap-2">
             <JoystickStatus lastUpdateTime={lastSensorUpdate} joystick={joystickInput}  />
+            <ObstructionStatus {sensorData} {lastSensorUpdate}/>
         </div>
-        <QueryInput {onSubmit} bind:query={input} bind:inputFocus={inputFocus}/>
+        
         
         
     </div>
     <div class="w-full flex flex-row items-center gap-2 justify-between">
-        <ObstructionStatus {sensorData} {lastSensorUpdate}/>
+        <QueryInput {onSubmit} bind:query={input} bind:inputFocus={inputFocus}/>
     </div>
 </div>

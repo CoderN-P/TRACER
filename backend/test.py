@@ -2,7 +2,7 @@ import time, struct
 import serial
 
 # Open serial port
-arduino = serial.Serial('/dev/ttyUSB1', 115200, timeout=1)
+arduino = serial.Serial('/dev/cu.usbserial-120', 115200, timeout=1)
 print("Connected to Arduino")
 
 while True:
@@ -11,11 +11,30 @@ while True:
         arduino.reset_input_buffer()
 
         # Record start time
+        command = input("Enter command (e.g., 'm', 's', 'd', 'l): ").strip().lower()
         
-        l1 = input("Enter line 1 (max 16 chars): ").ljust(16)[:16].encode('utf-8')
-        l2 = input("Enter line 2 (max 16 chars): ").ljust(16)[:16].encode('utf-8')
-        # Send command to request sensor data
-        cmd_packet = struct.pack("<B16s16s", 0x02, l1, l2)
+        if command == 'm':
+            speed_left, speed_right = map(lambda x: int(x), input("Enter left and right speeds (e.g., 100 -100): ").split())
+            # Send command to request sensor data
+            if abs(speed_left) > 0 or abs(speed_right) > 0:
+                cmd_packet = struct.pack("<Bhh", 0x01, speed_left, speed_right)
+            else:
+                cmd_packet = struct.pack("<B", 0x04)  # Stop command
+        elif command == 's':
+            # Send command to stop motors
+            cmd_packet = struct.pack("<B", 0x04)
+        elif command == 'd':
+            # Send command to request sensor data
+            cmd_packet = struct.pack("<B", 0x03)
+        elif command == 'l':
+            l1 = input("Enter line 1 (max 16 chars): ")[:16].ljust(16)
+            l2 = input("Enter line 2 (max 16 chars): ")[:16].ljust(16)
+            cmd_packet = struct.pack("<B16s16s", 0x02, l1.encode('utf-8'), l2.encode('utf-8'))
+        else:
+            print("Invalid command")
+            continue
+    
+        
         checksum = sum(cmd_packet) & 0xFF
         arduino.write(cmd_packet + bytes([checksum]))
 
@@ -68,7 +87,7 @@ while True:
 
         if not response_received:
             print("Timeout waiting for response")
-
+        
     except Exception as e:
         print(f"Error: {e}")
         time.sleep(1)

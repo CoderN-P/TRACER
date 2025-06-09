@@ -13,6 +13,8 @@ class SerialManager:
         self.running = False
         self.robot = None  # Reference to the robot instance
         self.loop = None   # Event loop to use for coroutine execution
+        self._START_BYTE = 0xAA
+        self._PACKET_LENGTH = 23
 
     def start(self, robot, loop):
         self.robot = robot
@@ -24,13 +26,10 @@ class SerialManager:
         asyncio.create_task(robot.start())
 
     def read_loop(self):
-        START_BYTE = 0xAA
         while self.running:
-            if self.serial.in_waiting >= 23:
-                print(f"[Serial] in_waiting: {self.serial.in_waiting}")
-                data = self.serial.read(23)
-                print(f"[Serial] Raw packet: {data.hex()} len={len(data)}")
-                if data[0] == START_BYTE:
+            if self.serial.in_waiting >= self._PACKET_LENGTH:
+                data = self.serial.read(self._PACKET_LENGTH)
+                if data[0] == self._START_BYTE:
                     future = asyncio.run_coroutine_threadsafe(
                         self.robot.process_sensor_data(data), self.loop
                     )
@@ -59,5 +58,9 @@ class SerialManager:
             self.serial.write(packet + bytes([checksum]))
         elif data.command_type == CommandType.SENSOR:
             packet = struct.pack("<B", 0x03)
+            checksum = sum(packet) & 0xFF
+            self.serial.write(packet + bytes([checksum]))
+        elif data.command_type == CommandType.STOP:
+            packet = struct.pack("<B", 0x04)
             checksum = sum(packet) & 0xFF
             self.serial.write(packet + bytes([checksum]))

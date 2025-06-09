@@ -9,6 +9,7 @@ const int IN3 = 6; // Input pin 1 for motor 2
 const int IN4 = 7; // Input pin 2 for motor 2
 const int IR_FRONT = 8;
 const int IR_BACK = 12;
+const int STBY = 13;
 const int TRIGGER = 2; // Trigger pin for ultrasonic sensor
 const int ECHO = 11;   // Echo pin for ultrasonic sensor
 const int MAX_BUFFER_SIZE = 512;
@@ -16,6 +17,8 @@ const int MPUAddress = 0x68; // I2C address for MPU6050
 unsigned long lastUltrasonicSampleTime = 0;
 unsigned long lastMPUSampleTime = 0;
 unsigned long lastLCDUpdateTime = 0;
+bool bufferSensorSending = false;
+bool motorsEnabled = true;
 int ax, ay, az, gx, gy, gz;
 float lastDistance, tempC;
 char lastLine1[17] = "";
@@ -46,6 +49,7 @@ void setup()
     pinMode(IR_BACK, INPUT);
     pinMode(TRIGGER, OUTPUT);
     pinMode(ECHO, INPUT);
+    pinMode(STBY, OUTPUT);
 
     Wire.begin();
     Serial.begin(115200);
@@ -54,10 +58,17 @@ void setup()
     lcd.init();
     lcd.backlight();
     lcd.setCursor(0, 0);
+    updateLCD();
+    delay(1000); // Allow time for sensors to stabilize
+    digitalWrite(STBY, HIGH);
+    
+    
     if (initMPU6050())
     {
         strncpy(lcdLine1, "MPU OK", sizeof(lcdLine1));
         lcdLine1[16] = '\0';
+        getUltrasonicData(lastDistance);
+        getMPUData(ax, ay, az, gx, gy, gz, tempC);
     }
     else
     {
@@ -73,6 +84,8 @@ uint8_t expected_command_length(uint8_t cmd)
     if (cmd == 0x02)
         return 34;
     if (cmd == 0x03)
+        return 2;
+    if (cmd == 0x04)
         return 2;
     return 255; // invalid
 }
@@ -106,29 +119,28 @@ uint8_t getIRBack()
     return digitalRead(IR_BACK);
 }
 
+
 void getUltrasonicData(float &distance)
 {
-    // Trigger the ultrasonic sensor
     digitalWrite(TRIGGER, LOW);
     delayMicroseconds(2);
     digitalWrite(TRIGGER, HIGH);
     delayMicroseconds(10);
     digitalWrite(TRIGGER, LOW);
 
-    // Read the echo time with timeout
-    long duration = pulseIn(ECHO, HIGH, 30000); // 30ms timeout
-
-    // Calculate distance in cm
-    if (duration == 0) {
-      // No echo (too far or object not detected)
-      distance = -1;
-    } else if (duration < 100) {
-      // Too close or invalid reading
-      distance = -2;
-    } else {
-      // Normal
-      distance = duration * 0.034 / 2; // in cm
+    // Use a shorter timeout to prevent blocking
+    long duration = pulseIn(ECHO, HIGH, 25000); // 25ms timeout (~4.25m max)
+    
+    if (duration == 0)
+    {
+        distance = -1; // Indicate too far
+        return;
+    } else if (duration < 100) 
+    {
+        distance = -2; // Indicate too close
+        return;
     }
+    distance = (duration / 2.0) * 0.0343; // Convert to cm
 }
 
 void getMPUData(int &ax, int &ay, int &az, int &gx, int &gy, int &gz, float &tempC)
@@ -193,6 +205,10 @@ void sendSensorData()
     buffer[i++] = checksum;
 
     Serial.write(buffer, i); // Send the data over Serial
+    
+    if (bufferSensorSending){
+        bufferSensorSending = false;
+    }
 }
 
 
@@ -222,7 +238,9 @@ void handleCommand(byte *buffer, size_t length)
         int16_t left, right;
         memcpy(&left, &buffer[1], 2);
         memcpy(&right, &buffer[3], 2);
+        
         handleMovement(left, right);
+
         char lcd_buffer[17];
         sprintf(lcd_buffer, "L:%d R:%d", left, right);
 
@@ -231,12 +249,13 @@ void handleCommand(byte *buffer, size_t length)
         
         strncpy(lcdLine2, "Moving", sizeof(lcdLine2));
         lcdLine2[16] = '\0';
-        sendSensorData();
+        
+        bufferSensorSending = true; // Set flag to send sensor data next loop
     }
     else if (cmd == 0x02 && length == 34)
     {
         // Command 0x02: Update LCD with two lines of text
-        sendSensorData();
+        bufferSensorSending = true; // Set flag to send sensor data next loop
         memcpy(lcdLine1, &buffer[1], 16);
         memcpy(lcdLine2, &buffer[17], 16);
         
@@ -244,10 +263,19 @@ void handleCommand(byte *buffer, size_t length)
     else if (cmd == 0x03 && length == 2)
     {
         // Command 0x03: Request sensor data
-        sendSensorData();
+        bufferSensorSending = true; // Set flag to send sensor data next loop
         strncpy(lcdLine1, "Sending Data", sizeof(lcdLine1));
         lcdLine1[16] = '\0';
         strncpy(lcdLine2, "Check Serial", sizeof(lcdLine2));
+        lcdLine2[16] = '\0';
+    } else if (cmd == 0x04 && length == 2){
+      // Command 0x04: STOP
+        motorsEnabled = false;
+        digitalWrite(STBY, LOW);
+        bufferSensorSending = true; // Stop sending sensor data
+        strncpy(lcdLine1, "STOP COMMAND", sizeof(lcdLine1));
+        lcdLine1[16] = '\0';
+        strncpy(lcdLine2, "Motors stopped", sizeof(lcdLine2));
         lcdLine2[16] = '\0';
     }
     else
@@ -262,6 +290,10 @@ void handleCommand(byte *buffer, size_t length)
 void handleMovement(int16_t leftSpeed, int16_t rightSpeed)
 {
     // Values already mapped between -255 and 255
+
+    if (!motorsEnabled){
+      digitalWrite(STBY, HIGH);
+    }
 
     if (leftSpeed > 0)
     {
@@ -313,21 +345,31 @@ void loop()
     }
 
     if (millis() - lastMPUSampleTime >= 10){
-      getMPUData(ax, ay, az, gx, gy, gx, tempC);
+      getMPUData(ax, ay, az, gx, gy, gz, tempC);
       lastMPUSampleTime = millis();
     }
 
     if (millis() - lastLCDUpdateTime >= 500){
         // Update LCD only if the content has changed'
        if (strncmp(lcdLine1, lastLine1, sizeof(lcdLine1)) != 0 || strncmp(lcdLine2, lastLine2, sizeof(lcdLine2)) != 0) {
-            strncpy(lastLine1, lcdLine1, sizeof(lastLine1));
-            strncpy(lastLine2, lcdLine2, sizeof(lastLine2));
-            lcd.clear();
-            lcd.setCursor(0, 0);
-            lcd.print(lcdLine1);
-            lcd.setCursor(0, 1);
-            lcd.print(lcdLine2);
+            updateLCD();
         }
        lastLCDUpdateTime = millis();  
     }
+    
+    if (bufferSensorSending)
+    {
+        sendSensorData();
+    }
+}
+
+void updateLCD()
+{
+    strncpy(lastLine1, lcdLine1, sizeof(lastLine1));
+    strncpy(lastLine2, lcdLine2, sizeof(lastLine2));
+    lcd.clear();
+    lcd.setCursor(0, 0);
+    lcd.print(lcdLine1);
+    lcd.setCursor(0, 1);
+    lcd.print(lcdLine2);
 }

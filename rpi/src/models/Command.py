@@ -19,23 +19,32 @@ class Command(BaseModel):
     def __init__(self, **data):
         super().__init__(**data)
         self.ID = str(uuid.uuid4())
-
-
+        
+    @staticmethod
+    def apply_deadzone_and_scale(value, deadzone=0.1, min_speed=60, max_speed=255):
+        if abs(value) < deadzone:
+            return 0
+        
+        sign = 1 if value > 0 else -1
+        scaled = (abs(value) - deadzone) / (1 - deadzone)
+        scaled = min(1, max(0, scaled))  # Clamp to [0, 1]
+        
+        return sign * (min_speed + scaled*(max_speed - min_speed))
+        
+    
     @classmethod
     async def send_from_joystick(cls, left_y: float, right_x: float, ser: 'SerialManager'):
         """
         Calculate the differential drive values based on the controller input.
         """
-        if abs(left_y) < 0.1: left_y = 0
-        if abs(right_x) < 0.1: right_x = 0
-
+        
+        
+        forward = cls.apply_deadzone_and_scale(left_y)
+        turn = cls.apply_deadzone_and_scale(right_x)
+        
         # Calculate motor values (arcade drive)
-        left_motor = int(255 * (left_y - right_x))
-        right_motor = int(255 * (left_y + right_x))
-
-        # Clamp values
-        left_motor = max(-255, min(255, left_motor))
-        right_motor = max(-255, min(255, right_motor))
+        left_motor = min(255, max(-255, forward - turn))
+        right_motor = min(255, max(-255, forward + turn))
 
         command = cls(
             ID="",
@@ -48,6 +57,21 @@ class Command(BaseModel):
             duration=0
         )
 
+        ser.send(command)
+        
+    @classmethod
+    async def stop(cls, ser: 'SerialManager'):
+        """
+        Send a stop command to the robot.
+        """
+        command = cls(
+            ID="",
+            command_type=CommandType.STOP,
+            command=None,  # Stop command has no specific motor values
+            pause_duration=0,
+            duration=0
+        )
+        
         ser.send(command)
     
     

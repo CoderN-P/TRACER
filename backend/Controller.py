@@ -34,6 +34,7 @@ class Controller:
         left_y, right_x = self.read_input()
         moved_enough = abs(left_y) > 0.1 or abs(right_x) > 0.1
         return moved_enough
+
     
     def send_update(self):
         """
@@ -65,7 +66,7 @@ class Controller:
         
         try:
             self.socketio_server.emit('joystick_input', data)
-            # self.socketio.emit('joystick_input', data)
+            self.socketio.emit('joystick_input', data)
         except Exception as e:
             raise RuntimeError(f"Failed to send controller update: {e}")
         
@@ -77,8 +78,8 @@ class Controller:
         right_x = data.get('right_x', 0)
 
         self.socketio.emit('joystick_input', {
-            "left_y": left_y,
-            "right_x": right_x
+            "left_y": -left_y,
+            "right_x": -right_x
         })
 
 

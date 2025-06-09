@@ -29,7 +29,7 @@ class Command(BaseModel):
         scaled = (abs(value) - deadzone) / (1 - deadzone)
         scaled = min(1, max(0, scaled))  # Clamp to [0, 1]
         
-        return sign * (min_speed + scaled*(max_speed - min_speed))
+        return int(sign * (min_speed + scaled*(max_speed - min_speed)))
         
     
     @classmethod

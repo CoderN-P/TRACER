@@ -73,7 +73,7 @@ class Robot:
         self.obstacle_detected = False
         
     @staticmethod
-    def bytes_to_sensor_data(self, data: bytes):
+    def bytes_to_sensor_data(data: bytes):
         """Convert bytes to SensorData model."""
 
 
@@ -158,8 +158,7 @@ class Robot:
             low = max(0.0, min(low, 1.0))
             high = 1 - low  # Ensure high is always the complement of low
 
-            if current_time - self.last_rumble_time < self.rumble_cooldown:
-                await Command.stop(self.serial)  # Stop motors if rumble is active
+            if current_time - self.last_rumble_time > self.rumble_cooldown:
                 await self.socketio.emit(
                     'rumble',
                     {
@@ -169,7 +168,9 @@ class Robot:
                     }
                 )
                 self.last_rumble_time = current_time
-                
+
+            self.waiting_for_sensor = True
+            await Command.stop(self.serial)                
             self.obstacle_detected = True  # Set flag to indicate an obstacle is detected
             await asyncio.create_task(self._reset_obstacle_detected())
                 

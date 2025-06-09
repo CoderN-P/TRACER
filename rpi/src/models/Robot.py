@@ -172,6 +172,7 @@ class Robot:
             self.waiting_for_sensor = True
             await Command.stop(self.serial)                
             self.obstacle_detected = True  # Set flag to indicate an obstacle is detected
+            
             await asyncio.create_task(self._reset_obstacle_detected())
                 
             return avg_distance  # Return the average distance for further processing if needed

@@ -1,4 +1,6 @@
 import asyncio
+
+from src import text_to_command
 from src import Robot, SerialManager, run_socket_server, socketio
 
 async def main():

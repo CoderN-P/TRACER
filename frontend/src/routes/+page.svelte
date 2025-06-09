@@ -44,7 +44,9 @@
     
     function onSubmit(e) {
         if (input.trim() === '') return;
-        socket.emit('query', input);
+        socket.emit('query', {
+            "query": input.trim(),
+        });
         logs.push({
             timestamp: new Date().toISOString(),
             message: `Query sent: ${input}`,

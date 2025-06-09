@@ -1,13 +1,13 @@
 from openai import OpenAI
 from dotenv import load_dotenv
 load_dotenv()
-from ..models import CommandResponse
+from ..models.CommandResponse import AICommand
 
 
 client = OpenAI()
 
-def text_to_command(query: str) -> CommandResponse:
-    with open('PROMPT.txt', 'r') as prompt_file:
+def text_to_command(query: str, path="src/ai/PROMPT.txt") -> AICommand:
+    with open(path, 'r') as prompt_file:
         system_prompt = prompt_file.read()
         
     messages = [
@@ -20,17 +20,21 @@ def text_to_command(query: str) -> CommandResponse:
             "content": query
         }
     ]
-    
-    response = client.beta.chat.completions.parse(
+
+    response = client.responses.parse(
         model="gpt-4.1-nano",
-        messages=messages,
+        input=messages,
         temperature=1,
         top_p=1,
-        max_tokens=500,
-        response_format=CommandResponse
+        max_output_tokens=500,
+        text_format=AICommand
     )
     
-    return response.choices[0].message.parsed
+    return response.output_parsed
+
+
+
+
         
     
     

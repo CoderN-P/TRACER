@@ -5,7 +5,7 @@ class CommandType(Enum):
     MOTOR = "MOTOR"
     LED = "LED"
     BUZZER = "BUZZER"
-    SENSOR = "SENSOR", # GET SENSOR DATA
+    SENSOR = "SENSOR"
     STOP = "STOP"
     
 

@@ -10,11 +10,11 @@ class Command(BaseModel):
     """
     Represents a command to be executed by the robot.
     """
-    ID: str = Field(..., description="Unique identifier for the command")
+    ID: str = Field(description="Unique identifier for the command")
     command_type: CommandType
     command: LCDCommand | MotorCommand | None = Field(description="Command to be executed, can be LCDCommand or MotorCommand, or None for stop command")
-    pause_duration: int = Field(default=0, description="Pause duration in seconds after executing the command (AI Command ONLY)")
-    duration: int = Field(default=0, description="Duration in seconds for which the command should be executed (AI Command ONLY)")
+    pause_duration: int = Field(description="Pause duration in seconds after executing the command (AI Command ONLY)")
+    duration: int = Field(description="Duration in seconds for which the command should be executed (AI Command ONLY)")
 
     def __init__(self, **data):
         super().__init__(**data)

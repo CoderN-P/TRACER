@@ -5,7 +5,7 @@ class Controller:
         self.controller = controller
         self.socketio = socketio # socketio client
         self.socketio_server = socketio_server # socketio server
-        self.reset_motor = False
+        self.reset_motor = True  # Flag to reset motors if no input is detected
 
     @classmethod
     def initialize(cls, socketio, socketio_server) -> 'Controller':
@@ -32,7 +32,7 @@ class Controller:
         Check if the controller input is significant enough to send a command.
         """
         left_y, right_x = self.read_input()
-        moved_enough = abs(left_y) > 0.1 or abs(right_x) > 0.1
+        moved_enough = abs(left_y) > 0.15 or abs(right_x) > 0.15
         return moved_enough
 
     
@@ -40,7 +40,7 @@ class Controller:
         """
         Send the current joystick data to the specified URL.
         """
-
+        print(self.read_input())
         if not self.should_send_update():
             if self.reset_motor:
                 # If no significant input, reset motors

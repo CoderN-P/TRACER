@@ -40,7 +40,7 @@ class Controller:
         """
         Send the current joystick data to the specified URL.
         """
-        print(self.read_input())
+  
         if not self.should_send_update():
             if self.reset_motor:
                 # If no significant input, reset motors

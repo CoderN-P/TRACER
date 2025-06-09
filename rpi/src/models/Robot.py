@@ -1,6 +1,7 @@
 import time, struct
 import asyncio
 from . import SerialManager, SensorData, Command, CommandType, MotorCommand
+from .. import LCDCommand
 from ..ai.get_commands import text_to_command
 
 
@@ -244,18 +245,31 @@ class Robot:
             for command in commands.commands:
                 self.waiting_for_sensor = True
                 self.serial.send(command)
-                self.socketio.emit('active_command', command.model_dump())
+                await self.socketio.emit('active_command', command.model_dump())
                 await asyncio.sleep(command.duration)
                 if command.pause_duration and command.command_type == CommandType.MOTOR:
-                    await Command.send_from_joystick(0, 0, self.serial)
-                   
+                    await Command.stop(self.serial)
                     await asyncio.sleep(command.pause_duration)
+            self.waiting_for_sensor = True 
+            await Command.stop(self.serial)  # Ensure motors are stopped after command sequence
         except Exception as e:
             print(f"Error running command sequence: {e}")
             
 
     def handle_query(self, query):
+        self.serial.send(
+            Command(
+                ID="",
+                command_type=CommandType.LCD,
+                command=LCDCommand(
+                    line_1="Thinking...",
+                    line_2=""
+                ),
+                pause_duration=0,
+                duration=0
+            )
+        )
+        
         commands = text_to_command(query)
-
         command_task = asyncio.create_task(self._run_command_sequence(commands))
         return command_task

@@ -264,10 +264,6 @@ void handleCommand(byte *buffer, size_t length)
     {
         // Command 0x03: Request sensor data
         bufferSensorSending = true; // Set flag to send sensor data next loop
-        strncpy(lcdLine1, "Sending Data", sizeof(lcdLine1));
-        lcdLine1[16] = '\0';
-        strncpy(lcdLine2, "Check Serial", sizeof(lcdLine2));
-        lcdLine2[16] = '\0';
     } else if (cmd == 0x04 && length == 2){
       // Command 0x04: STOP
         motorsEnabled = false;

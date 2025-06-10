@@ -4,14 +4,15 @@
     import { Button } from '$lib/components/ui/button';
     import * as Card from '$lib/components/ui/card';
     import {ChevronLeft, ChevronUp, Circle, ChevronDown, ChevronRight} from "lucide-svelte";
-    
-    
+
+
     let { joystick = $bindable(), lastUpdateTime }: { joystick: Joystick, lastUpdateTime: number } = $props();
-    
+
     function updateJoystick(direction: 'up' | 'down' | 'left' | 'right' | 'stop') {
         switch (direction) {
             case 'up':
                 joystick.left_y = -1;
+                console.log(`Joystick updated: left_y=${joystick.left_y}, right_x=${joystick.right_x}`);
                 break;
             case 'down':
                 joystick.left_y = 1;
@@ -28,7 +29,7 @@
                 break;
         }
     }
-    
+
     // Reset joystick values on mouse up
     function resetJoystick(direction: 'up' | 'down' | 'left' | 'right' | 'stop') {
         switch (direction) {

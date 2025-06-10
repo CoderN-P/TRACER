@@ -1,5 +1,8 @@
 import socketio
 from fastapi import FastAPI
+import uvicorn
+
+from .models import Command
 
 sio = socketio.AsyncServer(cors_allowed_origins='*', async_mode='asgi')
 app = FastAPI()
@@ -13,12 +16,15 @@ def setup_routes(robot):
     @sio.on('query')
     async def on_query(sid, data):
         await robot.handle_query(data["query"])
+        
+    @sio.on('stop')
+    async def on_stop(sid):
+        await Command.stop(robot.serial)
 
     @sio.event
     async def connect(sid, environ):
         print("Client connected:", sid)
 
-import uvicorn
 
 async def run_socket_server(robot):
     setup_routes(robot)

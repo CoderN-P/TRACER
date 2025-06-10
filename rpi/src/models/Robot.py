@@ -247,11 +247,14 @@ class Robot:
                 await self.socketio.emit('active_command', command.model_dump())
                 await asyncio.sleep(command.duration)
                 if command.pause_duration and command.command_type == CommandType.MOTOR:
+                    self.waiting_for_sensor = True
                     await Command.stop(self.serial)
                     await asyncio.sleep(command.pause_duration)
             self.waiting_for_sensor = True 
             await Command.stop(self.serial) # Ensure motors are stopped after command sequence
-            await self.socketio.emit('active_command', None)  # Clear active command
+            await self.socketio.emit('active_command', {
+                "ID": ""
+            })  # Clear active command
         except Exception as e:
             print(f"Error running command sequence: {e}")
             

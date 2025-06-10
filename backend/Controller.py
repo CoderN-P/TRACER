@@ -6,6 +6,8 @@ class Controller:
         self.socketio = socketio # socketio client
         self.socketio_server = socketio_server # socketio server
         self.reset_motor = True  # Flag to reset motors if no input is detected
+        self.stop_motor = False  # Flag to stop motors if no input is detected
+        self.stopped = False  # Flag to indicate if the motors are stopped
 
     @classmethod
     def initialize(cls, socketio, socketio_server) -> 'Controller':
@@ -35,12 +37,36 @@ class Controller:
         moved_enough = abs(left_y) > 0.15 or abs(right_x) > 0.15
         return moved_enough
 
-    
+    def _reset_stop_motor(self):
+        """
+        Reset the stop motor flag after a short delay.
+        """
+        threading.Timer(5, self.reset).start()
+        
+    def reset(self):
+        self.stopped = False
+        
     def send_update(self):
         """
         Send the current joystick data to the specified URL.
         """
-  
+        # check if Button B is pressed to reset motors
+        pygame.event.pump()  # Process events to update joystick state
+        if self.controller.get_button(1):  # Assuming Button B is at index 1
+            if self.stop_motor:
+                self.socketio.emit('stop', {})
+                self.socketio_server.emit('stop', {})
+                print("Stopping motors due to Button B press")
+                self.stop_motor = False  # Reset flag to avoid sending stop command repeatedly
+                self.stopped = True
+                self._reset_stop_motor()
+            return 
+        else:
+            self.stop_motor = True
+            
+        if self.stopped:
+            return
+        
         if not self.should_send_update():
             if self.reset_motor:
                 # If no significant input, reset motors

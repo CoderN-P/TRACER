@@ -10,7 +10,7 @@
 {#if temperature === null}
     <Skeleton class="w-full h-48 rounded-sm" />
 {:else}
-    <Card.Root class="w-full h-full">
+    <Card.Root class="w-full sm:w-1/2">
         <Card.Header class="flex flex-row items-center gap-2">
             {#if tempF < 60}
                 <ThermometerSnowflake class="text-blue-500" />

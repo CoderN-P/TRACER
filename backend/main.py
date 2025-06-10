@@ -37,6 +37,7 @@ def setup_routes(controller: Controller):
         
     @sio_client.on('active_command')
     def handle_active_command(data):
+        print(data)
         socket.emit('active_command', data)
         
     @sio_client.event

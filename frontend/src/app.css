@@ -129,3 +129,32 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Mobile optimizations */
+@layer utilities {
+  .sticky-bottom {
+    position: sticky;
+    bottom: 0;
+    z-index: 10;
+  }
+  
+  /* Improve scrolling on touch devices */
+  .overscroll-contain {
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  /* Better touch targets for mobile */
+  .touch-manipulation {
+    touch-action: manipulation;
+  }
+}
+
+
+.container {
+  -ms-overflow-style: none;  /* Internet Explorer 10+ */
+  scrollbar-width: none;  /* Firefox, Safari 18.2+, Chromium 121+ */
+}
+.container::-webkit-scrollbar {
+  display: none;  /* Older Safari and Chromium */
+}

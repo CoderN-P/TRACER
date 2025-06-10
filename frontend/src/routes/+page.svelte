@@ -75,7 +75,7 @@
         });
         
         socket.on('active_command', (data) => {
-            if (!data) { // Finished command sequence
+            if (!data.ID) { // Finished command sequence
                 loadingAICommands = false;
                 activeCommand = null;
             } else {
@@ -179,38 +179,57 @@
 
 
 <KeyboardHandler bind:joystick={uiJoystick} {inputFocus} />
-<div class="w-screen h-screen max-w-screen flex flex-col bg-gray-50 gap-2 p-4">
-    <div class="w-full flex flex-row items-center gap-2 justify-between">
+<div class="flex flex-col gap-2 p-4 ">
+    <!-- Status bar - Keep row on mobile but make it wrap -->
+    <div class="w-full flex flex-col md:flex-row items-center gap-2 justify-between">
         <Status {lastSensorUpdate} bind:logs={logs}/>
-        <Uptime {lastSensorUpdate} />
-        <SensorRate rate={sensorRate} />
+        <div class="flex flex-row gap-2 w-full justify-between md:justify-end">
+            <Uptime {lastSensorUpdate} />
+            <SensorRate rate={sensorRate} />
+        </div>
     </div>
-    <div class="w-full flex flex-row items-center gap-2 justify-between">
-        <UltrasonicGraph {distanceHistory}/>
-        <div class="flex flex-col w-1/2 shrink-0 items-start gap-2 h-[400px] "> 
-            <div class="flex flex-row w-full shrink-0 gap-2">
-                <TemperatureDisplay temperature={sensorData?.imu.temperature ?? null} />
-                <ControlPad bind:joystick={uiJoystick} lastUpdateTime={lastSensorUpdate}/>
+    
+    <!-- Main content area - Stack on mobile, side by side on desktop -->
+    <div class="w-full flex flex-col md:flex-row items-stretch gap-2">
+        <!-- Left column on desktop, top section on mobile -->
+        <div class="w-full md:w-1/2 flex-grow">
+            <UltrasonicGraph {distanceHistory}/>
+        </div>
+        
+        <!-- Right column on desktop, bottom section on mobile -->
+        <div class="flex flex-col w-full md:w-1/2 items-start gap-2"> 
+            <!-- Temperature and Control Pad - Stack on small mobile, side by side otherwise -->
+            <div class="flex flex-col sm:flex-row w-full gap-2">
+                <TemperatureDisplay temperature={sensorData?.imu.temperature ?? null}/>
+                <ControlPad bind:joystick={uiJoystick} 
+                            lastUpdateTime={lastSensorUpdate}
+                            class="w-full sm:w-1/2"/>
             </div>
-            <Logs {logs} />
+            
+            <!-- Logs section with mobile optimizations -->
+            <Logs {logs} class="w-full" />
         </div>
     </div>
-    <div class="w-full flex flex-row items-center gap-2 justify-between">
-        <div class="flex flex-row w-1/2 gap-2">
-            <JoystickStatus lastUpdateTime={lastSensorUpdate} joystick={joystickInput}  />
-            <ObstructionStatus {sensorData} {lastSensorUpdate}/>
-        </div>
-        
-        
-        
+    
+    <!-- Joystick status and obstruction area -->
+    <div class="w-full flex flex-col sm:flex-row items-stretch gap-2">
+        <JoystickStatus lastUpdateTime={lastSensorUpdate} 
+                       joystick={joystickInput}
+                       class="w-full h-full sm:w-1/2"/>
+        <ObstructionStatus {sensorData} 
+                          {lastSensorUpdate}
+                          class="w-full h-full sm:w-1/2"/>
     </div>
-    <div class="w-full flex flex-row items-center gap-2 justify-between">
+    
+    <!-- Command list section - Full width with mobile optimizations -->
+    <div class="w-full">
         <CommandList commands={aiCommands} 
-                     activeCommand={activeCommand} 
-                     lastSensorUpdateTime={lastSensorUpdate} 
-                     loading={loadingAICommands} 
-                     bind:query={input} 
-                     onSubmit={onSubmit} 
-                     bind:inputFocus />
+                    activeCommand={activeCommand} 
+                    lastSensorUpdateTime={lastSensorUpdate} 
+                    loading={loadingAICommands} 
+                    bind:query={input} 
+                    onSubmit={onSubmit} 
+                    bind:inputFocus 
+                    class="overscroll-contain touch-manipulation hide-scrollbar" />
     </div>
 </div>

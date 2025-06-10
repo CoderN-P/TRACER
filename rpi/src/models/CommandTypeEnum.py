@@ -1,6 +1,6 @@
 from enum import Enum
 
-class CommandType(Enum):
+class CommandType(str, Enum):
     LCD = "LCD"
     MOTOR = "MOTOR"
     LED = "LED"

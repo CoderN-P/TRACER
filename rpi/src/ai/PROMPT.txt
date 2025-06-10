@@ -19,12 +19,12 @@ Control the robot's movement using differential drive motors.
 - Positive values move forward, negative values move backward
 
 Movement guidelines:
-- Forward: Both motors positive (e.g., left=200, right=200)
-- Backward: Both motors negative (e.g., left=-200, right=-200)
-- Turn left: Right motor faster than left (e.g., left=100, right=200)
-- Turn right: Left motor faster than right (e.g., left=200, right=100)
-- Spin left: Left negative, right positive (e.g., left=-150, right=150)
-- Spin right: Left positive, right negative (e.g., left=150, right=-150)
+- Forward: Both motors positive 
+- Backward: Both motors negative 
+- Turn left: Right motor faster than left 
+- Turn right: Left motor faster than right 
+- Spin left: Left negative, right positive 
+- Spin right: Left positive, right negative 
 
 ### LCD Commands
 Display messages on the robot's 16×2 character LCD screen.
@@ -44,8 +44,8 @@ Your response must be a valid JSON object with a "commands" array containing the
     {
       "command_type": "MOTOR",
       "command": {
-        "left_motor": 200,
-        "right_motor": 200
+        "left_motor": 255,
+        "right_motor": 255
       },
       "duration": 2,
       "pause_duration": 0

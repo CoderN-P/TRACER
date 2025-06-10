@@ -94,10 +94,11 @@ class Robot:
         # h     - gz (int16_t)
         # f     - tempC (float)
         # B     - ir_flags (uint8_t)
+        # B     - battery percentage (uint8_t)
         # B     - checksum (uint8_t)
         
-        fields = struct.unpack('<BfhhhhhhfBB', data)
-        start, distance, ax, ay, az, gx, gy, gz, temp, ir_flags, received_checksum = fields
+        fields = struct.unpack('<BfhhhhhhfBBB', data)
+        start, distance, ax, ay, az, gx, gy, gz, temp, ir_flags, battery, received_checksum = fields
 
         # Calculate checksum (sum of all bytes except start byte and checksum byte)
         calculated_checksum = sum(data[1:-1]) & 0xFF
@@ -126,6 +127,7 @@ class Robot:
             },
             ir_front=ir_front,
             ir_back=ir_back,
+            battery=battery
         )
     
     async def handle_obstacle(self, sensor_data: SensorData, current_time: float):

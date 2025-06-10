@@ -9,7 +9,7 @@
 </script>
 
 {#if lastUpdateTime === 0 || !joystick}
-    <Skeleton class="w-full h-[120px] md:h-[160px] rounded-sm {className}" />
+    <Skeleton class="w-full h-48 rounded-sm " />
 {:else}
     <Card.Root class="w-full h-full {className}">
         <Card.Header>

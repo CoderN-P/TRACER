@@ -20,7 +20,7 @@
     import SensorRate from "$lib/components/SensorRate.svelte";
     import KeyboardHandler from "$lib/components/KeyboardHandler.svelte";
     import TemperatureDisplay from "$lib/components/TemperatureDisplay.svelte";
-    import QueryInput from "$lib/components/QueryInput.svelte";
+    import BatteryPercentage from "$lib/components/BatteryPercentage.svelte";
     import ObstructionStatus from "$lib/components/ObstructionStatus.svelte";
     import CommandList from "$lib/components/CommandList.svelte";
     
@@ -183,6 +183,8 @@
     <!-- Status bar - Keep row on mobile but make it wrap -->
     <div class="w-full flex flex-col md:flex-row items-center gap-2 justify-between">
         <Status {lastSensorUpdate} bind:logs={logs}/>
+        <BatteryPercentage percent={sensorData?.battery ?? 0} 
+                          lastSensorUpdateTime={lastSensorUpdate} />
         <div class="flex flex-row gap-2 w-full justify-between md:justify-end">
             <Uptime {lastSensorUpdate} />
             <SensorRate rate={sensorRate} />

@@ -64,7 +64,7 @@
 </script>
 
 {#if !logs || logs.length === 0}
-    <Skeleton class="w-full h-48 rounded-sm" />
+    <Skeleton class="w-full h-50 rounded-sm" />
 {:else}
     <Card.Root class="w-full h-full {className} overflow-hidden">
         <Card.Header>

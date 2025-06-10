@@ -1,4 +1,4 @@
-import pygame, threading
+import pygame, threading, time
 
 class Controller:
     def __init__(self, controller, socketio, socketio_server):
@@ -21,6 +21,26 @@ class Controller:
         controller.init()
 
         return cls(controller, socketio, socketio_server)
+    
+    def reconnect_controller(self):
+        """
+        Reconnect the controller if it has been disconnected in a thread
+        """
+        
+        while pygame.joystick.get_count() == 0:
+            print("No controller found, trying to reconnect...")
+            pygame.joystick.quit()  # Quit the joystick module to reset it
+            pygame.joystick.init()  # Reinitialize the joystick module
+            try:
+                self.controller = pygame.joystick.Joystick(0)
+                self.controller.init()
+                print("Controller reconnected successfully")
+                return
+            except pygame.error:
+                print("Failed to reconnect controller, retrying...")
+            time.sleep(1)  # Wait before trying again
+        
+        
 
     def read_input(self) -> tuple:
         pygame.event.pump()  # Process events to update joystick state
@@ -51,8 +71,12 @@ class Controller:
         Send the current joystick data to the specified URL.
         """
         # check if Button B is pressed to reset motors
+        if pygame.joystick.get_count() == 0:
+            
+            threading.Thread(self.reconnect_controller())
+            
         pygame.event.pump()  # Process events to update joystick state
-        if self.controller.get_button(1):  # Assuming Button B is at index 1
+        if self.controller.get_button(1):  #  Button B is at index 1
             if self.stop_motor:
                 self.socketio.emit('stop', {})
                 self.socketio_server.emit('stop', {})

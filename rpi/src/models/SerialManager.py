@@ -14,7 +14,7 @@ class SerialManager:
         self.robot = None  # Reference to the robot instance
         self.loop = None   # Event loop to use for coroutine execution
         self._START_BYTE = 0xAA
-        self._PACKET_LENGTH = 23
+        self._PACKET_LENGTH = 24
 
     def start(self, robot, loop):
         self.robot = robot

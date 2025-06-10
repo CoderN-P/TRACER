@@ -46,7 +46,7 @@ while True:
         start_time = time.time()
 
         while time.time() - start_time < timeout and not response_received:
-            if arduino.in_waiting >= 23:  # Full sensor packet size
+            if arduino.in_waiting >= 24:  # Full sensor packet size
                 # Record when we got the data
                 response_time = time.time() - start_time
 
@@ -55,12 +55,12 @@ while True:
 
                 if start_byte[0] == 0xAA:  # Valid start byte
                     # Read the rest of the packet
-                    data = start_byte + arduino.read(22)
+                    data = start_byte + arduino.read(23)
                     response_received = True
 
                     print(f"Response received in {response_time*1000:.2f} ms")
-                    fields = struct.unpack('<BfhhhhhhfBB', data)
-                    start, distance, ax, ay, az, gx, gy, gz, temp, ir_flags, received_checksum = fields
+                    fields = struct.unpack('<BfhhhhhhfBBB', data)
+                    start, distance, ax, ay, az, gx, gy, gz, temp, ir_flags, battery, received_checksum = fields
             
                     # Calculate checksum (sum of all bytes except start byte and checksum byte)
                     calculated_checksum = sum(data[1:-1]) & 0xFF
@@ -80,7 +80,8 @@ while True:
                         f"Gyro: ({gx/131:.2f}°/s, {gy/131:.2f}°/s, {gz/131:.2f}°/s), "
                         f"Temp: {temp:.1f}°C, "
                         f"IR Front: {'Floor' if ir_front else 'Cliff'}, "
-                        f"IR Back: {'Floor' if ir_back else 'Cliff'}"
+                        f"IR Back: {'Floor' if ir_back else 'Cliff'}",
+                        f"Battery: {battery}%"
                     )
                 else:
                     print(f"Invalid start byte: {hex(start_byte[0])}")

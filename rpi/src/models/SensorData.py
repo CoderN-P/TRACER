@@ -10,6 +10,7 @@ class SensorData(BaseModel):
     imu: IMUData = Field(..., description="Data from the IMU (Inertial Measurement Unit)")
     ir_front: bool = Field(..., description="Front IR sensor status (True if floor is detected)")
     ir_back: bool = Field(..., description="Back IR sensor status (True if floor is detected)")
+    battery: int = Field(..., description="Battery level in percentage (0-100)")
     
     def is_obstacle_detected(self, threshold: float = 10.0) -> bool:
         """

@@ -10,13 +10,17 @@ const int IN4 = 7; // Input pin 2 for motor 2
 const int IR_FRONT = 8;
 const int IR_BACK = 12;
 const int STBY = 13;
+const int BATTERY = A3; // Battery voltage pin
 const int TRIGGER = 2; // Trigger pin for ultrasonic sensor
 const int ECHO = 11;   // Echo pin for ultrasonic sensor
 const int MAX_BUFFER_SIZE = 512;
 const int MPUAddress = 0x68; // I2C address for MPU6050
+int storedBatteryPercent = -1;
+bool motorsRunning = false;
 unsigned long lastUltrasonicSampleTime = 0;
 unsigned long lastMPUSampleTime = 0;
 unsigned long lastLCDUpdateTime = 0;
+
 bool bufferSensorSending = false;
 bool motorsEnabled = true;
 int ax, ay, az, gx, gy, gz;
@@ -50,6 +54,7 @@ void setup()
     pinMode(TRIGGER, OUTPUT);
     pinMode(ECHO, INPUT);
     pinMode(STBY, OUTPUT);
+    pinMode(BATTERY, INPUT);
 
     Wire.begin();
     Serial.begin(115200);
@@ -167,6 +172,18 @@ void getMPUData(int &ax, int &ay, int &az, int &gx, int &gy, int &gz, float &tem
     gz = (Wire.read() << 8) | Wire.read();
 }
 
+uint8_t getBatteryPercent()
+{
+    int raw = analogRead(BATTERY);  // 0–1023
+    float voltageAtPin = raw * (5.0 / 1023.0);
+    float batteryVoltage = voltageAtPin * 13.0 / 3.0; // because of 10k & 3k
+    float maxV = 8.4; // 2S LiPo max voltage
+    float minV = 6.0; // 2S LiPo min voltage
+    
+    float percent = (batteryVoltage - minV) / (maxV - minV) * 100.0;
+    return constrain((uint8_t)percent, 0, 100);
+}
+
 void sendSensorData()
 {
 
@@ -176,6 +193,20 @@ void sendSensorData()
     uint8_t ir_front = getIRFront();
     uint8_t ir_back = getIRBack();
     uint8_t ir_flags = (ir_front << 0) | (ir_back << 1); // bit 0 = front, bit 1 = back
+    uint8_t batteryPercent = 0;
+    
+    if (motorsRunning){
+        batteryPercent = storedBatteryPercent; // Use the precomputed battery percentage if motors are on
+    } else {
+        // Get battery voltage percentage
+        if (storedBatteryPercent == -1) {
+            batteryPercent = getBatteryPercent(); // Get the battery percentage if not stored
+        } else {
+            batteryPercent = (uint8_t)(0.8*getBatteryPercent() + 0.2*storedBatteryPercent); // Smooth the battery percentage
+        }
+        
+        storedBatteryPercent = batteryPercent; // Store it for future use
+    }
 
     byte buffer[20];
     int i = 0;
@@ -198,6 +229,7 @@ void sendSensorData()
     memcpy(&buffer[i], &tempC, 4);
     i += 4;                 // Store temperature as float
     buffer[i++] = ir_flags; // Store IR flags
+    buffer[i++] = batteryPercent; // Store battery voltage percentage
 
     uint8_t checksum = 0;
     for (int j = 1; j < i; j++)
@@ -240,6 +272,12 @@ void handleCommand(byte *buffer, size_t length)
         memcpy(&right, &buffer[3], 2);
         
         handleMovement(left, right);
+        
+        if (left != 0 || right != 0){
+            motorsRunning = true;
+        } else {
+            motorsRunning = false;
+        }
 
         char lcd_buffer[17];
         sprintf(lcd_buffer, "L:%d R:%d", left, right);
@@ -267,6 +305,7 @@ void handleCommand(byte *buffer, size_t length)
     } else if (cmd == 0x04 && length == 2){
       // Command 0x04: STOP
         motorsEnabled = false;
+        motorsRunning = false;
         digitalWrite(STBY, LOW);
         bufferSensorSending = true; // Stop sending sensor data
         strncpy(lcdLine1, "STOP COMMAND", sizeof(lcdLine1));

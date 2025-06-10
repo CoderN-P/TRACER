@@ -35,6 +35,10 @@ def setup_routes(controller: Controller):
     def handle_sensor_update(data):
         socket.emit('sensor_data', data)
         
+    @sio_client.on('active_command')
+    def handle_active_command(data):
+        socket.emit('active_command', data)
+        
     @sio_client.event
     def connect():
         print("Connected to RPi backend")

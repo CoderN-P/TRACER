@@ -1,7 +1,6 @@
 import time, struct
 import asyncio
-from . import SerialManager, SensorData, Command, CommandType, MotorCommand
-from .. import LCDCommand
+from . import SerialManager, SensorData, Command, CommandType, LCDCommand
 from ..ai.get_commands import text_to_command
 
 
@@ -251,7 +250,8 @@ class Robot:
                     await Command.stop(self.serial)
                     await asyncio.sleep(command.pause_duration)
             self.waiting_for_sensor = True 
-            await Command.stop(self.serial)  # Ensure motors are stopped after command sequence
+            await Command.stop(self.serial) # Ensure motors are stopped after command sequence
+            await self.socketio.emit('active_command', None)  # Clear active command
         except Exception as e:
             print(f"Error running command sequence: {e}")
             

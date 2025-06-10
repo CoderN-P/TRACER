@@ -1,7 +1,7 @@
 <script lang="ts">
-    import { Send } from 'lucide-svelte';
+    import { Send, LoaderCircle } from 'lucide-svelte';
     
-    let { query = $bindable(), onSubmit, inputFocus = $bindable() }: { query: string, onSubmit: (e) => void, inputFocus: boolean } = $props();
+    let { query = $bindable(), onSubmit, inputFocus = $bindable(), loading }: { query: string, onSubmit: (e) => void, inputFocus: boolean, loading: boolean } = $props();
     
 </script>
 
@@ -22,7 +22,12 @@
     <button 
         class="ml-2 p-2 rounded-md  text-gray-500 hover:bg-gray-100 transition-colors"
         onclick={(e) => onSubmit(e)}
+        disabled={loading || query.trim() === ''}
     >
-        <Send class="w-5 h-5" />
+        {#if loading}
+            <LoaderCircle class="w-5 h-5 animate-spin" />
+        {:else}
+            <Send class="w-5 h-5" />
+        {/if}
     </button>
 </div>

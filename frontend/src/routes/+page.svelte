@@ -3,6 +3,7 @@
     import { onMount } from 'svelte';
     import {
         type SensorData,
+        type Command,
         type Joystick,
         SensorDataSchema,
         JoystickSchema,
@@ -21,6 +22,7 @@
     import TemperatureDisplay from "$lib/components/TemperatureDisplay.svelte";
     import QueryInput from "$lib/components/QueryInput.svelte";
     import ObstructionStatus from "$lib/components/ObstructionStatus.svelte";
+    import CommandList from "$lib/components/CommandList.svelte";
     
     let sensorData = $state<SensorData | null>(null);
     let previousSensorData = $state<SensorData | null>(null);
@@ -40,10 +42,14 @@
     let distanceHistory = $state<DistanceEntry[]>([]);
     let input = $state<string>('');
     let inputFocus = $state<boolean>(false);
+    let loadingAICommands = $state<boolean>(false);
+    let aiCommands = $state<Command[]>([]);
+    let activeCommand = $state<string | null>(null);
    
     
     function onSubmit(e) {
         if (input.trim() === '') return;
+        loadingAICommands = true;
         socket.emit('query', {
             "query": input.trim(),
         });
@@ -66,6 +72,16 @@
 
         socket.on('joystick_input', (data) => {
             joystickInput = JoystickSchema.parse(data);
+        });
+        
+        socket.on('active_command', (data) => {
+            if (!data) { // Finished command sequence
+                loadingAICommands = false;
+                activeCommand = null;
+            } else {
+                aiCommands.push(data);
+                activeCommand = data.ID;
+            }
         });
         
         socket.on('sensor_data', (data) => {
@@ -189,6 +205,12 @@
         
     </div>
     <div class="w-full flex flex-row items-center gap-2 justify-between">
-        <QueryInput {onSubmit} bind:query={input} bind:inputFocus={inputFocus}/>
+        <CommandList commands={aiCommands} 
+                     activeCommand={activeCommand} 
+                     lastSensorUpdateTime={lastSensorUpdate} 
+                     loading={loadingAICommands} 
+                     bind:query={input} 
+                     onSubmit={onSubmit} 
+                     bind:inputFocus />
     </div>
 </div>

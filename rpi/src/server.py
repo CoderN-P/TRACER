@@ -18,7 +18,7 @@ def setup_routes(robot):
         await robot.handle_query(data["query"])
         
     @sio.on('stop')
-    async def on_stop(sid):
+    async def on_stop(sid, data):
         await Command.stop(robot.serial)
 
     @sio.event

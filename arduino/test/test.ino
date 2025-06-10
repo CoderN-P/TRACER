@@ -208,7 +208,7 @@ void sendSensorData()
         storedBatteryPercent = batteryPercent; // Store it for future use
     }
 
-    byte buffer[20];
+    byte buffer[24];
     int i = 0;
 
     buffer[i++] = 0xAA; // Start byte

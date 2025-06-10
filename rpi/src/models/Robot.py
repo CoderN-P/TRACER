@@ -21,6 +21,8 @@ class Robot:
         self.sensor_count = 0  # Count of sensor data received
         self.last_sensor_request_time = 0  # Last time sensor data was requested
         self.obstacle_detected = False  # Flag to indicate if an obstacle is detected
+        self.backup_time = 2  # AMount of time to backup when an obstacle is detected
+        self.obstacle_threshold = 20 # Distance threshold for obstacle detection
 
     async def start(self):
         """Start the robot's background tasks"""
@@ -71,6 +73,14 @@ class Robot:
     async def _reset_obstacle_detected(self):
         await asyncio.sleep(5)
         self.obstacle_detected = False
+        
+    async def backup(self):
+        """Backup the robot for a short duration when an obstacle is detected."""
+        self.waiting_for_sensor = True
+        await Command.send_from_joystick(1, 0, self.serial)  # Backup for 2 seconds
+        await asyncio.sleep(self.backup_time)
+        self.waiting_for_sensor = True
+        await Command.stop(self.serial)  # Stop motors after backing up
         
     @staticmethod
     def bytes_to_sensor_data(data: bytes):
@@ -131,9 +141,9 @@ class Robot:
         )
     
     async def handle_obstacle(self, sensor_data: SensorData, current_time: float):
-        if sensor_data.is_obstacle_detected() and not self.obstacle_detected:
+        if sensor_data.is_obstacle_detected(self.obstacle_threshold) and not self.obstacle_detected:
             distance = sensor_data.ultrasonic.distance
-            low = distance / 10
+            low = distance / self.obstacle_threshold
 
             # check if distance is -1 and if so determine if it means too far or too close
             
@@ -150,7 +160,7 @@ class Robot:
                 # find the average of the last 10 distances
                 if len(self.distance_history) > 0:
                     avg_distance = sum(self.distance_history) / len(self.distance_history)
-                    low = avg_distance / 10
+                    low = avg_distance / self.obstacle_threshold  # Adjust low based on average distance
                 else:
                     avg_distance = 0
             else:
@@ -171,10 +181,9 @@ class Robot:
                 )
                 self.last_rumble_time = current_time
 
-            self.waiting_for_sensor = True
-            await Command.stop(self.serial)                
-            self.obstacle_detected = True  # Set flag to indicate an obstacle is detected
             
+            await asyncio.create_task(self.backup())  # Backup for a short duration when an obstacle is detected
+            self.obstacle_detected = True  # Set flag to indicate an obstacle is detected
             await asyncio.create_task(self._reset_obstacle_detected())
                 
             return avg_distance  # Return the average distance for further processing if needed

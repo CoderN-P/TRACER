@@ -23,6 +23,7 @@
     import BatteryPercentage from "$lib/components/BatteryPercentage.svelte";
     import ObstructionStatus from "$lib/components/ObstructionStatus.svelte";
     import CommandList from "$lib/components/CommandList.svelte";
+    import Recordings from "$lib/components/Recordings.svelte";
     
     let sensorData = $state<SensorData | null>(null);
     let previousSensorData = $state<SensorData | null>(null);
@@ -45,6 +46,7 @@
     let loadingAICommands = $state<boolean>(false);
     let aiCommands = $state<Command[]>([]);
     let activeCommand = $state<string | null>(null);
+    let recordings = $state<{timestamp: string, isPlaying?: boolean, name?: string, duration: number}[]>([]);
    
     
     function onSubmit(e) {
@@ -82,6 +84,42 @@
                 aiCommands.push(data);
                 activeCommand = data.ID;
             }
+        });
+        
+        // Handle recording events
+        socket.on('start_playback', (data) => {
+            // If we don't already have this recording, add it
+            if (!recordings.some(r => r.timestamp === data.timestamp)) {
+                recordings.push({
+                    timestamp: data.timestamp,
+                    duration: data.duration,
+                    isPlaying: true
+                });
+            } else {
+                // Update existing recording status
+                recordings = recordings.map(r => 
+                    r.timestamp === data.timestamp ? {...r, isPlaying: true} : r
+                );
+            }
+            
+            // Add a log entry
+            logs.push({
+                timestamp: new Date().toISOString(),
+                message: 'Started playback of recorded movements',
+                icon: 'info'
+            });
+        });
+        
+        socket.on('stop_playback', () => {
+            // Update all recordings to not playing
+            recordings = recordings.map(r => ({ ...r, isPlaying: false }));
+            
+            // Add a log entry
+            logs.push({
+                timestamp: new Date().toISOString(),
+                message: 'Finished playback of recorded movements',
+                icon: 'info'
+            });
         });
         
         socket.on('sensor_data', (data) => {
@@ -223,15 +261,23 @@
                           class="w-full h-full sm:w-1/2"/>
     </div>
     
-    <!-- Command list section - Full width with mobile optimizations -->
-    <div class="w-full">
-        <CommandList commands={aiCommands} 
-                    activeCommand={activeCommand} 
-                    lastSensorUpdateTime={lastSensorUpdate} 
-                    loading={loadingAICommands} 
-                    bind:query={input} 
-                    onSubmit={onSubmit} 
-                    bind:inputFocus 
-                    class="overscroll-contain touch-manipulation hide-scrollbar" />
+    <!-- Recordings and Command List Section - Side by side on large screens -->
+    <div class="w-full flex flex-col lg:flex-row items-stretch gap-2">
+        <!-- Recordings section -->
+        <div class="w-full lg:w-2/5">
+            <Recordings bind:recordings={recordings} class="h-full" />
+        </div>
+        
+        <!-- Command list section - Full width with mobile optimizations -->
+        <div class="w-full lg:w-3/5">
+            <CommandList commands={aiCommands} 
+                        activeCommand={activeCommand} 
+                        lastSensorUpdateTime={lastSensorUpdate} 
+                        loading={loadingAICommands} 
+                        bind:query={input} 
+                        onSubmit={onSubmit} 
+                        bind:inputFocus 
+                        class="overscroll-contain touch-manipulation hide-scrollbar" />
+        </div>
     </div>
 </div>

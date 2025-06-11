@@ -307,7 +307,7 @@ void handleCommand(byte *buffer, size_t length)
         motorsEnabled = false;
         motorsRunning = false;
         digitalWrite(STBY, LOW);
-        bufferSensorSending = true; // Stop sending sensor data
+        bufferSensorSending = true; // Send sensor data
         strncpy(lcdLine1, "STOP COMMAND", sizeof(lcdLine1));
         lcdLine1[16] = '\0';
         strncpy(lcdLine2, "Motors stopped", sizeof(lcdLine2));

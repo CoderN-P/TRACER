@@ -34,7 +34,7 @@
                         annotations={[
                           {
                             type: "line",
-                            y: 10,
+                            y: 20,
                             label: "Obstacle",
                             labelXOffset: 4,
                             labelYOffset: 2,
@@ -57,7 +57,7 @@
                         }}
                 >
                     {#snippet marks({ context, series })}
-                        {@const thresholdValue = 10}
+                        {@const thresholdValue = 20}
                         {@const thresholdOffset = context.yScale(thresholdValue)/ (context.height + context.padding.bottom)}
                         {#each series as s, i (s.key)}
                             <LinearGradient
@@ -86,7 +86,7 @@
                         {@const value = context.tooltip?.data && context.y(context.tooltip?.data)}
                         <Highlight
                                 lines
-                                points={{ fill: value <= 10 ? "var(--chart-1)" : "var(--chart-2)" }}
+                                points={{ fill: value <= 20 ? "var(--chart-1)" : "var(--chart-2)" }}
                         />
                     {/snippet}
                     {#snippet tooltip()}

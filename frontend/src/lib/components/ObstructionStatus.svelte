@@ -24,9 +24,9 @@
   } = $props();
 
   // Distance thresholds
-  const CRITICAL_DISTANCE = 5;
-  const WARNING_DISTANCE = 10;
-  const SAFE_DISTANCE = 20;
+  const CRITICAL_DISTANCE = 10;
+  const WARNING_DISTANCE = 20;
+  const SAFE_DISTANCE = 30;
 
   function getObstructionStatus() {
     if (!sensorData) return null;

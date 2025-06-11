@@ -27,10 +27,10 @@
                 Control TRACER with natural language
             </Card.Description>
         </Card.Header>
-        <Card.Content class="px-3 sm:px-6">
+        <Card.Content class="px-3 sm:px-6 h-full">
             <!-- Command history with dynamic height based on screen size -->
             <div class="flex flex-col gap-2 mb-3 sm:mb-4 
-                        max-h-[35vh] sm:max-h-[40vh] md:max-h-[45vh] 
+                        max-h-[35vh] sm:max-h-[40vh] h-full md:max-h-[45vh] 
                         overflow-y-auto overscroll-contain 
                         rounded-md p-1">
                 {#if commands.length === 0}

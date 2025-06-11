@@ -73,14 +73,21 @@ class Robot:
     async def _reset_obstacle_detected(self):
         await asyncio.sleep(5)
         self.obstacle_detected = False
-        
+
     async def backup(self):
         """Backup the robot for a short duration when an obstacle is detected."""
+
+        # Wait until not waiting for sensor
+        while self.waiting_for_sensor:
+            await asyncio.sleep(0.01)
+    
+        await Command.send_from_joystick(-0.5, 0, self.serial)
         self.waiting_for_sensor = True
-        await Command.send_from_joystick(1, 0, self.serial)  # Backup for 2 seconds
         await asyncio.sleep(self.backup_time)
+    
+        await Command.stop(self.serial)
         self.waiting_for_sensor = True
-        await Command.stop(self.serial)  # Stop motors after backing up
+            
         
     @staticmethod
     def bytes_to_sensor_data(data: bytes):

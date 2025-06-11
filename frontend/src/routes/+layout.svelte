@@ -1,7 +1,9 @@
 <script lang="ts">
 	import '../app.css';
+	import { Toaster } from '$lib/components/ui/sonner';
 	
 	let { children } = $props();
+	
 	
 	// Add viewport meta tag for mobile optimization
 	// We need to do this in the layout to ensure it applies to all pages
@@ -52,4 +54,5 @@
 	</style>
 </svelte:head>
 
+<Toaster />
 {@render children()}

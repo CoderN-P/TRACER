@@ -40,6 +40,41 @@ def setup_routes(controller: Controller):
         print(data)
         socket.emit('active_command', data)
         
+    @socket.on('play_recording')
+    def handle_play_recording(data):
+        """
+        Handle the play recording command.
+        """
+        controller.play_recording(data["timestamp"])
+        
+    @socket.on('stop_recording')
+    def handle_stop_recording():
+        """
+        Handle the stop recording command.
+        """
+        controller.stop_recording()
+    
+    @socket.on('start_recording')
+    def handle_start_recording():
+        """
+        Handle the start recording command.
+        """
+        controller.start_recording()
+        
+    @socket.on('precision_mode')
+    def handle_toggle_precision_mode(data):
+        """
+        Toggle precision mode for the robot.
+        """
+        controller.toggle_precision_mode()
+    
+    @socket.on('joystick_mode')
+    def handle_joystick_mode(data):
+        """
+        Handle joystick mode toggle.
+        """
+        controller.manage_state(data['mode'])
+        
     @sio_client.event
     def connect():
         print("Connected to RPi backend")

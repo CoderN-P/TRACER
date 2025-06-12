@@ -4,7 +4,7 @@
 
 ## System Overview
 
-TRACER is a modern, distributed robotics control system featuring a responsive web-based dashboard, intelligent command processing, and real-time controls. The architecture consists of three interconnected components:
+TRACER is a modern, distributed robotics control system implemented into a robot tank featuring a responsive web-based dashboard, intelligent command processing, and real-time controls. The architecture consists of three interconnected components:
 
 1. **Frontend Dashboard** - Responsive SvelteKit web interface
 2. **Raspberry Pi Controller** - Central processing and AI integration

@@ -149,8 +149,7 @@ class Robot:
 
     async def handle_obstacle(self, sensor_data: SensorData, current_time: float) -> float:
         """Detect obstacles and trigger backup if needed. Returns processed distance."""
-        if not sensor_data.is_obstacle_detected(self.obstacle_threshold) or self.obstacle_clear.is_set():
-            self.obstacle_clear.set()
+        if not sensor_data.is_obstacle_detected(self.obstacle_threshold) or not self.obstacle_clear.is_set():
             return sensor_data.ultrasonic.distance
     
         distance = sensor_data.ultrasonic.distance

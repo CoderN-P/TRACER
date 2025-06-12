@@ -1,12 +1,12 @@
 import asyncio
-
+import logging
 from src import text_to_command
 from src import Robot, SerialManager, run_socket_server, socketio
 
 async def main():
     port = SerialManager.find_port()
     if not port:
-        print("No serial port found. Please connect the robot.")
+        logging.error("No serial port found. Please connect the robot.")
         return
     serial_manager = SerialManager(port, 115200)
     robot = Robot(serial_manager, socketio)

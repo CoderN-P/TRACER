@@ -55,7 +55,7 @@ class Robot:
         await asyncio.sleep(1)  # Allow time for the connection to stabilize
         while self.running:
             try:
-                await asyncio.wait_for(self.ready_event.wait(), timeout=1.0)
+                await asyncio.wait_for(self.waiting_for_sensor.wait(), timeout=1.0)
             except asyncio.TimeoutError:
                 self._logger.warning("Waiting for sensor data timed out, retrying...")
                 self.waiting_for_sensor.set()  # op

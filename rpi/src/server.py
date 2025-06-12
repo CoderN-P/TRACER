@@ -1,3 +1,5 @@
+import logging
+
 import socketio
 from fastapi import FastAPI
 import uvicorn
@@ -7,6 +9,7 @@ from .models import Command
 sio = socketio.AsyncServer(cors_allowed_origins='*', async_mode='asgi')
 app = FastAPI()
 app = socketio.ASGIApp(sio, other_asgi_app=app)
+logger = logging.getLogger("SocketServer")
 
 def setup_routes(robot):
     @sio.on('joystick_input')
@@ -23,7 +26,7 @@ def setup_routes(robot):
 
     @sio.event
     async def connect(sid, environ):
-        print("Client connected:", sid)
+        logger.info(f"Client connected: {sid}")
 
 
 async def run_socket_server(robot):

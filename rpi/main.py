@@ -4,7 +4,11 @@ from src import text_to_command
 from src import Robot, SerialManager, run_socket_server, socketio
 
 async def main():
-    serial_manager = SerialManager('/dev/ttyUSB0', 115200)
+    port = SerialManager.find_port()
+    if not port:
+        print("No serial port found. Please connect the robot.")
+        return
+    serial_manager = SerialManager(port, 115200)
     robot = Robot(serial_manager, socketio)
     
     loop = asyncio.get_running_loop()

@@ -33,7 +33,7 @@ class Command(BaseModel):
         
     
     @classmethod
-    async def send_from_joystick(cls, left_y: float, right_x: float, ser: 'SerialManager'):
+    def from_joystick(cls, left_y: float, right_x: float):
         """
         Calculate the differential drive values based on the controller input.
         """
@@ -57,10 +57,10 @@ class Command(BaseModel):
             duration=0
         )
 
-        ser.send(command)
+        return command
         
     @classmethod
-    async def stop(cls, ser: 'SerialManager'):
+    def stop(cls):
         """
         Send a stop command to the robot.
         """
@@ -72,6 +72,6 @@ class Command(BaseModel):
             duration=0
         )
         
-        ser.send(command)
+        return command
     
     

@@ -2,7 +2,9 @@ import asyncio
 import threading
 import serial
 import time
+import logging
 import struct
+import serial.tools.list_ports
 from .Command import Command
 from .CommandTypeEnum import CommandType
 
@@ -13,8 +15,23 @@ class SerialManager:
         self.running = False
         self.robot = None  # Reference to the robot instance
         self.loop = None   # Event loop to use for coroutine execution
+        self._buffer = bytearray()  # Buffer to store incoming data
+        self._logger = logging.getLogger("SerialManager")
         self._START_BYTE = 0xAA
         self._PACKET_LENGTH = 24
+        
+    @staticmethod
+    def find_port():
+        ports = serial.tools.list_ports.comports()
+        for port in ports:
+            # Typical Arduino port names on Linux: ttyUSB*, ttyACM*
+            # On Windows: COM*
+            if 'USB' in port.device or 'ACM' in port.device or 'COM' in port.device:
+                if port.manufacturer and 'Arduino' in port.manufacturer:
+                    return port.device
+                
+                return port.device
+        return None
 
     def start(self, robot, loop):
         self.robot = robot
@@ -22,21 +39,44 @@ class SerialManager:
         self.running = True
         thread = threading.Thread(target=self.read_loop, daemon=True)
         thread.start()
-        print(f"SerialManager started on {self.serial.portstr} at {self.serial.baudrate} baud")
+        self._logger.info(f"SerialManager started on {self.serial.portstr} at {self.serial.baudrate} baud")
         asyncio.create_task(robot.start())
 
+    def stop(self):
+        self.running = False
+        self._logger.info("SerialManager stopping...")
+
     def read_loop(self):
-        while self.running:
-            if self.serial.in_waiting >= self._PACKET_LENGTH:
-                data = self.serial.read(self._PACKET_LENGTH)
-                if data[0] == self._START_BYTE:
-                    future = asyncio.run_coroutine_threadsafe(
-                        self.robot.process_sensor_data(data), self.loop
-                    )
-                    try:
-                        future.result()  # Optional: block and catch exceptions
-                    except Exception as e:
-                        print(f"[Serial] Coroutine failed: {e}")
+        try:
+            while self.running:
+                if self.serial.in_waiting:
+                    data = self.serial.read(self.serial.in_waiting)
+                    self._buffer.extend(data)
+
+                    while len(self._buffer) >= self._PACKET_LENGTH:
+                        start_index = self._buffer.find(bytes([self._START_BYTE]))
+                        if start_index == -1:
+                            self._logger.warning("Start byte not found, clearing buffer")
+                            self._buffer.clear()
+                            break
+                        elif start_index > 0:
+                            self._logger.warning(f"Discarding {start_index} bytes before start byte")
+                            del self._buffer[:start_index]
+
+                        if len(self._buffer) < self._PACKET_LENGTH:
+                            break
+
+                        packet = self._buffer[:self._PACKET_LENGTH]
+                        del self._buffer[:self._PACKET_LENGTH]
+
+                        self.loop.call_soon_threadsafe(
+                            lambda p=packet: asyncio.create_task(self.robot.process_sensor_data(p))
+                        )
+                else:
+                    time.sleep(0.001)
+        except Exception as e:
+            self._logger.exception(f"Exception in read_loop: {e}")
+            self.running = False
 
     def send(self, data: Command):
         # Check if data is a string or pydantic model

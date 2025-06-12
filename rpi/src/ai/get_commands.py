@@ -1,12 +1,12 @@
-from openai import OpenAI
+from openai import AsyncOpenAI
 from dotenv import load_dotenv
 load_dotenv()
 from ..models.CommandResponse import AICommand
 
 
-client = OpenAI()
+client = AsyncOpenAI()
 
-def text_to_command(query: str, path="src/ai/PROMPT.txt") -> AICommand:
+async def text_to_command(query: str, path="src/ai/PROMPT.txt") -> AICommand:
     with open(path, 'r') as prompt_file:
         system_prompt = prompt_file.read()
         
@@ -21,7 +21,7 @@ def text_to_command(query: str, path="src/ai/PROMPT.txt") -> AICommand:
         }
     ]
 
-    response = client.responses.parse(
+    response = await client.responses.parse(
         model="gpt-4.1-nano",
         input=messages,
         temperature=1,

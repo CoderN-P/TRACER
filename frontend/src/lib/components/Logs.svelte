@@ -188,7 +188,7 @@
 
       <Card.Content
         bind:this={logElement}
-        class="flex flex-col-reverse overflow-y-auto overflow-x-hidden w-full gap-0.5 px-3 sm:px-4 py-2 pb-4 max-h-[300px] md:max-h-[250px]"
+        class="flex flex-col-reverse container overflow-y-auto overflow-x-hidden w-full gap-0.5 px-3 sm:px-4 py-2 pb-4 max-h-[300px] md:max-h-[250px]"
       >
         {#if filteredLogs.length === 0}
           <div

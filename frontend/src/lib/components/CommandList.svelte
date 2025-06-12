@@ -19,7 +19,7 @@
     let commandContainer: HTMLElement | null = null;
     
     $effect(() => {
-        if (commands) {
+        if (commands && commandContainer) {
             // Scroll to bottom when new commands are added
             commandContainer.scrollTop = commandContainer.scrollHeight;
         }

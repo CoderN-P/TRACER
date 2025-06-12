@@ -439,7 +439,7 @@
 {#if lastSensorUpdateTime === 0 }
   <Skeleton class="w-fulll h-48"/>
 {:else}
-  <Card.Root class="w-full h-full {className}">
+  <Card.Root class="w-full h-full pb-0 {className}">
     <Card.Header class="pb-2">
       <div class="flex items-center justify-between">
         <div class="flex items-center gap-2">
@@ -744,7 +744,7 @@
     </Card.Content>
   
     <!-- Recording controls -->
-    <div class="p-4 border-t border-gray-200 bg-gray-50 grow">
+    <div class="p-4  border-gray-300 bg-gray-50 rounded-b-xl">
       <div class="flex items-center justify-between">
         <h3 class="text-sm font-medium text-gray-700">Recording Controls</h3>
   

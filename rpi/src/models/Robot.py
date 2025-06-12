@@ -13,7 +13,7 @@ class Robot:
         self.last_rumble_time = 0
         self.rumble_cooldown = 1  # seconds between rumbles
         self.socketio = socketio
-        self.cliff_detected = False
+        self.cliff_clear = asyncio.Event()
         self.waiting_for_sensor = asyncio.Event()
         self.sensor_request_interval = 0.1  # 10Hz = 0.1 seconds
         self.sensor_request_task = None
@@ -22,12 +22,14 @@ class Robot:
         self.sensor_count = 0  # Count of sensor data received
         self.last_sensor_request_time = 0  # Last time sensor data was requested
         self.obstacle_clear = asyncio.Event()
-        self.obstacle_clear.set()
         self.backup_time = 2  # Amount of time to backup when an obstacle is detected
         self.obstacle_threshold = 20 # Distance threshold for obstacle detection
         self._logger = logging.getLogger("RobotManager")
         self.motor_lock = asyncio.Lock()
+        
         self.waiting_for_sensor.set()
+        self.obstacle_clear.set()
+        self.cliff_clear.set()
 
     async def send_safe_command(self, command: Command, wait_after: float = 0):
         async with self.motor_lock:
@@ -77,12 +79,12 @@ class Robot:
             await asyncio.sleep(self.sensor_request_interval)
 
     async def _reset_cliff_detected(self):
-        """Reset the cliff detected flag after a short duration."""
-        await asyncio.sleep(5)  # Wait for 5 seconds before resetting cliff detection to ensure stop
-        self.cliff_detected = False
+        """Reset the cliff clear flag after a short duration."""
+        await asyncio.sleep(0.5)  # Wait for half a second before resetting cliff detection to ensure backup completes
+        self.cliff_clear.set()
         
     async def _reset_obstacle_clear(self):
-        await asyncio.sleep(5)
+        await asyncio.sleep(0.5)
         self.obstacle_clear.set()
 
     async def backup(self):
@@ -176,6 +178,29 @@ class Robot:
         asyncio.create_task(self._reset_obstacle_clear())
     
         return avg_distance
+    
+    
+    async def handle_cliff(self, sensor_data: SensorData, current_time: float):
+        """Handle cliff detection and stop motors if cliff is detected."""
+        
+        if not sensor_data.check_cliff() and not self.cliff_clear.is_set():
+            return 
+        
+        self.cliff_clear.clear()
+        asyncio.create_task(self._reset_cliff_detected())  # Reset cliff detection after 0.5 seconds, basically halting commands
+
+        await self.send_safe_command(Command.stop())  # Stop motors if cliff is detected
+
+        if current_time - self.last_rumble_time > self.rumble_cooldown:
+            await self.socketio.emit(
+                'rumble',
+                {
+                    "low": 0.5,
+                    "high": 0.5,
+                    "duration": 1000,
+                }
+            )
+            self.last_rumble_time = current_time
                 
             
     async def process_sensor_data(self, data: bytes):
@@ -192,26 +217,10 @@ class Robot:
         
         if len(self.distance_history) >= 10:
             self.distance_history.pop(0)
-        # Check for cliff detection
-        if sensor_data.check_cliff() and not self.cliff_detected:
-            self.cliff_detected = True
-            asyncio.create_task(self._reset_cliff_detected())  # Reset cliff detection after 0.5 seconds, basically halting commands
             
-            await self.send_safe_command(Command.stop())  # Stop motors if cliff is detected
-
-            if current_time - self.last_rumble_time > self.rumble_cooldown:
-                await self.socketio.emit(
-                    'rumble',
-                    {
-                        "low": 0.5,
-                        "high": 0.5,
-                        "duration": 1000,
-                    }
-                )
-                self.last_rumble_time = current_time
-        else:
-            self.cliff_detected = False
-
+        # Check for cliff 
+        await self.handle_cliff(sensor_data, current_time)
+           
         # Emit sensor data at a fixed interval
         if current_time - self.last_emit_time >= self.emit_interval:
             self.last_emit_time = current_time
@@ -229,7 +238,7 @@ class Robot:
         left_y = data.get('left_y', 0)
         right_x = data.get('right_x', 0)
 
-        if not self.cliff_detected and self.waiting_for_sensor.is_set() and self.obstacle_clear.is_set():
+        if not self.cliff_clear.is_set() and self.waiting_for_sensor.is_set() and self.obstacle_clear.is_set():
             await self.send_safe_command(Command.from_joystick(left_y, right_x))
             
 

@@ -17,7 +17,7 @@
 {#if distanceHistory.length === 0 }
     <Skeleton class="w-full h-[400px] rounded-sm" />
 {:else}
-    <Card.Root class="w-full h-[400px] ">
+    <Card.Root class="w-full h-full ">
         <Card.Header>
             <Card.Title>Ultrasonic Sensor</Card.Title>
             <Card.Description>Showing distance to walls/obstacles</Card.Description>

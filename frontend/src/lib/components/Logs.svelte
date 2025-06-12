@@ -77,7 +77,7 @@
 {#if !logs || logs.length === 0}
   <Skeleton class="w-full h-50 rounded-sm" />
 {:else}
-  <Card.Root class="w-full h-full {className} overflow-hidden">
+  <Card.Root class="w-full h-full md:w-1/2 " style="height: 435px;">
     <Card.Header>
       <div class="flex items-center justify-between">
         <div class="flex items-center gap-2">

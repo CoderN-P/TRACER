@@ -247,7 +247,10 @@
             </div>
             
             <!-- Logs section with mobile optimizations -->
-            <Logs {logs} class="w-full" />
+         
+            <ObstructionStatus {sensorData}
+                               {lastSensorUpdate}
+                               class="w-full h-full"/>
         </div>
     </div>
     
@@ -256,16 +259,14 @@
         <JoystickStatus lastUpdateTime={lastSensorUpdate} 
                        joystick={joystickInput}
                        class="w-full h-full sm:w-1/2"/>
-        <ObstructionStatus {sensorData} 
-                          {lastSensorUpdate}
-                          class="w-full h-full sm:w-1/2"/>
+        <Logs {logs} class="w-full h-full" />
     </div>
     
     <!-- Recordings and Command List Section - Side by side on large screens -->
     <div class="w-full flex flex-col lg:flex-row items-stretch gap-2">
         <!-- Recordings section -->
         <div class="w-full lg:w-2/5">
-            <Recordings bind:recordings={recordings} class="h-full" />
+            <Recordings lastSensorUpdateTime={lastSensorUpdate} bind:recordings={recordings} class="h-full" />
         </div>
         
         <!-- Command list section - Full width with mobile optimizations -->

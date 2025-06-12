@@ -33,9 +33,11 @@
 
   let {
     recordings = $bindable(),
+    lastSensorUpdateTime,
     class: className = "",
   }: {
     recordings?: Recording[];
+    lastSensorUpdateTime: number;
     class?: string;
   } = $props();
 
@@ -434,348 +436,352 @@
   });
 </script>
 
-<Card.Root class="w-full h-full {className}">
-  <Card.Header class="pb-2">
-    <div class="flex items-center justify-between">
-      <div class="flex items-center gap-2">
-        <Mic class="w-5 h-5 text-purple-500" />
-        <Card.Title>Joystick Macros</Card.Title>
-      </div>
-
-      {#if recordings.length > 0}
-        <span class="text-xs text-gray-500"
-          >{recordings.length}
-          {recordings.length === 1 ? "recording" : "recordings"}</span
-        >
-      {/if}
-    </div>
-    <Card.Description>Saved joystick movement patterns</Card.Description>
-  </Card.Header>
-
-  <Card.Content class="overflow-hidden">
-    {#if recordings.length === 0}
-      <div class="flex flex-col items-center justify-center py-8 text-gray-400">
-        <Clock class="w-12 h-12 mb-3 opacity-25" />
-        <p class="text-center text-sm">No recordings yet</p>
-        <p class="text-center text-xs mt-1">
-          Use the controller to record joystick movements
-        </p>
-      </div>
-    {:else}
-      <div class="flex flex-col gap-2">
-        {#each recordings as recording (recording.timestamp)}
-          <div
-            class="relative group border border-gray-100 hover:border-gray-200 rounded-md p-3 bg-white transition-all"
-            transition:slide={{ duration: 200, easing: quintOut }}
-            class:border-purple-200={recording.isPlaying}
-            class:bg-purple-50={recording.isPlaying}
+{#if lastSensorUpdateTime === 0 }
+  <Skeleton class="w-fulll h-48"/>
+{:else}
+  <Card.Root class="w-full h-full {className}">
+    <Card.Header class="pb-2">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <Mic class="w-5 h-5 text-purple-500" />
+          <Card.Title>Joystick Macros</Card.Title>
+        </div>
+  
+        {#if recordings.length > 0}
+          <span class="text-xs text-gray-500"
+            >{recordings.length}
+            {recordings.length === 1 ? "recording" : "recordings"}</span
           >
-            {#if showConfirmDelete === recording.timestamp}
-              <div
-                class="absolute inset-0 bg-gray-800/75 backdrop-blur-sm rounded-md flex items-center justify-center z-10"
-                transition:fade={{ duration: 150 }}
-              >
-                <div class="bg-white p-3 rounded-md shadow-lg">
-                  <p class="text-sm mb-2">Delete this recording?</p>
-                  <div class="flex gap-2 justify-end">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      class="h-8"
-                      onclick={() => (showConfirmDelete = null)}
-                    >
-                      Cancel
-                    </Button>
-                    <Button
-                      variant="destructive"
-                      size="sm"
-                      class="h-8"
-                      onclick={() => deleteRecording(recording.timestamp)}
-                    >
-                      Delete
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            {/if}
-
-            <div class="flex flex-col gap-2">
-              <!-- First row: name and controls -->
-              <div class="flex items-center justify-between">
-                <div class="flex-grow min-w-0">
-                  {#if renaming === recording.timestamp}
-                    <div
-                      class="flex items-center gap-2"
-                      transition:fade={{ duration: 150 }}
-                    >
-                      <input
-                        type="text"
-                        class="w-full text-sm border border-gray-200 rounded-md px-2 py-1 focus:outline-none focus:ring-1 focus:ring-purple-400"
-                        placeholder="Enter recording name"
-                        bind:value={newName}
-                        onkeydown={(e) => {
-                          if (e.key === "Enter") {
-                            completeRename();
-                          } else if (e.key === "Escape") {
-                            renaming = null;
-                            newName = "";
-                          }
-                        }}
-                        autofocus
-                      />
+        {/if}
+      </div>
+      <Card.Description>Saved joystick movement patterns</Card.Description>
+    </Card.Header>
+  
+    <Card.Content class="overflow-hidden h-full">
+      {#if recordings.length === 0}
+        <div class="flex flex-col items-center justify-center py-8 text-gray-400">
+          <Clock class="w-12 h-12 mb-3 opacity-25" />
+          <p class="text-center text-sm">No recordings yet</p>
+          <p class="text-center text-xs mt-1">
+            Use the controller to record joystick movements
+          </p>
+        </div>
+      {:else}
+        <div class="flex flex-col gap-2">
+          {#each recordings as recording (recording.timestamp)}
+            <div
+              class="relative group border border-gray-100 hover:border-gray-200 rounded-md p-3 bg-white transition-all"
+              transition:slide={{ duration: 200, easing: quintOut }}
+              class:border-purple-200={recording.isPlaying}
+              class:bg-purple-50={recording.isPlaying}
+            >
+              {#if showConfirmDelete === recording.timestamp}
+                <div
+                  class="absolute inset-0 bg-gray-800/75 backdrop-blur-sm rounded-md flex items-center justify-center z-10"
+                  transition:fade={{ duration: 150 }}
+                >
+                  <div class="bg-white p-3 rounded-md shadow-lg">
+                    <p class="text-sm mb-2">Delete this recording?</p>
+                    <div class="flex gap-2 justify-end">
                       <Button
                         variant="outline"
                         size="sm"
-                        class="h-7 px-2"
-                        onclick={completeRename}
+                        class="h-8"
+                        onclick={() => (showConfirmDelete = null)}
                       >
-                        Save
+                        Cancel
+                      </Button>
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        class="h-8"
+                        onclick={() => deleteRecording(recording.timestamp)}
+                      >
+                        Delete
                       </Button>
                     </div>
-                  {:else}
-                    <div class="flex flex-col">
-                      <div class="flex items-center gap-2">
-                        {#if recording.isPlaying}
-                          <span
-                            class="w-2 h-2 rounded-full bg-purple-500 animate-pulse"
-                          ></span>
-                        {/if}
-                        <span class="font-medium text-sm truncate">
-                          {recording.name ||
-                            formatTimestamp(recording.timestamp)}
-                        </span>
-                      </div>
-                      <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
-                        <span
-                          class="text-xs text-gray-500 flex items-center gap-0.5"
-                        >
-                          <Calendar class="w-3 h-3" />
-                          {getRelativeTime(recording.timestamp)}
-                        </span>
-
-                        {#if editingDuration === recording.timestamp}
-                          <div
-                            class="flex items-center gap-1"
-                            transition:fade={{ duration: 150 }}
-                          >
-                            <input
-                              type="number"
-                              class="w-16 text-xs border border-gray-200 rounded-sm px-1 py-0.5"
-                              min="1"
-                              bind:value={newDuration}
-                              onkeydown={(e) => {
-                                if (e.key === "Enter") {
-                                  completeEditDuration();
-                                } else if (e.key === "Escape") {
-                                  editingDuration = null;
-                                }
-                              }}
-                            />
-                            <span class="text-xs">sec</span>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              class="h-5 w-5 p-0"
-                              onclick={completeEditDuration}
-                              title="Save duration"
-                            >
-                              <Check class="h-3 w-3" />
-                            </Button>
-                          </div>
-                        {:else}
-                          <button
-                            class="text-xs text-gray-500 hover:text-purple-500 flex items-center gap-1"
-                            onclick={() =>
-                              !recording.isPlaying &&
-                              startEditDuration(recording.timestamp)}
-                            disabled={recording.isPlaying}
-                          >
-                            <Clock class="h-3 w-3" />
-                            <span>{formatDuration(recording.duration)}</span>
-                          </button>
-                        {/if}
-                      </div>
-                    </div>
-                  {/if}
+                  </div>
                 </div>
-
-                <div class="flex items-center gap-1 shrink-0">
-                  {#if !recording.isPlaying}
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      class="h-7 w-7"
-                      onclick={() => playRecording(recording.timestamp)}
-                      title="Play recording"
-                    >
-                      <Play class="h-3.5 w-3.5" />
-                    </Button>
-                  {:else}
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      class="h-7 w-7 text-purple-500"
-                      onclick={() => stopPlayback(recording.timestamp)}
-                      title="Stop playback"
-                    >
-                      <Pause class="h-3.5 w-3.5" />
-                    </Button>
-                  {/if}
-
-                  {#if !recording.isPlaying}
-                    <div
-                      class="opacity-0 group-hover:opacity-100 transition-opacity flex"
-                    >
+              {/if}
+  
+              <div class="flex flex-col gap-2">
+                <!-- First row: name and controls -->
+                <div class="flex items-center justify-between">
+                  <div class="flex-grow min-w-0">
+                    {#if renaming === recording.timestamp}
+                      <div
+                        class="flex items-center gap-2"
+                        transition:fade={{ duration: 150 }}
+                      >
+                        <input
+                          type="text"
+                          class="w-full text-sm border border-gray-200 rounded-md px-2 py-1 focus:outline-none focus:ring-1 focus:ring-purple-400"
+                          placeholder="Enter recording name"
+                          bind:value={newName}
+                          onkeydown={(e) => {
+                            if (e.key === "Enter") {
+                              completeRename();
+                            } else if (e.key === "Escape") {
+                              renaming = null;
+                              newName = "";
+                            }
+                          }}
+                          autofocus
+                        />
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          class="h-7 px-2"
+                          onclick={completeRename}
+                        >
+                          Save
+                        </Button>
+                      </div>
+                    {:else}
+                      <div class="flex flex-col">
+                        <div class="flex items-center gap-2">
+                          {#if recording.isPlaying}
+                            <span
+                              class="w-2 h-2 rounded-full bg-purple-500 animate-pulse"
+                            ></span>
+                          {/if}
+                          <span class="font-medium text-sm truncate">
+                            {recording.name ||
+                              formatTimestamp(recording.timestamp)}
+                          </span>
+                        </div>
+                        <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
+                          <span
+                            class="text-xs text-gray-500 flex items-center gap-0.5"
+                          >
+                            <Calendar class="w-3 h-3" />
+                            {getRelativeTime(recording.timestamp)}
+                          </span>
+  
+                          {#if editingDuration === recording.timestamp}
+                            <div
+                              class="flex items-center gap-1"
+                              transition:fade={{ duration: 150 }}
+                            >
+                              <input
+                                type="number"
+                                class="w-16 text-xs border border-gray-200 rounded-sm px-1 py-0.5"
+                                min="1"
+                                bind:value={newDuration}
+                                onkeydown={(e) => {
+                                  if (e.key === "Enter") {
+                                    completeEditDuration();
+                                  } else if (e.key === "Escape") {
+                                    editingDuration = null;
+                                  }
+                                }}
+                              />
+                              <span class="text-xs">sec</span>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                class="h-5 w-5 p-0"
+                                onclick={completeEditDuration}
+                                title="Save duration"
+                              >
+                                <Check class="h-3 w-3" />
+                              </Button>
+                            </div>
+                          {:else}
+                            <button
+                              class="text-xs text-gray-500 hover:text-purple-500 flex items-center gap-1"
+                              onclick={() =>
+                                !recording.isPlaying &&
+                                startEditDuration(recording.timestamp)}
+                              disabled={recording.isPlaying}
+                            >
+                              <Clock class="h-3 w-3" />
+                              <span>{formatDuration(recording.duration)}</span>
+                            </button>
+                          {/if}
+                        </div>
+                      </div>
+                    {/if}
+                  </div>
+  
+                  <div class="flex items-center gap-1 shrink-0">
+                    {#if !recording.isPlaying}
                       <Button
                         size="icon"
                         variant="ghost"
                         class="h-7 w-7"
-                        onclick={() => startRename(recording.timestamp)}
-                        title="Rename recording"
+                        onclick={() => playRecording(recording.timestamp)}
+                        title="Play recording"
                       >
-                        <Edit class="h-3 w-3" />
+                        <Play class="h-3.5 w-3.5" />
                       </Button>
-
+                    {:else}
                       <Button
                         size="icon"
                         variant="ghost"
-                        class="h-7 w-7 hover:text-red-500"
-                        onclick={() =>
-                          (showConfirmDelete = recording.timestamp)}
-                        title="Delete recording"
+                        class="h-7 w-7 text-purple-500"
+                        onclick={() => stopPlayback(recording.timestamp)}
+                        title="Stop playback"
                       >
-                        <Trash2 class="h-3.5 w-3.5" />
+                        <Pause class="h-3.5 w-3.5" />
                       </Button>
-                    </div>
-                  {/if}
+                    {/if}
+  
+                    {#if !recording.isPlaying}
+                      <div
+                        class="opacity-0 group-hover:opacity-100 transition-opacity flex"
+                      >
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          class="h-7 w-7"
+                          onclick={() => startRename(recording.timestamp)}
+                          title="Rename recording"
+                        >
+                          <Edit class="h-3 w-3" />
+                        </Button>
+  
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          class="h-7 w-7 hover:text-red-500"
+                          onclick={() =>
+                            (showConfirmDelete = recording.timestamp)}
+                          title="Delete recording"
+                        >
+                          <Trash2 class="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    {/if}
+                  </div>
                 </div>
-              </div>
-
-              <!-- Progress bar -->
-              <div
-                class="w-full mt-1 {recording.isPlaying
-                  ? ''
-                  : 'opacity-50 group-hover:opacity-100'} transition-opacity"
-                onmousemove={(e) =>
-                  handleProgressHover(
-                    e,
-                    recording.timestamp,
-                    recording.duration || 10
-                  )}
-                onmouseleave={() => clearProgressHover(recording.timestamp)}
-              >
+  
+                <!-- Progress bar -->
                 <div
-                  class="h-2 bg-gray-100 rounded-full overflow-hidden relative"
+                  class="w-full mt-1 {recording.isPlaying
+                    ? ''
+                    : 'opacity-50 group-hover:opacity-100'} transition-opacity"
+                  onmousemove={(e) =>
+                    handleProgressHover(
+                      e,
+                      recording.timestamp,
+                      recording.duration || 10
+                    )}
+                  onmouseleave={() => clearProgressHover(recording.timestamp)}
                 >
-                  <!-- Time markers -->
-                  {#each getTimeMarkers(recording.duration || 10) as marker}
-                    <div
-                      class="absolute top-0 bottom-0 w-px bg-gray-300/50"
-                      style="left: {marker}%;"
-                    ></div>
-                  {/each}
-
-                  <!-- Hover indicator -->
-                  {#if hoverProgress[recording.timestamp] !== null && hoverProgress[recording.timestamp] !== undefined}
-                    <div
-                      class="absolute top-0 h-full w-px bg-gray-500 z-10"
-                      style="left: {hoverProgress[recording.timestamp]}%;"
-                      transition:fade={{ duration: 100 }}
-                    ></div>
-                  {/if}
-
-                  <!-- Progress bar -->
                   <div
-                    class="h-full bg-purple-500 transition-all {recording.isPlaying
-                      ? 'duration-300 ease-linear'
-                      : ''} rounded-full"
-                    style="width: {recording.progress || 0}%"
-                  ></div>
-                </div>
-
-                <!-- Time display -->
-                <div class="flex justify-between mt-1">
-                  {#if hoverProgress[recording.timestamp] !== null && hoverProgress[recording.timestamp] !== undefined && !recording.isPlaying}
-                    <span
-                      class="text-[10px] text-purple-500 font-medium"
-                      transition:fade={{ duration: 100 }}
-                    >
-                      {Math.floor(
-                        ((hoverProgress[recording.timestamp] || 0) / 100) *
-                          (recording.duration || 10)
-                      )}s
-                    </span>
-                  {:else if recording.isPlaying}
-                    <span class="text-[10px] text-purple-700">
-                      {formatTimeDisplay(
-                        Math.floor(
-                          ((recording.progress || 0) / 100) *
+                    class="h-2 bg-gray-100 rounded-full overflow-hidden relative"
+                  >
+                    <!-- Time markers -->
+                    {#each getTimeMarkers(recording.duration || 10) as marker}
+                      <div
+                        class="absolute top-0 bottom-0 w-px bg-gray-300/50"
+                        style="left: {marker}%;"
+                      ></div>
+                    {/each}
+  
+                    <!-- Hover indicator -->
+                    {#if hoverProgress[recording.timestamp] !== null && hoverProgress[recording.timestamp] !== undefined}
+                      <div
+                        class="absolute top-0 h-full w-px bg-gray-500 z-10"
+                        style="left: {hoverProgress[recording.timestamp]}%;"
+                        transition:fade={{ duration: 100 }}
+                      ></div>
+                    {/if}
+  
+                    <!-- Progress bar -->
+                    <div
+                      class="h-full bg-purple-500 transition-all {recording.isPlaying
+                        ? 'duration-300 ease-linear'
+                        : ''} rounded-full"
+                      style="width: {recording.progress || 0}%"
+                    ></div>
+                  </div>
+  
+                  <!-- Time display -->
+                  <div class="flex justify-between mt-1">
+                    {#if hoverProgress[recording.timestamp] !== null && hoverProgress[recording.timestamp] !== undefined && !recording.isPlaying}
+                      <span
+                        class="text-[10px] text-purple-500 font-medium"
+                        transition:fade={{ duration: 100 }}
+                      >
+                        {Math.floor(
+                          ((hoverProgress[recording.timestamp] || 0) / 100) *
                             (recording.duration || 10)
-                        ),
-                        recording.duration || 10
-                      )}
-                    </span>
-                  {:else}
-                    <span class="text-[10px] text-gray-400">
-                      {formatTimeDisplay(0, recording.duration || 10)}
-                    </span>
-                  {/if}
-
-                  {#if recording.isPlaying}
-                    <span
-                      class="text-[10px] flex items-center gap-0.5 text-purple-500"
-                    >
-                      <Loader2 class="w-2 h-2 animate-spin" />
-                      Playing
-                    </span>
-                  {/if}
+                        )}s
+                      </span>
+                    {:else if recording.isPlaying}
+                      <span class="text-[10px] text-purple-700">
+                        {formatTimeDisplay(
+                          Math.floor(
+                            ((recording.progress || 0) / 100) *
+                              (recording.duration || 10)
+                          ),
+                          recording.duration || 10
+                        )}
+                      </span>
+                    {:else}
+                      <span class="text-[10px] text-gray-400">
+                        {formatTimeDisplay(0, recording.duration || 10)}
+                      </span>
+                    {/if}
+  
+                    {#if recording.isPlaying}
+                      <span
+                        class="text-[10px] flex items-center gap-0.5 text-purple-500"
+                      >
+                        <Loader2 class="w-2 h-2 animate-spin" />
+                        Playing
+                      </span>
+                    {/if}
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
-        {/each}
+          {/each}
+        </div>
+      {/if}
+    </Card.Content>
+  
+    <!-- Recording controls -->
+    <div class="p-4 border-t border-gray-200 bg-gray-50 grow">
+      <div class="flex items-center justify-between">
+        <h3 class="text-sm font-medium text-gray-700">Recording Controls</h3>
+  
+        {#if isRecording}
+          <Button
+            variant="destructive"
+            size="sm"
+            class="h-8"
+            onclick={stopRecording}
+            title="Stop recording"
+          >
+            <StopCircle class="h-4 w-4 mr-1" />
+            Stop Recording
+          </Button>
+        {:else}
+          <Button
+            variant="outline"
+            size="sm"
+            class="h-8"
+            onclick={startRecording}
+            title="Start recording"
+          >
+            <Mic class="h-4 w-4 mr-1" />
+            Start Recording
+          </Button>
+        {/if}
       </div>
-    {/if}
-  </Card.Content>
-
-  <!-- Recording controls -->
-  <div class="p-4 border-t border-gray-200 bg-gray-50">
-    <div class="flex items-center justify-between">
-      <h3 class="text-sm font-medium text-gray-700">Recording Controls</h3>
-
-      {#if isRecording}
-        <Button
-          variant="destructive"
-          size="sm"
-          class="h-8"
-          onclick={stopRecording}
-          title="Stop recording"
-        >
-          <StopCircle class="h-4 w-4 mr-1" />
-          Stop Recording
-        </Button>
-      {:else}
-        <Button
-          variant="primary"
-          size="sm"
-          class="h-8"
-          onclick={startRecording}
-          title="Start recording"
-        >
-          <Mic class="h-4 w-4 mr-1" />
-          Start Recording
-        </Button>
-      {/if}
+  
+      <!-- Recording status -->
+      <div class="mt-2 text-xs text-gray-500">
+        {#if isRecording}
+          <p>Recording in progress...</p>
+          <p>Duration: {formatDuration(recordingDuration)}</p>
+        {:else}
+          <p>No recording in progress</p>
+        {/if}
+      </div>
     </div>
-
-    <!-- Recording status -->
-    <div class="mt-2 text-xs text-gray-500">
-      {#if isRecording}
-        <p>Recording in progress...</p>
-        <p>Duration: {formatDuration(recordingDuration)}</p>
-      {:else}
-        <p>No recording in progress</p>
-      {/if}
-    </div>
-  </div>
-</Card.Root>
+  </Card.Root>
+{/if}

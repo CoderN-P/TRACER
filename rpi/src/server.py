@@ -22,7 +22,7 @@ def setup_routes(robot):
         
     @sio.on('stop')
     async def on_stop(sid, data):
-        await Command.stop(robot.serial)
+        await robot.send_safe_command(Command.stop())
 
     @sio.event
     async def connect(sid, environ):

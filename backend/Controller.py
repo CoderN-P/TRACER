@@ -310,6 +310,9 @@ class Controller:
             # Decrease speed with right trigger (brake)
             if right_trigger > 0.1:
                 self.speed -= 0.05 * right_trigger
+                
+            if left_trigger < 0.1 and right_trigger < 0.1:
+                self.speed -= 0.01  # Slow down if no trigger is pressed
 
             # Clamp speed between -1 and 1 to allow reverse
             self.speed = max(0, min(self.speed, 1))

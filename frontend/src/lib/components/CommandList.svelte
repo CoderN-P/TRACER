@@ -15,6 +15,15 @@
         inputFocus: boolean,
         class?: string
     } = $props();
+    
+    let commandContainer: HTMLElement | null = null;
+    
+    $effect(() => {
+        if (commands) {
+            // Scroll to bottom when new commands are added
+            commandContainer.scrollTop = commandContainer.scrollHeight;
+        }
+    });
 </script>
 
 {#if lastSensorUpdateTime === 0}
@@ -29,9 +38,9 @@
         </Card.Header>
         <Card.Content class="px-3 sm:px-6 h-full">
             <!-- Command history with dynamic height based on screen size -->
-            <div class="flex flex-col gap-2 mb-3 sm:mb-4 
-                        max-h-[35vh] sm:max-h-[40vh] h-full md:max-h-[45vh] 
-                        overflow-y-auto overscroll-contain 
+            <div bind:this={commandContainer} style="height: calc(100% - 70px); max-height: 230px;" class="flex container flex-col gap-2 mb-3 sm:mb-4 
+                        flex-grow h-[calc(100% - 36px)]
+                        overflow-y-scroll overscroll-contain 
                         rounded-md p-1">
                 {#if commands.length === 0}
                     <div class="text-center py-6 text-gray-400 text-sm italic">

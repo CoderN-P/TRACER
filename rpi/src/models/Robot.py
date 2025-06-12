@@ -21,19 +21,22 @@ class Robot:
         self.distance_history = []  # Store last 10 distances
         self.sensor_count = 0  # Count of sensor data received
         self.last_sensor_request_time = 0  # Last time sensor data was requested
-        self.obstacle_detected = False  # Flag to indicate if an obstacle is detected
+        self.obstacle_clear = asyncio.Event()
+        self.obstacle_clear.set()
         self.backup_time = 2  # Amount of time to backup when an obstacle is detected
         self.obstacle_threshold = 20 # Distance threshold for obstacle detection
         self._logger = logging.getLogger("RobotManager")
+        self.motor_lock = asyncio.Lock()
         self.waiting_for_sensor.set()
 
     async def send_safe_command(self, command: Command, wait_after: float = 0):
-        await self.waiting_for_sensor.wait()
-        self.waiting_for_sensor.clear()
-        self.serial.send(command)
-        if wait_after > 0:
-            await asyncio.sleep(wait_after)
-        self.waiting_for_sensor.set()
+        async with self.motor_lock:
+            await self.waiting_for_sensor.wait()
+            self.waiting_for_sensor.clear()
+            self.serial.send(command)
+            if wait_after > 0:
+                await asyncio.sleep(wait_after)
+            self.waiting_for_sensor.set()
 
     async def start(self):
         """Start the robot's background tasks"""
@@ -78,10 +81,9 @@ class Robot:
         await asyncio.sleep(5)  # Wait for 5 seconds before resetting cliff detection to ensure stop
         self.cliff_detected = False
         
-    async def _reset_obstacle_detected(self):
-        """Reset the obstacle detected flag after a short duration."""
+    async def _reset_obstacle_clear(self):
         await asyncio.sleep(5)
-        self.obstacle_detected = False
+        self.obstacle_clear.set()
 
     async def backup(self):
         """Backup the robot for a short duration when an obstacle is detected."""
@@ -147,8 +149,8 @@ class Robot:
 
     async def handle_obstacle(self, sensor_data: SensorData, current_time: float) -> float:
         """Detect obstacles and trigger backup if needed. Returns processed distance."""
-        if not sensor_data.is_obstacle_detected(self.obstacle_threshold) or self.obstacle_detected:
-            self.obstacle_detected = False
+        if not sensor_data.is_obstacle_detected(self.obstacle_threshold) or self.obstacle_clear.is_set():
+            self.obstacle_clear.set()
             return sensor_data.ultrasonic.distance
     
         distance = sensor_data.ultrasonic.distance
@@ -171,8 +173,8 @@ class Robot:
             self.last_rumble_time = current_time
     
         asyncio.create_task(self.backup())
-        self.obstacle_detected = True
-        asyncio.create_task(self._reset_obstacle_detected())
+        self.obstacle_clear.clear()
+        asyncio.create_task(self._reset_obstacle_clear())
     
         return avg_distance
                 
@@ -181,9 +183,6 @@ class Robot:
         self.waiting_for_sensor.set()
         try:
             sensor_data = self.bytes_to_sensor_data(data)
-            if self.sensor_count < 2: # Dont process the first two sensor data packets (UNSTABLE)
-                self.sensor_count += 1
-                return 
         except Exception as e:
             self._logger.error(f"Error processing sensor data: {e}")
             return
@@ -199,7 +198,7 @@ class Robot:
             self.cliff_detected = True
             asyncio.create_task(self._reset_cliff_detected())  # Reset cliff detection after 0.5 seconds, basically halting commands
             
-            await self.stop_command()
+            await self.send_safe_command(Command.stop())  # Stop motors if cliff is detected
 
             if current_time - self.last_rumble_time > self.rumble_cooldown:
                 await self.socketio.emit(
@@ -231,7 +230,7 @@ class Robot:
         left_y = data.get('left_y', 0)
         right_x = data.get('right_x', 0)
 
-        if not self.cliff_detected and self.waiting_for_sensor.is_set() and not self.obstacle_detected:
+        if not self.cliff_detected and self.waiting_for_sensor.is_set() and self.obstacle_clear.is_set():
             await self.send_safe_command(Command.from_joystick(left_y, right_x))
             
 

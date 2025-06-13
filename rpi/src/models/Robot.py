@@ -232,7 +232,7 @@ class Robot:
         left_y = data.get('left_y', 0)
         right_x = data.get('right_x', 0)
 
-        if not self.cliff_clear.is_set() and self.waiting_for_sensor.is_set() and self.obstacle_clear.is_set():
+        if self.cliff_clear.is_set() and self.waiting_for_sensor.is_set() and self.obstacle_clear.is_set():
             await self.send_safe_command(Command.from_joystick(left_y, right_x))
             
 

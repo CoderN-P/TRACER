@@ -187,6 +187,7 @@ class Robot:
             return 
         
         self.cliff_clear.clear()
+        asyncio.create_task(self.backup())
         asyncio.create_task(self._reset_cliff_detected())  # Reset cliff detection after 0.5 seconds, basically halting commands
 
         await self.send_safe_command(Command.stop())  # Stop motors if cliff is detected

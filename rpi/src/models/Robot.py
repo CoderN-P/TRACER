@@ -183,7 +183,7 @@ class Robot:
     async def handle_cliff(self, sensor_data: SensorData, current_time: float):
         """Handle cliff detection and stop motors if cliff is detected."""
         
-        if not sensor_data.check_cliff() and not self.cliff_clear.is_set():
+        if not sensor_data.check_cliff() or not self.cliff_clear.is_set():
             return 
         
         self.cliff_clear.clear()
@@ -192,14 +192,7 @@ class Robot:
         await self.send_safe_command(Command.stop())  # Stop motors if cliff is detected
 
         if current_time - self.last_rumble_time > self.rumble_cooldown:
-            await self.socketio.emit(
-                'rumble',
-                {
-                    "low": 0.5,
-                    "high": 0.5,
-                    "duration": 1000,
-                }
-            )
+            await self.socketio.emit('rumble', {"low": 0.5, "high": 0.5, "duration": 1000})
             self.last_rumble_time = current_time
                 
             

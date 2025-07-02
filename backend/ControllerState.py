@@ -6,4 +6,4 @@ class ControllerState(str, Enum):
     TWO_ARCADE = "two_arcade" # Two joystick arcade drive
     TANK = "tank" # Tank drive with two joysticks
     CAR = "car" # Car-like drive with triggers for acceleration and braking and left joystick for steering
-    
+    GESTURE = "gesture" # Gesture control using accelerometer data from hifive board

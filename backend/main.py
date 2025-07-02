@@ -1,14 +1,18 @@
 import time
+
+import requests
 from flask import Flask
 from flask_socketio import SocketIO
 import socketio
 from Controller import Controller
 import threading
 
+from GestureController import GestureController
 
 app = Flask(__name__)
 socket = SocketIO(app, cors_allowed_origins='*')
 sio_client = socketio.Client()
+gesture_controller_route = "http://192.168.4.235/sensors"
 
 
 def setup_routes(controller: Controller):
@@ -28,7 +32,6 @@ def setup_routes(controller: Controller):
         
     @sio_client.on('rumble')
     def handle_rumble(data):
-        print(f"Rumble command received: {data}")
         controller.rumble(data['low'], data['high'], data['duration'])
         
     @sio_client.on('sensor_data')
@@ -37,7 +40,6 @@ def setup_routes(controller: Controller):
         
     @sio_client.on('active_command')
     def handle_active_command(data):
-        print(data)
         socket.emit('active_command', data)
         
     @socket.on('play_recording')
@@ -88,16 +90,24 @@ def start_socket_server():
 
 if __name__ == "__main__":
     # Init joystick
-    controller = Controller.initialize(sio_client, socket)
-    setup_routes(controller)
 
+    # Start the gesture controller sensor loop
+
+    gesture_controller = GestureController(gesture_controller_route)
+    gesture_controller.start_sensor_loop()
+    
+    controller = Controller.initialize(sio_client, socket, gesture_controller)
+    setup_routes(controller)
+    
     # Connect to RPi backend
     sio_client.connect('http://192.168.4.119:8080')
 
     # Start socket server in a background thread
     threading.Thread(target=start_socket_server, daemon=True).start()
+    
 
     # Main loop for joystick input (main thread = avoids macOS issues)
+
     try:
         while True:
             controller.send_update()

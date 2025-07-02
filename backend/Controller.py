@@ -5,7 +5,7 @@ from ControllerState import ControllerState
 
 
 class Controller:
-    def __init__(self, controller, socketio, socketio_server):
+    def __init__(self, controller, socketio, socketio_server, gesture_controller=None):
         self.controller = controller
         self.socketio = socketio  # socketio client
         self.socketio_server = socketio_server  # socketio server
@@ -29,9 +29,12 @@ class Controller:
 
         # --- Joystick history ---
         self.joystick_history = []  # List to store joystick history for recording
+        
+        # --- Gesture controller ---
+        self.gesture_controller = gesture_controller  # Optional gesture controller for accelerometer input
 
     @classmethod
-    def initialize(cls, socketio, socketio_server) -> 'Controller':
+    def initialize(cls, socketio, socketio_server, gesture_controller=None) -> 'Controller':
         pygame.init()
         pygame.joystick.init()
 
@@ -41,7 +44,7 @@ class Controller:
         controller = pygame.joystick.Joystick(0)
         controller.init()
 
-        return cls(controller, socketio, socketio_server)
+        return cls(controller, socketio, socketio_server, gesture_controller)
 
     def reconnect_controller(self):
         """
@@ -87,7 +90,10 @@ class Controller:
         if self.state == ControllerState.CAR:
             # In CAR state, we consider the speed to determine if we should send an update
             return abs(self.speed) > 0.15
-
+        
+        if self.state == ControllerState.GESTURE:
+            return self.gesture_controller and self.gesture_controller.should_send_update()
+        
         left_y, right_x = self.read_input()
         moved_enough = abs(left_y) > 0.15 or abs(right_x) > 0.15
         return moved_enough
@@ -220,6 +226,12 @@ class Controller:
                 self.state = ControllerState.TANK
             elif new_state == "CAR":
                 self.state = ControllerState.CAR
+            elif new_state == "GESTURE":
+                if self.gesture_controller:
+                    self.state = ControllerState.GESTURE
+                else:
+                    print("Gesture control is not available")
+                    return
             else:
                 print(f"Unknown state: {new_state}")
                 return
@@ -234,18 +246,22 @@ class Controller:
                 elif self.state == ControllerState.TANK:
                     self.state = ControllerState.CAR
                 elif self.state == ControllerState.CAR:
+                    self.state = ControllerState.GESTURE
+                elif self.state == ControllerState.GESTURE:
                     self.state = ControllerState.TWO_ARCADE
                 self.rumble(0.5, 0.5, 500)
                 self.socketio_server.emit("joystick_mode", {"mode": self.state.name})
             elif self.is_button_ready(9, 'state_cooldown'):
                 if self.state == ControllerState.TWO_ARCADE:
-                    self.state = ControllerState.CAR
+                    self.state = ControllerState.GESTURE
                 elif self.state == ControllerState.ONE_ARCADE:
                     self.state = ControllerState.TWO_ARCADE
                 elif self.state == ControllerState.TANK:
                     self.state = ControllerState.ONE_ARCADE
                 elif self.state == ControllerState.CAR:
                     self.state = ControllerState.TANK
+                elif self.state == ControllerState.GESTURE:
+                    self.state = ControllerState.CAR
                 self.rumble(0.5, 0.5, 500)
                 self.socketio_server.emit("joystick_mode", {"mode": self.state.name})
 
@@ -257,6 +273,7 @@ class Controller:
         if pygame.joystick.get_count() == 0 and not self.reconnecting:
             self.reconnecting = True
             threading.Thread(self.reconnect_controller()).start()
+        
 
         pygame.event.pump()  # Process events to update joystick state
         if self.controller.get_button(1):  # Button B is at index 1
@@ -337,7 +354,6 @@ class Controller:
                 y = -self.controller.get_axis(1)
 
                 magnitude = math.sqrt(x ** 2 + y ** 2)
-                print(f"Joystick magnitude: {magnitude}, x: {x}, y: {y}")
 
                 # x and y must have 1 magnitude
                 # even if x and y are 0, 0 we still move straight since we only care about joystick direction
@@ -350,6 +366,9 @@ class Controller:
 
                 left_y = y * self.speed
                 right_x = x * self.speed
+                
+            elif self.state == ControllerState.GESTURE:
+                left_y, right_x = self.gesture_controller.get_joystick_input()
             else:
                 left_y, right_x = self.read_input()
 

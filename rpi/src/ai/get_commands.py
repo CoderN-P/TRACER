@@ -1,10 +1,12 @@
+import os
+
 from openai import AsyncOpenAI
 from dotenv import load_dotenv
 load_dotenv()
 from ..models.CommandResponse import AICommand
 
 
-client = AsyncOpenAI()
+client = AsyncOpenAI(api_key=os.environ["OPENAI_API_KEY"])
 
 async def text_to_command(query: str, path="src/ai/PROMPT.txt") -> AICommand:
     with open(path, 'r') as prompt_file:
@@ -30,7 +32,10 @@ async def text_to_command(query: str, path="src/ai/PROMPT.txt") -> AICommand:
         text_format=AICommand
     )
     
+    
+    
     return response.output_parsed
+
 
 
 

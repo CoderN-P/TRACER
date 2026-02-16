@@ -1,6 +1,9 @@
 import asyncio
 import logging
 from src import text_to_command
+import os
+from dotenv import load_dotenv
+load_dotenv()
 from src import Robot, SerialManager, run_socket_server, socketio
 
 async def main():
@@ -17,4 +20,8 @@ async def main():
     await run_socket_server(robot)
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    hostname = os.uname().nodename
+    logging.info(f"Running on hostname: {hostname}")
+    if hostname == "tracer":
+        asyncio.run(main())
+        

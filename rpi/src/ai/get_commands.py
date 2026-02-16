@@ -1,8 +1,7 @@
 import os
 
 from openai import AsyncOpenAI
-from dotenv import load_dotenv
-load_dotenv()
+
 from ..models.CommandResponse import AICommand
 
 
@@ -28,7 +27,6 @@ async def text_to_command(query: str, path="src/ai/PROMPT.txt") -> AICommand:
         input=messages,
         temperature=1,
         top_p=1,
-        max_output_tokens=500,
         text_format=AICommand
     )
     

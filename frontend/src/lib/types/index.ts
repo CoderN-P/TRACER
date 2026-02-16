@@ -8,3 +8,4 @@ export { type SensorData, SensorDataSchema } from './SensorData';
 export { type UltrasonicSensor, UltrasonicSensorSchema } from './UltrasonicSensor';
 export { type DistanceEntry, DistanceEntrySchema } from './DistanceEntry';
 export { type LogEntry, LogEntrySchema } from './LogEntry';
+export { type GestureData, GestureDataSchema } from './GestureData';

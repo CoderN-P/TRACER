@@ -39,12 +39,16 @@ class Controller:
         pygame.joystick.init()
 
         if pygame.joystick.get_count() == 0:
-            threading.Thread(cls.reconnect_controller()).start()
-
-        controller = pygame.joystick.Joystick(0)
-        controller.init()
-
-        return cls(controller, socketio, socketio_server, gesture_controller)
+            controller = None
+        else:
+            controller = pygame.joystick.Joystick(0)
+            controller.init()
+        c = cls(controller, socketio, socketio_server, gesture_controller)
+        
+        if not controller:
+            threading.Thread(c.reconnect_controller()).start()
+            
+        return c
 
     def reconnect_controller(self):
         """

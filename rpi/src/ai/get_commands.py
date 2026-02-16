@@ -22,7 +22,7 @@ async def text_to_command(query: str, path="src/ai/PROMPT.txt") -> AICommand:
     ]
 
     response = await client.responses.parse(
-        model="gpt-4.1-nano",
+        model="gpt-5-nano",
         input=messages,
         temperature=1,
         top_p=1,

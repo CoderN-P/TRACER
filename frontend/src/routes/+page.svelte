@@ -3,9 +3,11 @@
     import { onMount } from 'svelte';
     import {
         type SensorData,
+        type GestureData,
         type Command,
         type Joystick,
         SensorDataSchema,
+        GestureDataSchema,
         JoystickSchema,
         type DistanceEntry,
         DistanceEntrySchema,
@@ -24,8 +26,10 @@
     import ObstructionStatus from "$lib/components/ObstructionStatus.svelte";
     import CommandList from "$lib/components/CommandList.svelte";
     import Recordings from "$lib/components/Recordings.svelte";
+    import GestureController from "$lib/components/GestureController.svelte";
     
     let sensorData = $state<SensorData | null>(null);
+    let gestureData = $state<GestureData | null>(null);
     let previousSensorData = $state<SensorData | null>(null);
     let logs = $state<LogEntry[]>([]);
     let joystickInput = $state<Joystick>({
@@ -147,6 +151,11 @@
             updateLogs();
         });
 
+        socket.on('gesture_data', (data) => {
+            console.log('Received gesture data:', data);
+            gestureData = GestureDataSchema.parse(data); // Assuming gestureData is already in the correct format
+        });
+
         return () => {
             socket.disconnect();
         };
@@ -260,6 +269,11 @@
                        joystick={joystickInput}
                        class="w-full h-full sm:w-1/2"/>
         <Logs {logs} class="w-full h-full" />
+    </div>
+    
+    <!-- Board Orientation Visualization -->
+    <div class="w-full">
+        <GestureController {gestureData} />
     </div>
     
     <!-- Recordings and Command List Section - Side by side on large screens -->

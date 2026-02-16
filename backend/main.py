@@ -11,9 +11,10 @@ from GestureController import GestureController
 
 app = Flask(__name__)
 socket = SocketIO(app, cors_allowed_origins='*')
-sio_client = socketio.Client()
-gesture_controller_route = "http://192.168.4.235/sensors"
-
+sio_client = socketio.Client()  # Use WebSocket transport for better performance
+gesture_controller_route = "http://192.168.4.235/sensors" # esp32 running gesture controller code, serving sensor data at this endpoint
+AP = "http://10.42.0.1:8080"
+NORMAL = "http://192.168.4.119:8080"
 
 def setup_routes(controller: Controller):
     @socket.on('query')
@@ -93,24 +94,26 @@ if __name__ == "__main__":
 
     # Start the gesture controller sensor loop
 
-    gesture_controller = GestureController(gesture_controller_route)
+    gesture_controller = GestureController(gesture_controller_route, socket)
     gesture_controller.start_sensor_loop()
     
     controller = Controller.initialize(sio_client, socket, gesture_controller)
+    # controller = Controller.initialize(sio_client, socket)
     setup_routes(controller)
-    
-    # Connect to RPi backend
-    sio_client.connect('http://192.168.4.119:8080')
+    # # Connect to RPi backend
+    sio_client.connect(NORMAL, transports=['polling'])
+
 
     # Start socket server in a background thread
     threading.Thread(target=start_socket_server, daemon=True).start()
     
 
     # Main loop for joystick input (main thread = avoids macOS issues)
-
+    
     try:
         while True:
             controller.send_update()
             time.sleep(0.05)  # 20 Hz
     except KeyboardInterrupt:
         print("Shutting down.")
+    

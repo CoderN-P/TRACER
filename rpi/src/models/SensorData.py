@@ -1,3 +1,5 @@
+import datetime
+
 from pydantic import BaseModel, Field
 from . import UltrasonicSensor, IMUData
 
@@ -11,6 +13,7 @@ class SensorData(BaseModel):
     ir_front: bool = Field(..., description="Front IR sensor status (True if floor is detected)")
     ir_back: bool = Field(..., description="Back IR sensor status (True if floor is detected)")
     battery: int = Field(..., description="Battery level in percentage (0-100)")
+    timestamp: datetime.datetime = Field(..., description="Timestamp of the sensor data", default_factory=datetime.datetime.now) 
     
     def is_obstacle_detected(self, threshold: float = 10.0) -> bool:
         """

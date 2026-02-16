@@ -7,22 +7,15 @@ import requests, time, math
 from GestureData import GestureData
 
 class GestureController:
-    def __init__(self, url):
+    def __init__(self, url, socketio):
         self.api_url = url
         self.last_query_time = 0
         self.query_interval = 0.1  # seconds between emits - 10hz 
         self.data = GestureData()
+        self.socketio = socketio # socketio server
 
     @staticmethod
-    def accelerometer_to_joystick(ax, ay, az):
-        norm = math.sqrt(ax**2 + ay**2 + az**2)
-        ax /= norm or 1
-        ay /= norm or 1
-        az /= norm or 1
-    
-        pitch = math.degrees(math.atan2(ax, math.sqrt(ay**2 + az**2)))
-        roll  = math.degrees(math.atan2(ay, az))
-    
+    def accelerometer_to_joystick(pitch, roll):
         pitch = max(-60, min(pitch, 60))
         roll  = max(-60, min(roll, 60))
     
@@ -45,6 +38,8 @@ class GestureController:
                     response = requests.get(self.api_url)
                     if response.status_code == 200:
                         self.data = GestureData.model_validate(response.json())
+                        
+                        self.socketio.emit('gesture_data', self.data.model_dump())
                         self.last_query_time = current_time
                     else:
                         print(f"Failed to fetch data: {response.status_code}")
@@ -67,11 +62,10 @@ class GestureController:
         if not self.data:
             return False
         
-        ax = self.data.accelerometer.x
-        ay = self.data.accelerometer.y
-        az = self.data.accelerometer.z
+        pitch = self.data.mag_angles.pitch
+        roll = self.data.mag_angles.roll
         
-        y, x = self.accelerometer_to_joystick(ax, ay, az)
+        y, x = self.accelerometer_to_joystick(pitch, roll)
         
         # Check if the joystick input is significant enough to send an update
         if abs(y) > 0 or abs(x) > 0:
@@ -82,11 +76,10 @@ class GestureController:
         Get joystick input based on accelerometer data.
         :return: Tuple of (left_y, right_x) for joystick axes
         """
-        ax = self.data.accelerometer.x
-        ay = self.data.accelerometer.y
-        az = self.data.accelerometer.z
+        pitch = self.data.mag_angles.pitch
+        roll = self.data.mag_angles.roll
         
-        return self.accelerometer_to_joystick(ax, ay, az)
+        return self.accelerometer_to_joystick(pitch, roll)
             
             
         

@@ -35,9 +35,9 @@ class MagnetomerAngleData(BaseModel):
     Represents magnetometer angle data from wireless sifive board.
     """
     
-    x: float = 0.0
-    y: float = 0.0
-    z: float = 0.0
+    heading: float = 0.0
+    pitch: float = 0.0
+    roll: float = 0.0
    
 
 class GestureData(BaseModel):

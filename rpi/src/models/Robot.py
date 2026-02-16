@@ -1,5 +1,6 @@
 import logging
 import time, struct
+from datetime import datetime
 import asyncio
 from . import SerialManager, SensorData, Command, CommandType, LCDCommand
 from ..ai.get_commands import text_to_command
@@ -146,7 +147,8 @@ class Robot:
             },
             ir_front=ir_front,
             ir_back=ir_back,
-            battery=battery
+            battery=battery,
+            timestamp=datetime.now().isoformat()
         )
 
     async def handle_obstacle(self, sensor_data: SensorData, current_time: float) -> float:

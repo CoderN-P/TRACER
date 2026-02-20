@@ -26,6 +26,9 @@ class Controller:
         self.precision_mode_cooldown = False  # Cooldown to prevent rapid precision mode switching
         self.recording_cooldown = False  # Cooldown to prevent rapid recording toggling
         self.playing_recording_cooldown = False  # Cooldown to prevent rapid playback toggling
+        self.rumble_cooldown = False  # Cooldown to prevent overlapping rumbles
+        
+        self.obstacle_threshold = 20  # Distance in cm to trigger obstacle feedback
 
         # --- Joystick history ---
         self.joystick_history = []  # List to store joystick history for recording
@@ -110,7 +113,7 @@ class Controller:
         def reset():
             self.stopped = False
 
-        threading.Timer(5, reset).start()
+        threading.Timer(2, reset).start()
 
     def _reset_cooldown(self, attr):
         """
@@ -180,7 +183,37 @@ class Controller:
             threading.Timer(duration, self._reset_cooldown, args=(cooldown_attr,)).start()
             return True
         return False
-
+    
+    def on_obstacle_detected(self, data):
+        """
+        Handle obstacle detection by stopping the motors and providing feedback.
+        """
+        
+        # calculate strength of rumble based on distance (closer = stronger)
+        
+        distance = data.get("distance", 0)
+        strength = max(0.5, min(1.0, (1 - distance / self.obstacle_threshold)))  # Distance in cm, max too
+        
+        low = strength
+        high = strength
+        duration = 500  # ms
+        
+        self.rumble(low, high, duration)
+        
+    def on_cliff_detected(self, data):
+        """
+        Handle cliff detection by stopping the motors and providing feedback.
+        """
+        front = data.get("ir_front", True)
+        back = data.get("ir_back", True)
+        
+        if not front and not back:
+            # Both sensors detect a cliff, strong rumble
+            self.rumble(1.0, 1.0, 1000)
+        elif not front or not back:
+            # One sensor detects a cliff, medium rumble
+            self.rumble(0.5, 0.5, 1000)
+        
     def stop_recording(self):
         """
         Stop the current recording and reset the recording flag.
@@ -410,8 +443,12 @@ class Controller:
         })
 
     def rumble(self, low, high, duration_ms):
+        if self.rumble_cooldown:
+            return
         self.controller.rumble(low, high, duration_ms)
 
         # Stop after duration using a background timer
         duration_sec = duration_ms / 1000
         threading.Timer(duration_sec, self.controller.stop_rumble).start()
+        self.rumble_cooldown = True
+        threading.Timer(duration_sec + 0.2, self._reset_cooldown, args=('rumble_cooldown',)).start() # Add a small buffer to prevent immediate re-rumble

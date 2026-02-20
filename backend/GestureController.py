@@ -16,11 +16,11 @@ class GestureController:
 
     @staticmethod
     def accelerometer_to_joystick(pitch, roll):
-        pitch = max(-60, min(pitch, 60))
-        roll  = max(-60, min(roll, 60))
+        pitch = max(-80, min(pitch, 80))
+        roll  = max(-80, min(roll, 80))
     
-        x = -roll / 60
-        y = pitch / 60 
+        x = -roll / 80
+        y = -pitch / 80 
     
         if abs(x) < 0.2: x = 0
         if abs(y) < 0.2: y = 0
@@ -38,7 +38,7 @@ class GestureController:
                     response = requests.get(self.api_url)
                     if response.status_code == 200:
                         self.data = GestureData.model_validate(response.json())
-                        
+    
                         self.socketio.emit('gesture_data', self.data.model_dump())
                         self.last_query_time = current_time
                     else:

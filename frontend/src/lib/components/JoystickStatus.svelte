@@ -8,7 +8,7 @@
   import { onMount } from "svelte";
 
   // Define available joystick modes
-  type JoystickMode = "TWO_ARCADE" | "ONE_ARCADE" | "TANK" | "CAR";
+  type JoystickMode = "TWO_ARCADE" | "ONE_ARCADE" | "TANK" | "CAR" | "GESTURE";
 
   let {
     joystick,
@@ -26,6 +26,7 @@
     ONE_ARCADE: "Single Joystick Arcade",
     TANK: "Tank Drive",
     CAR: "Car Mode",
+    GESTURE: "Gesture Control",
   };
 
   // Icons for each mode
@@ -39,6 +40,8 @@
         return Tank;
       case "CAR":
         return Car;
+      case "GESTURE":
+        return Target;
       default:
         return Gamepad2;
     }
@@ -162,6 +165,8 @@
                 <Tank class="w-4 h-4 mr-1" />
               {:else if getModeIcon(mode as JoystickMode) === Car}
                 <Car class="w-4 h-4 mr-1" />
+              {:else if getModeIcon(mode as JoystickMode) === Target}
+                <Target class="w-4 h-4 mr-1" />
               {/if}
               <span class="text-xs"
                 >{mode

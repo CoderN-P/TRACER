@@ -12,7 +12,7 @@ from GestureController import GestureController
 app = Flask(__name__)
 socket = SocketIO(app, cors_allowed_origins='*')
 sio_client = socketio.Client()  # Use WebSocket transport for better performance
-gesture_controller_route = "http://192.168.4.235/sensors" # esp32 running gesture controller code, serving sensor data at this endpoint
+gesture_controller_route = "http://192.168.4.47/sensors" # esp32 running gesture controller code, serving sensor data at this endpoint
 AP = "http://10.42.0.1:8080"
 NORMAL = "http://192.168.4.119:8080"
 
@@ -31,9 +31,15 @@ def setup_routes(controller: Controller):
         """
         controller.handle_joystick_input(data)
         
-    @sio_client.on('rumble')
-    def handle_rumble(data):
-        controller.rumble(data['low'], data['high'], data['duration'])
+    @sio_client.on('obstacle_detected')
+    def handle_obstacle_detected(data):
+        controller.on_obstacle_detected(data)
+        socket.emit('obstacle_detected', data)
+        
+    @sio_client.on('cliff_detected')
+    def handle_cliff_detected(data):
+        controller.on_cliff_detected(data)
+        socket.emit('cliff_detected', data)
         
     @sio_client.on('sensor_data')
     def handle_sensor_update(data):

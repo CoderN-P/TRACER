@@ -261,6 +261,7 @@ void handleCommand(byte *buffer, size_t length)
        
         strncpy(lcdLine2, "Invalid Data", sizeof(lcdLine2));
         lcdLine2[16] = '\0';
+        bufferSensorSending = true; // Send sensor data even if the command failed
         return;
     }
 

@@ -19,13 +19,13 @@ class GestureController:
         pitch = max(-80, min(pitch, 80))
         roll  = max(-80, min(roll, 80))
     
-        x = -roll / 80
-        y = -pitch / 80 
+        x = abs(roll / 80)**0.9 * (-1 if roll > 0 else 1) # Roll controls turning (x-axis)
+        y = abs(pitch / 80)**0.9 * (-1 if pitch > 0 else 1) # Pitch controls forward/backward (y-axis)
     
-        if abs(x) < 0.2: x = 0
-        if abs(y) < 0.2: y = 0
+        if abs(x) < 0.05: x = 0
+        if abs(y) < 0.05: y = 0
         
-        if abs(y) > 0.5:
+        if abs(y) > 0.4:
             x = x if abs(x) > 0.4 else 0 # If y is significant, ignore x unless it's also significant
     
         return y, x # Treat like joystick axes

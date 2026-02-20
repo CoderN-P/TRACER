@@ -11,8 +11,6 @@ class Robot:
         self.serial = serial_manager
         self.last_emit_time = 0
         self.emit_interval = 0.1  # for sensor data
-        self.last_rumble_time = 0
-        self.rumble_cooldown = 1  # seconds between rumbles
         self.socketio = socketio
         self.cliff_clear = asyncio.Event()
         self.waiting_for_sensor = asyncio.Event()
@@ -24,7 +22,7 @@ class Robot:
         self.last_sensor_request_time = 0  # Last time sensor data was requested
         self.obstacle_clear = asyncio.Event()
         self.backup_time = 2  # Amount of time to backup when an obstacle is detected
-        self.obstacle_threshold = 20 # Distance threshold for obstacle detection
+        self.obstacle_threshold = 20 # Distance threshold for obstacle detection (cm)
         self._logger = logging.getLogger("RobotManager")
         self.motor_lock = asyncio.Lock()
         
@@ -85,7 +83,7 @@ class Robot:
         self.cliff_clear.set()
         
     async def _reset_obstacle_clear(self):
-        await asyncio.sleep(0.5)
+        await asyncio.sleep(self.backup_time)  # Wait for backup duration before allowing new obstacle detection
         self.obstacle_clear.set()
 
     async def backup(self):
@@ -157,23 +155,16 @@ class Robot:
             return sensor_data.ultrasonic.distance
     
         distance = sensor_data.ultrasonic.distance
-        low = distance / self.obstacle_threshold
     
         if distance == -1:  # too far
             avg_distance = sum(self.distance_history) / len(self.distance_history) if self.distance_history else 300
             return avg_distance
         elif distance == -2:  # too close
             avg_distance = sum(self.distance_history) / len(self.distance_history) if self.distance_history else 0
-            low = avg_distance / self.obstacle_threshold
         else:
             avg_distance = distance
     
-        low = max(0.0, min(low, 1.0))
-        high = 1 - low
-    
-        if current_time - self.last_rumble_time > self.rumble_cooldown:
-            await self.socketio.emit('rumble', {"low": low, "high": high, "duration": 1000})
-            self.last_rumble_time = current_time
+        await self.socketio.emit('obstacle_detected', {"distance": distance})
     
         asyncio.create_task(self.backup())
         self.obstacle_clear.clear()
@@ -193,10 +184,10 @@ class Robot:
         asyncio.create_task(self._reset_cliff_detected())  # Reset cliff detection after 0.5 seconds, basically halting commands
 
         await self.send_safe_command(Command.stop())  # Stop motors if cliff is detected
-
-        if current_time - self.last_rumble_time > self.rumble_cooldown:
-            await self.socketio.emit('rumble', {"low": 0.5, "high": 0.5, "duration": 1000})
-            self.last_rumble_time = current_time
+        await self.socketio.emit('cliff_detected', {
+            "ir_front": sensor_data.ir_front,
+            "ir_back": sensor_data.ir_back
+        })
                 
             
     async def process_sensor_data(self, data: bytes):

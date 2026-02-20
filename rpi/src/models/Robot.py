@@ -23,6 +23,7 @@ class Robot:
         self.obstacle_clear = asyncio.Event()
         self.backup_time = 2  # Amount of time to backup when an obstacle is detected
         self.obstacle_threshold = 20 # Distance threshold for obstacle detection (cm)
+        self.obstacle_avoid_threshold = 10 # Distance threshold for obstacle avoidance (cm)
         self._logger = logging.getLogger("RobotManager")
         self.motor_lock = asyncio.Lock()
         
@@ -166,9 +167,11 @@ class Robot:
     
         await self.socketio.emit('obstacle_detected', {"distance": distance})
     
-        asyncio.create_task(self.backup())
-        self.obstacle_clear.clear()
-        asyncio.create_task(self._reset_obstacle_clear())
+        # If the distance is below the obstacle avoidance threshold, trigger backup and set obstacle clear flag
+        if distance <= self.obstacle_avoid_threshold:
+            asyncio.create_task(self.backup())
+            self.obstacle_clear.clear()
+            asyncio.create_task(self._reset_obstacle_clear())
     
         return avg_distance
     

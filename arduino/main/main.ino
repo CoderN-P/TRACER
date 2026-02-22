@@ -1,41 +1,78 @@
 #include <LiquidCrystal_I2C.h>
 #include <Wire.h>
+#include "PID.h"
 
+// Constants for motor control
+const float WHEEL_DIAMETER = 0.05 // wheel diameter in meters
+const int MIN_PWM = 50 // Minimum PWM value
+const int MAX_PWM = 255 // Max PWM Value
+const int REDUCTION_RATIO = 56;
+const int MAX_OUTPUT_RPM = 178;
+
+// Pin definitions
 const int EN1 = 9; // Enable pin for motor 1
 const int IN1 = 3; // Input pin 1 for motor 1
 const int IN2 = 4; // Input pin 2 for motor 1
 const int EN2 = 5; // Enable pin for motor 2
 const int IN3 = 6; // Input pin 1 for motor 2
 const int IN4 = 7; // Input pin 2 for motor 2
-const int IR_FRONT = 8;
-const int IR_BACK = 12;
-const int STBY = 13;
+const int IR_FRONT = 8; // IR sensor at the front
+const int IR_BACK = 12; // IR sensor at the back
+const int STBY = 13; // Standby pin for motor driver
 const int BATTERY = A3; // Battery voltage pin
 const int TRIGGER = 2; // Trigger pin for ultrasonic sensor
 const int ECHO = 11;   // Echo pin for ultrasonic sensor
+
+// System constants
 const int MAX_BUFFER_SIZE = 512;
-const int MPUAddress = 0x68; // I2C address for MPU6050
-int storedBatteryPercent = -1;
-bool motorsRunning = false;
+const int BAUD_RATE = 115200;
+
+// I2C addresses and Register addresses
+const int MPU_ADDRESS = 0x68; // I2C address for MPU6050
+const int LCD_ADDRESS = 0x27; // I2C address for LCD
+const int PWR_MGMT_1 = 0x6B; // Power management register for MPU6050
+
+// Command definitions
+const uint8_t CMD_MOVE = 0x01;
+const uint8_t CMD_LCD_UPDATE = 0x02;
+const uint8_t CMD_REQUEST_SENSOR = 0x03;
+const uint8_t CMD_STOP = 0x04;
+
+// Timing intervals (in milliseconds)
+const unsigned long ULTRASONIC_INTERVAL = 30; // Sample ultrasonic sensor every 30
+const unsigned long MPU_INTERVAL = 10;        // Sample MPU-6050 every 10
+const unsigned long LCD_UPDATE_INTERVAL = 500; // Update LCD every 500ms
+
+// Timing variables
 unsigned long lastUltrasonicSampleTime = 0;
 unsigned long lastMPUSampleTime = 0;
 unsigned long lastLCDUpdateTime = 0;
 
 bool bufferSensorSending = false;
 bool motorsEnabled = true;
+bool motorsRunning = false;
+
+// Sensor data variables
 int ax, ay, az, gx, gy, gz;
 float lastDistance, tempC;
+int storedBatteryPercent = -1;
+
+// LCD Display buffers
 char lastLine1[17] = "";
 char lastLine2[17] = "";
 char lcdLine1[17] = "Init...";
 char lcdLine2[17] = "";
+LiquidCrystal_I2C lcd(LCD_ADDRESS, 16, 2);
 
-LiquidCrystal_I2C lcd(0x27, 16, 2);
+// PID Controllers
+
+PIDController pidLeft(1.0, 0.0, 0.1, 100);
+PIDController pidRight(1.0, 0.0, 0.1, 100);
 
 bool initMPU6050()
 {
-    Wire.beginTransmission(MPUAddress);
-    Wire.write(0x6B); // PWR_MGMT_1 register
+    Wire.beginTransmission(MPU_ADDRESS);
+    Wire.write(PWR_MGMT_1); // PWR_MGMT_1 register
     Wire.write(0);    // Wake up the MPU-6050 (0 = wake up)
     byte status = Wire.endTransmission(true);
     return status == 0; // Return true if successful
@@ -57,7 +94,7 @@ void setup()
     pinMode(BATTERY, INPUT);
 
     Wire.begin();
-    Serial.begin(115200);
+    Serial.begin(BAUD_RATE);
     Serial.setTimeout(50);
 
     lcd.init();
@@ -84,13 +121,13 @@ void setup()
 
 uint8_t expected_command_length(uint8_t cmd)
 {
-    if (cmd == 0x01)
+    if (cmd == CMD_MOVE)
         return 6;
-    if (cmd == 0x02)
+    if (cmd == CMD_LCD_UPDATE)
         return 34;
-    if (cmd == 0x03)
+    if (cmd == CMD_REQUEST_SENSOR)
         return 2;
-    if (cmd == 0x04)
+    if (cmd == CMD_STOP)
         return 2;
     return 255; // invalid
 }
@@ -170,6 +207,41 @@ void getMPUData(int &ax, int &ay, int &az, int &gx, int &gy, int &gz, float &tem
     gx = (Wire.read() << 8) | Wire.read();
     gy = (Wire.read() << 8) | Wire.read();
     gz = (Wire.read() << 8) | Wire.read();
+}
+
+
+float getLeftMotorSpeed()
+{
+    // Placeholder: Replace with actual encoder reading
+    return 0.0;
+}
+
+float getRightMotorSpeed()
+{
+    // Placeholder: Replace with actual encoder reading
+    return 0.0;
+}
+
+int applyDeadband(float pwm) {
+    int sign = (pwm >= 0) ? 1 : -1;
+    float mag = abs(pwm);
+
+    if (mag == 0) return 0;
+
+    // Scale 0–255 PID output into 50–255 motor range
+    float scaled = MIN_PWM + (mag / MAX_PWM) * (MAX_PWM - MIN_PWM);
+
+    return sign * (int)scaled;
+}
+
+void pidLoop(){
+    float leftSpeed = getLeftMotorSpeed();
+    float rightSpeed = getRightMotorSpeed();
+    
+    float leftOutput = pidLeft.compute(leftSpeed);
+    float rightOutput = pidRight.compute(rightSpeed);
+    
+    handleMovement(applyDeadband(leftOutput), applyDeadband(rightOutput));
 }
 
 uint8_t getBatteryPercent()
@@ -265,21 +337,17 @@ void handleCommand(byte *buffer, size_t length)
         return;
     }
 
-    if (cmd == 0x01 && length == 6)
+    if (cmd == CMD_MOVE && length == 6)
     {
         // Command 0x01: Handle movement
-        int16_t left, right;
-        memcpy(&left, &buffer[1], 2);
-        memcpy(&right, &buffer[3], 2);
+        int16_t leftVel, rightVel; // m/s
         
-        handleMovement(left, right);
+        memcpy(&leftVel, &buffer[1], 2);
+        memcpy(&rightVel, &buffer[3], 2);
         
-        if (left != 0 || right != 0){
-            motorsRunning = true;
-        } else {
-            motorsRunning = false;
-        }
-
+        pidLeft.setSetpoint(leftVel);
+        pidRight.setSetpoint(rightVel);
+        
         char lcd_buffer[17];
         sprintf(lcd_buffer, "L:%d R:%d", left, right);
 
@@ -291,7 +359,7 @@ void handleCommand(byte *buffer, size_t length)
         
         bufferSensorSending = true; // Set flag to send sensor data next loop
     }
-    else if (cmd == 0x02 && length == 34)
+    else if (cmd == CMD_LCD_UPDATE && length == 34)
     {
         // Command 0x02: Update LCD with two lines of text
         bufferSensorSending = true; // Set flag to send sensor data next loop
@@ -299,15 +367,20 @@ void handleCommand(byte *buffer, size_t length)
         memcpy(lcdLine2, &buffer[17], 16);
         
     }
-    else if (cmd == 0x03 && length == 2)
+    else if (cmd == CMD_REQUEST_SENSOR && length == 2)
     {
         // Command 0x03: Request sensor data
         bufferSensorSending = true; // Set flag to send sensor data next loop
-    } else if (cmd == 0x04 && length == 2){
+    } else if (cmd == CMD_STOP && length == 2){
       // Command 0x04: STOP
         motorsEnabled = false;
         motorsRunning = false;
+        
+        pidLeft.setSetpoint(0);
+        pidRight.setSetpoint(0);
+        
         digitalWrite(STBY, LOW);
+        
         bufferSensorSending = true; // Send sensor data
         strncpy(lcdLine1, "STOP COMMAND", sizeof(lcdLine1));
         lcdLine1[16] = '\0';
@@ -328,7 +401,8 @@ void handleMovement(int16_t leftSpeed, int16_t rightSpeed)
     // Values already mapped between -255 and 255
 
     if (!motorsEnabled){
-      digitalWrite(STBY, HIGH);
+        digitalWrite(STBY, HIGH);
+        motorsEnabled = true;
     }
 
     if (leftSpeed > 0)
@@ -368,34 +442,11 @@ void handleMovement(int16_t leftSpeed, int16_t rightSpeed)
         digitalWrite(IN4, LOW);
         analogWrite(EN2, 0);
     }
-}
-
-void loop()
-{
-
-    handleIncomingData();
-
-    if (millis() - lastUltrasonicSampleTime >= 30){
-      getUltrasonicData(lastDistance);
-      lastUltrasonicSampleTime = millis();
-    }
-
-    if (millis() - lastMPUSampleTime >= 10){
-      getMPUData(ax, ay, az, gx, gy, gz, tempC);
-      lastMPUSampleTime = millis();
-    }
-
-    if (millis() - lastLCDUpdateTime >= 500){
-        // Update LCD only if the content has changed'
-       if (strncmp(lcdLine1, lastLine1, sizeof(lcdLine1)) != 0 || strncmp(lcdLine2, lastLine2, sizeof(lcdLine2)) != 0) {
-            updateLCD();
-        }
-       lastLCDUpdateTime = millis();  
-    }
     
-    if (bufferSensorSending)
-    {
-        sendSensorData();
+    if (left != 0 || right != 0){
+        motorsRunning = true;
+    } else {
+        motorsRunning = false;
     }
 }
 
@@ -408,4 +459,33 @@ void updateLCD()
     lcd.print(lcdLine1);
     lcd.setCursor(0, 1);
     lcd.print(lcdLine2);
+}
+
+void loop()
+{
+
+    handleIncomingData();
+
+    if (millis() - lastUltrasonicSampleTime >= ULTRASONIC_INTERVAL){
+      getUltrasonicData(lastDistance);
+      lastUltrasonicSampleTime = millis();
+    }
+
+    if (millis() - lastMPUSampleTime >= MPU_INTERVAL){
+      getMPUData(ax, ay, az, gx, gy, gz, tempC);
+      lastMPUSampleTime = millis();
+    }
+
+    if (millis() - lastLCDUpdateTime >= LCD_UPDATE_INTERVAL){
+        // Update LCD only if the content has changed'
+       if (strncmp(lcdLine1, lastLine1, sizeof(lcdLine1)) != 0 || strncmp(lcdLine2, lastLine2, sizeof(lcdLine2)) != 0) {
+            updateLCD();
+        }
+       lastLCDUpdateTime = millis();  
+    }
+    
+    if (bufferSensorSending)
+    {
+        sendSensorData();
+    }
 }

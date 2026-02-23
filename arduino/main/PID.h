@@ -12,7 +12,8 @@ class PIDController {
         float integral;
     public:
         PIDController(float kp, float ki, float kd);
-        
+        void reset();     
         void setSetpoint(float setpoint); // Set the desired setpoint for the PID controller
         float compute(float input); // Returns required output based on the input and setpoint
 };
+#endif

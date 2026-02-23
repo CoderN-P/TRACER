@@ -1,8 +1,10 @@
 import logging
-import time, struct
+import threading
+import struct
+from collections import deque
 from datetime import datetime
 import asyncio
-from . import SerialManager, SensorData, Command, CommandType, LCDCommand
+from . import SerialManager, SensorData, Command, CommandType, LCDCommand, StateEstimator
 from ..ai.get_commands import text_to_command
 
 
@@ -10,73 +12,54 @@ class Robot:
     def __init__(self, serial_manager: SerialManager, socketio):
         self.serial = serial_manager
         self.last_emit_time = 0
-        self.emit_interval = 0.1  # for sensor data
+        self.emit_interval = 0.1  # for sensor data, 10Hz update to UI
+        self.obstacle_check_interval = 0.05  # Check for obstacles every 50ms (20hz)
+        self.cliff_check_interval = 0.05  # Check for cliffs every 50ms (20hz)
+        
+        self.main_loop_frequency = 100  # Main loop runs at 100Hz
         self.socketio = socketio
         self.cliff_clear = asyncio.Event()
-        self.waiting_for_sensor = asyncio.Event()
-        self.sensor_request_interval = 0.1  # 10Hz = 0.1 seconds
-        self.sensor_request_task = None
+        self.state_estimator = StateEstimator()
         self.running = False
-        self.distance_history = []  # Store last 10 distances
-        self.sensor_count = 0  # Count of sensor data received
-        self.last_sensor_request_time = 0  # Last time sensor data was requested
+        self.distance_history = deque(maxlen=10)  # Store last 10 distance readings for smoothing
+        self.last_obstacle_detect_time = 0  # Last time ultrasonic data was processed for obstacle detection
+        self.last_cliff_detect_time = 0  # Last time cliff sensors were processed for cliff detection
         self.obstacle_clear = asyncio.Event()
         self.backup_time = 2  # Amount of time to backup when an obstacle is detected
         self.obstacle_threshold = 20 # Distance threshold for obstacle detection (cm)
         self.obstacle_avoid_threshold = 10 # Distance threshold for obstacle avoidance (cm)
         self._logger = logging.getLogger("RobotManager")
         self.motor_lock = asyncio.Lock()
+
+        self.sensor_lock = threading.Lock()          # shared between serial thread and asyncio
+        self.latest_sensor_data = None               # written by serial thread, read by pose loop
+        self.main_loop_task = None                   
         
-        self.waiting_for_sensor.set()
         self.obstacle_clear.set()
         self.cliff_clear.set()
 
     async def send_safe_command(self, command: Command, wait_after: float = 0):
         async with self.motor_lock:
-            await self.waiting_for_sensor.wait()
-            self.waiting_for_sensor.clear()
             self.serial.send(command)
             if wait_after > 0:
                 await asyncio.sleep(wait_after)
-            self.waiting_for_sensor.set()
 
     async def start(self):
         """Start the robot's background tasks"""
         self.running = True
-        self.sensor_request_task = asyncio.create_task(self._sensor_request_loop())
+        self.main_loop_task = asyncio.create_task(self.main_loop())
+        self._logger.info("Robot main loop started")
 
     async def stop(self):
         """Stop the robot's background tasks"""
         self.running = False
-        if self.sensor_request_task:
-            self.sensor_request_task.cancel()
+        if self.main_loop_task:
+            self.main_loop_task.cancel()
             try:
-                await self.sensor_request_task
+                await self.main_loop_task
             except asyncio.CancelledError:
                 pass
-
-    async def _sensor_request_loop(self):
-        """Background task to request sensor data at 10Hz"""
-        await asyncio.sleep(1)  # Allow time for the connection to stabilize
-        while self.running:
-            try:
-                await asyncio.wait_for(self.waiting_for_sensor.wait(), timeout=1.0)
-            except asyncio.TimeoutError:
-                self._logger.warning("Waiting for sensor data timed out, retrying...")
-                self.waiting_for_sensor.set()  # op
-                
-            # Send "SENSOR" command to Arduino to request sensor data
-            sensor_request_command = Command(
-                ID="",
-                command_type=CommandType.SENSOR,
-                command=None,
-                pause_duration=0,
-                duration=0
-            )
-            self.last_sensor_request_time = time.time()
-            self.serial.send(sensor_request_command)
-            self.waiting_for_sensor.set()  # Reset waiting for sensor flag
-            await asyncio.sleep(self.sensor_request_interval)
+        self._logger.info("Robot main loop stopped")
 
     async def _reset_cliff_detected(self):
         """Reset the cliff clear flag after a short duration."""
@@ -93,7 +76,7 @@ class Robot:
         await self.send_safe_command(Command.from_joystick(-0.5, 0), wait_after=self.backup_time)
         await self.send_safe_command(Command.stop())  # Stop after backing up
         
-    def bytes_to_sensor_data(self, data: bytes):
+    def bytes_to_sensor_data(self, data: bytes) -> SensorData:
         """Convert bytes to SensorData model."""
 
         # Look for start byte (0xAA)
@@ -114,10 +97,11 @@ class Robot:
         # f     - tempC (float)
         # B     - ir_flags (uint8_t)
         # B     - battery percentage (uint8_t)
+        # I     - timestamp (uint32_t, microseconds)
         # B     - checksum (uint8_t)
         
-        fields = struct.unpack('<BfhhhhhhfBBB', data)
-        start, distance, ax, ay, az, gx, gy, gz, temp, ir_flags, battery, received_checksum = fields
+        fields = struct.unpack('<BfhhhhhhfBBIB', data)
+        start, distance, ax, ay, az, gx, gy, gz, temp, ir_flags, battery, timestamp, received_checksum = fields
 
         # Calculate checksum (sum of all bytes except start byte and checksum byte)
         calculated_checksum = sum(data[1:-1]) & 0xFF
@@ -131,11 +115,11 @@ class Robot:
         ir_front = not bool(ir_flags & 0b00000001)
         ir_back = not bool(ir_flags & 0b00000010)
         
-        return SensorData(
-            ultrasonic={
+        data = {
+            "ultrasonic": {
                 "distance": distance
             },
-            imu={
+            "imu": {
                 "acceleration_x": ax/16384,  # Convert to g's
                 "acceleration_y": ay/16384,  # Convert to g's
                 "acceleration_z": az/16384,  # Convert to g's
@@ -144,19 +128,18 @@ class Robot:
                 "gyroscope_z": gz/131,  # Convert to degrees per second
                 "temperature": temp
             },
-            ir_front=ir_front,
-            ir_back=ir_back,
-            battery=battery,
-            timestamp=datetime.now().isoformat()
-        )
+            "ir_front": ir_front,
+            "ir_back": ir_back,
+            "battery": battery,
+            "timestamp": timestamp
+        }
+        
+        return SensorData.model_validate(data)
 
-    async def handle_obstacle(self, sensor_data: SensorData, current_time: float) -> float:
+    async def handle_obstacle(self, sensor_data: SensorData) -> float:
         """Detect obstacles and trigger backup if needed. Returns processed distance."""
-        if not sensor_data.is_obstacle_detected(self.obstacle_threshold) or not self.obstacle_clear.is_set():
-            return sensor_data.ultrasonic.distance
-    
         distance = sensor_data.ultrasonic.distance
-    
+
         if distance == -1:  # too far
             avg_distance = sum(self.distance_history) / len(self.distance_history) if self.distance_history else 300
             return avg_distance
@@ -164,6 +147,9 @@ class Robot:
             avg_distance = sum(self.distance_history) / len(self.distance_history) if self.distance_history else 0
         else:
             avg_distance = distance
+            
+        if not sensor_data.is_obstacle_detected(self.obstacle_threshold) or not self.obstacle_clear.is_set():
+            return avg_distance
     
         await self.socketio.emit('obstacle_detected', {"distance": distance})
     
@@ -176,7 +162,7 @@ class Robot:
         return avg_distance
     
     
-    async def handle_cliff(self, sensor_data: SensorData, current_time: float):
+    async def handle_cliff(self, sensor_data: SensorData):
         """Handle cliff detection and stop motors if cliff is detected."""
         
         if not sensor_data.check_cliff() or not self.cliff_clear.is_set():
@@ -194,31 +180,51 @@ class Robot:
                 
             
     async def process_sensor_data(self, data: bytes):
-        self.waiting_for_sensor.set()
         try:
-            sensor_data = self.bytes_to_sensor_data(data)
+            with self.sensor_lock: # Ensure thread-safe access to latest_sensor_data
+                self.latest_sensor_data = self.bytes_to_sensor_data(data)
         except Exception as e:
             self._logger.error(f"Error processing sensor data: {e}")
             return
-
-        current_time = time.time()
-        sensor_data.ultrasonic.distance = await self.handle_obstacle(sensor_data, current_time)
-        self.distance_history.append(sensor_data.ultrasonic.distance)  # Store the distance for history
         
-        if len(self.distance_history) >= 10:
-            self.distance_history.pop(0)
-            
-        # Check for cliff 
-        await self.handle_cliff(sensor_data, current_time)
-           
-        # Emit sensor data at a fixed interval
+        
+    async def send_sensor_update(self, current_time, sensor_data: SensorData):
         if current_time - self.last_emit_time >= self.emit_interval:
             self.last_emit_time = current_time
             await self.socketio.emit(
                 'sensor_data',
                 sensor_data.model_dump(),
             )
+    
+    async def main_loop(self):
+        """Main loop to continuously read sensor data and update state estimator."""
+        dt = 1/self.main_loop_frequency
+        
+        while self.running:
+            start = asyncio.get_event_loop().time()
+            
+            with self.sensor_lock:
+                sensor_data = self.latest_sensor_data
+                
+            if not sensor_data:
+                elapsed = asyncio.get_event_loop().time() - start
+                await asyncio.sleep(max(0, dt - elapsed)) # 100Hz loop
+                continue
 
+            self.state_estimator.update(sensor_data)
+            
+            if (start - self.last_obstacle_detect_time) >= self.obstacle_check_interval:
+                self.last_obstacle_detect_time = start
+                sensor_data.ultrasonic.distance = await self.handle_obstacle(sensor_data) ## Run simple smoothing via moving average and handle obstacle detection/backup
+                self.distance_history.append(sensor_data.ultrasonic.distance)  # Store the ultrasonic distance for history for smoothing
+                
+            if (start - self.last_cliff_detect_time) >= self.cliff_check_interval:
+                self.last_cliff_detect_time = start
+                await self.handle_cliff(sensor_data)
+            
+            await self.send_sensor_update(start, sensor_data)
+            elapsed = asyncio.get_event_loop().time() - start
+            await asyncio.sleep(max(0, dt - elapsed)) # 100Hz loop
 
     async def handle_joystick_input(self, data):
         """
@@ -228,7 +234,7 @@ class Robot:
         left_y = data.get('left_y', 0)
         right_x = data.get('right_x', 0)
 
-        if self.cliff_clear.is_set() and self.waiting_for_sensor.is_set() and self.obstacle_clear.is_set():
+        if self.cliff_clear.is_set() and self.obstacle_clear.is_set():
             await self.send_safe_command(Command.from_joystick(left_y, right_x))
             
 

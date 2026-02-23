@@ -14,6 +14,9 @@ class StateEstimator:
             linear_velocity_y=0.0,
             angular_velocity=0.0
         )
+        self.alpha = alpha  # Complementary filter coefficient
+        self.wheel_base = 0.21  # Distance between the wheels in meters
+        self.wheel_diameter = 0.05  # Diameter of the wheels in meters
         self.last_timestep = None
 
     def update(self, sensor_data: SensorData):

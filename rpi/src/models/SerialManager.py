@@ -70,7 +70,7 @@ class SerialManager:
                         del self._buffer[:self._PACKET_LENGTH]
 
                         self.loop.call_soon_threadsafe(
-                            lambda p=packet: asyncio.create_task(self.robot.process_sensor_data(p))
+                            lambda p=packet: self.robot.process_sensor_data(p)
                         )
                 else:
                     time.sleep(0.001)
@@ -81,9 +81,12 @@ class SerialManager:
     def send(self, data: Command):
         # Check if data is a string or pydantic model
         if data.command_type == CommandType.MOTOR:
+            data.command.left_motor = int(max(-32767, min(32767, data.command.left_motor * 1000))) # Convert from m/s to mm/s to fit in int16
+            data.command.right_motor = int(max(-32767, min(32767, data.command.right_motor * 1000))) # Convert from m/s to mm/s to fit in int16
             packet = struct.pack("<Bhh", 0x01, data.command.left_motor, data.command.right_motor)
-            checksum = sum(packet) & 0xFF
-            self.serial.write(packet + bytes([checksum]))
+            full = bytes([0xAA]) + packet
+            checksum = sum(full) & 0xFF
+            self.serial.write(full + bytes([checksum]))
         elif data.command_type == CommandType.LCD:
             if len(data.command.line_1) > 16:
                 data.command.line_1 = data.command.line_1[:16]
@@ -94,13 +97,11 @@ class SerialManager:
             l2 = data.command.line_2.ljust(16)[:16].encode('utf-8')
 
             packet = struct.pack("<B16s16s", 0x02, l1, l2)
-            checksum = sum(packet) & 0xFF
-            self.serial.write(packet + bytes([checksum]))
-        elif data.command_type == CommandType.SENSOR:
-            packet = struct.pack("<B", 0x03)
-            checksum = sum(packet) & 0xFF
-            self.serial.write(packet + bytes([checksum]))
+            full = bytes([0xAA]) + packet
+            checksum = sum(full) & 0xFF
+            self.serial.write(full + bytes([checksum]))
         elif data.command_type == CommandType.STOP:
             packet = struct.pack("<B", 0x04)
-            checksum = sum(packet) & 0xFF
-            self.serial.write(packet + bytes([checksum]))
+            full = bytes([0xAA]) + packet
+            checksum = sum(full) & 0xFF
+            self.serial.write(full + bytes([checksum]))

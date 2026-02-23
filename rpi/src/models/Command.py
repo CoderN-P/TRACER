@@ -21,15 +21,15 @@ class Command(BaseModel):
         self.ID = str(uuid.uuid4())
         
     @staticmethod
-    def apply_deadzone_and_scale(value, deadzone=0.1, min_speed=60, max_speed=255):
-        if abs(value) < deadzone:
-            return 0
+    def scale(value):
+        wheel_diameter = 0.05 # in m
+        max_rpm = 178 # Max RPM of the motor
+        max_speed = (wheel_diameter * 3.1416 * max_rpm) / 60 # V = r*omega
         
         sign = 1 if value > 0 else -1
-        scaled = (abs(value) - deadzone) / (1 - deadzone)
-        scaled = min(1, max(0, scaled))  # Clamp to [0, 1]
+        scaled = min(1, max(0, abs(value)))  # Clamp to [0, 1]
         
-        return int(sign * (min_speed + scaled*(max_speed - min_speed)))
+        return int(sign * (scaled*max_speed))
         
     
     @classmethod
@@ -37,14 +37,16 @@ class Command(BaseModel):
         """
         Calculate the differential drive values based on the controller input.
         """
-        
+        wheel_diameter = 0.05 # in m
+        max_rpm = 178 # Max RPM of the motor
+        max_speed = (wheel_diameter * 3.1416 * max_rpm) / 60 # V = r*omega
         
         forward = cls.apply_deadzone_and_scale(left_y)
         turn = cls.apply_deadzone_and_scale(right_x)
         
         # Calculate motor values (arcade drive)
-        left_motor = min(255, max(-255, forward - turn))
-        right_motor = min(255, max(-255, forward + turn))
+        left_motor = min(max_speed, max(-max_speed, forward - turn))
+        right_motor = min(max_speed, max(-max_speed, forward + turn))
 
         command = cls(
             ID="",

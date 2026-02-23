@@ -28,3 +28,8 @@ float PIDController::compute(float input){
     
     return proportional_t + integral_t + derivative_t; 
 }
+void reset(){
+    this.lastError = 0;
+    this.integral = 0;
+    this.setpoint = 0;
+}

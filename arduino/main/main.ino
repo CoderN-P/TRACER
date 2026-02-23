@@ -1,11 +1,13 @@
 #include <LiquidCrystal_I2C.h>
 #include <Wire.h>
+#include <PulseInput.h>   
 #include "PID.h"
 
+
 // Constants for motor control
-const float WHEEL_DIAMETER = 0.05 // wheel diameter in meters
-const int MIN_PWM = 50 // Minimum PWM value
-const int MAX_PWM = 255 // Max PWM Value
+const float WHEEL_DIAMETER = 0.05; // wheel diameter in meters
+const int MIN_PWM = 50; // Minimum PWM value
+const int MAX_PWM = 255; // Max PWM Value
 const int REDUCTION_RATIO = 56;
 const int MAX_OUTPUT_RPM = 178;
 
@@ -20,11 +22,13 @@ const int IR_FRONT = 8; // IR sensor at the front
 const int IR_BACK = 12; // IR sensor at the back
 const int STBY = 13; // Standby pin for motor driver
 const int BATTERY = A3; // Battery voltage pin
-const int TRIGGER = 2; // Trigger pin for ultrasonic sensor
-const int ECHO = 11;   // Echo pin for ultrasonic sensor
+const int TRIGGER = 11; // Trigger pin for ultrasonic sensor
+const int ECHO = 2;   // Echo pin for ultrasonic sensor
 
 // System constants
-const int MAX_BUFFER_SIZE = 512;
+const int MAX_BUFFER_SIZE = 64;
+byte cmdBuf[64];
+size_t cmdIdx = 0;
 const int BAUD_RATE = 115200;
 
 // I2C addresses and Register addresses
@@ -35,20 +39,21 @@ const int PWR_MGMT_1 = 0x6B; // Power management register for MPU6050
 // Command definitions
 const uint8_t CMD_MOVE = 0x01;
 const uint8_t CMD_LCD_UPDATE = 0x02;
-const uint8_t CMD_REQUEST_SENSOR = 0x03;
 const uint8_t CMD_STOP = 0x04;
 
 // Timing intervals (in milliseconds)
-const unsigned long ULTRASONIC_INTERVAL = 30; // Sample ultrasonic sensor every 30
-const unsigned long MPU_INTERVAL = 10;        // Sample MPU-6050 every 10
+const unsigned long ULTRASONIC_INTERVAL = 50; // Sample ultrasonic sensor every 50 ms (20 hz)
+const unsigned long MPU_INTERVAL = 10;        // Sample MPU-6050 every 10 ms (100 hz)
 const unsigned long LCD_UPDATE_INTERVAL = 500; // Update LCD every 500ms
+const unsigned long SENSOR_SEND_INTERVAL = 10; // Send sensor data every 10 ms (100 hz)
 
 // Timing variables
 unsigned long lastUltrasonicSampleTime = 0;
 unsigned long lastMPUSampleTime = 0;
 unsigned long lastLCDUpdateTime = 0;
+unsigned long lastSensorSendTime = 0;
+unsigned long lastPIDComputeTime = 0;
 
-bool bufferSensorSending = false;
 bool motorsEnabled = true;
 bool motorsRunning = false;
 
@@ -56,6 +61,9 @@ bool motorsRunning = false;
 int ax, ay, az, gx, gy, gz;
 float lastDistance, tempC;
 int storedBatteryPercent = -1;
+volatile unsigned long echoStart = 0;
+volatile unsigned long echoDuration = 0;
+volatile bool echoReady = false;
 
 // LCD Display buffers
 char lastLine1[17] = "";
@@ -122,13 +130,11 @@ void setup()
 uint8_t expected_command_length(uint8_t cmd)
 {
     if (cmd == CMD_MOVE)
-        return 6;
+        return 7;
     if (cmd == CMD_LCD_UPDATE)
-        return 34;
-    if (cmd == CMD_REQUEST_SENSOR)
-        return 2;
+        return 35;
     if (cmd == CMD_STOP)
-        return 2;
+        return 3;
     return 255; // invalid
 }
 
@@ -136,16 +142,22 @@ void handleIncomingData()
 {
     if (Serial.available() > 0)
     {
-        static byte buf[64];
-        static size_t idx = 0;
-
         while (Serial.available())
         {
-            buf[idx++] = Serial.read();
-            if (idx == expected_command_length(buf[0]))
+            byte b = Serial.read();
+            if (cmdIdx == 0 && b != 0xAA) {
+                continue; // discard until valid start byte
+            }
+            cmdBuf[cmdIdx++] = Serial.read();
+            
+            if (cmdIdx >= MAX_BUFFER_SIZE) {
+                cmdIdx = 0; // reset if we exceed buffer size
+                continue;
+            }
+            if (cmdIdx == expected_command_length(cmdBuf[1]))
             {
-                handleCommand(buf, idx);
-                idx = 0;
+                handleCommand(cmdBuf, cmdIdx);
+                cmdIdx = 0;
             }
         }
     }
@@ -162,35 +174,21 @@ uint8_t getIRBack()
 }
 
 
-void getUltrasonicData(float &distance)
+void triggerUltrasonicPulse()
 {
     digitalWrite(TRIGGER, LOW);
     delayMicroseconds(2);
     digitalWrite(TRIGGER, HIGH);
     delayMicroseconds(10);
     digitalWrite(TRIGGER, LOW);
-
-    // Use a shorter timeout to prevent blocking
-    long duration = pulseIn(ECHO, HIGH, 25000); // 25ms timeout (~4.25m max)
-    
-    if (duration == 0)
-    {
-        distance = -1; // Indicate too far
-        return;
-    } else if (duration < 100) 
-    {
-        distance = -2; // Indicate too close
-        return;
-    }
-    distance = (duration / 2.0) * 0.0343; // Convert to cm
 }
 
 void getMPUData(int &ax, int &ay, int &az, int &gx, int &gy, int &gz, float &tempC)
 {
-    Wire.beginTransmission(MPUAddress);
+    Wire.beginTransmission(MPU_ADDRESS);
     Wire.write(0x3B); // Starting register for accelerometer data
     Wire.endTransmission(false);
-    Wire.requestFrom(MPUAddress, 14); // Request 14 bytes (6 for accelerometer, 6 for gyroscope, 2 for temperature)
+    Wire.requestFrom(MPU_ADDRESS, 14); // Request 14 bytes (6 for accelerometer, 6 for gyroscope, 2 for temperature)
 
     if (Wire.available() < 14)
     {
@@ -212,13 +210,13 @@ void getMPUData(int &ax, int &ay, int &az, int &gx, int &gy, int &gz, float &tem
 
 float getLeftMotorSpeed()
 {
-    // Placeholder: Replace with actual encoder reading
+    // Placeholder: Replace with actual encoder reading when motors arrive
     return 0.0;
 }
 
 float getRightMotorSpeed()
 {
-    // Placeholder: Replace with actual encoder reading
+    // Placeholder: Replace with actual encoder reading when motors arrive
     return 0.0;
 }
 
@@ -244,6 +242,15 @@ void pidLoop(){
     handleMovement(applyDeadband(leftOutput), applyDeadband(rightOutput));
 }
 
+void echoISR() {
+    if (digitalRead(ECHO) == HIGH) {
+        echoStart = micros();
+    } else {
+        echoDuration = micros() - echoStart;
+        echoReady = true;
+    }
+}
+
 uint8_t getBatteryPercent()
 {
     int raw = analogRead(BATTERY);  // 0–1023
@@ -267,6 +274,8 @@ void sendSensorData()
     uint8_t ir_flags = (ir_front << 0) | (ir_back << 1); // bit 0 = front, bit 1 = back
     uint8_t batteryPercent = 0;
     
+    uint32_t now = micros();
+    
     if (motorsRunning){
         batteryPercent = storedBatteryPercent; // Use the precomputed battery percentage if motors are on
     } else {
@@ -280,7 +289,7 @@ void sendSensorData()
         storedBatteryPercent = batteryPercent; // Store it for future use
     }
 
-    byte buffer[24];
+    byte buffer[28];
     int i = 0;
 
     buffer[i++] = 0xAA; // Start byte
@@ -302,6 +311,8 @@ void sendSensorData()
     i += 4;                 // Store temperature as float
     buffer[i++] = ir_flags; // Store IR flags
     buffer[i++] = batteryPercent; // Store battery voltage percentage
+    memcpy(&buffer[i], &now, 4); // Store timestamp
+    i += 4;
 
     uint8_t checksum = 0;
     for (int j = 1; j < i; j++)
@@ -309,16 +320,12 @@ void sendSensorData()
     buffer[i++] = checksum;
 
     Serial.write(buffer, i); // Send the data over Serial
-    
-    if (bufferSensorSending){
-        bufferSensorSending = false;
-    }
 }
 
 
 void handleCommand(byte *buffer, size_t length)
 {
-    uint8_t cmd = buffer[0];
+    uint8_t cmd = buffer[1]; // Command byte is the second byte (after start byte)
 
     uint8_t checksum = 0;
     for (size_t i = 0; i < length - 1; i++)
@@ -333,55 +340,44 @@ void handleCommand(byte *buffer, size_t length)
        
         strncpy(lcdLine2, "Invalid Data", sizeof(lcdLine2));
         lcdLine2[16] = '\0';
-        bufferSensorSending = true; // Send sensor data even if the command failed
         return;
     }
 
     if (cmd == CMD_MOVE && length == 6)
     {
         // Command 0x01: Handle movement
-        int16_t leftVel, rightVel; // m/s
+        int16_t leftVel, rightVel; // mm/s
         
         memcpy(&leftVel, &buffer[1], 2);
         memcpy(&rightVel, &buffer[3], 2);
         
-        pidLeft.setSetpoint(leftVel);
-        pidRight.setSetpoint(rightVel);
+        pidLeft.setSetpoint(leftVel/1000);
+        pidRight.setSetpoint(rightVel/1000);
         
         char lcd_buffer[17];
-        sprintf(lcd_buffer, "L:%d R:%d", left, right);
+        sprintf(lcd_buffer, "L:%d R:%d", leftVel, rightVel);
 
         strncpy(lcdLine1, lcd_buffer, sizeof(lcdLine1));
         lcdLine1[16] = '\0';
         
         strncpy(lcdLine2, "Moving", sizeof(lcdLine2));
         lcdLine2[16] = '\0';
-        
-        bufferSensorSending = true; // Set flag to send sensor data next loop
     }
     else if (cmd == CMD_LCD_UPDATE && length == 34)
     {
         // Command 0x02: Update LCD with two lines of text
-        bufferSensorSending = true; // Set flag to send sensor data next loop
         memcpy(lcdLine1, &buffer[1], 16);
         memcpy(lcdLine2, &buffer[17], 16);
-        
-    }
-    else if (cmd == CMD_REQUEST_SENSOR && length == 2)
-    {
-        // Command 0x03: Request sensor data
-        bufferSensorSending = true; // Set flag to send sensor data next loop
     } else if (cmd == CMD_STOP && length == 2){
       // Command 0x04: STOP
         motorsEnabled = false;
         motorsRunning = false;
         
-        pidLeft.setSetpoint(0);
-        pidRight.setSetpoint(0);
+        pidLeft.reset();
+        pidRight.reset();
         
         digitalWrite(STBY, LOW);
         
-        bufferSensorSending = true; // Send sensor data
         strncpy(lcdLine1, "STOP COMMAND", sizeof(lcdLine1));
         lcdLine1[16] = '\0';
         strncpy(lcdLine2, "Motors stopped", sizeof(lcdLine2));
@@ -396,10 +392,14 @@ void handleCommand(byte *buffer, size_t length)
     }
 }
 
-void handleMovement(int16_t leftSpeed, int16_t rightSpeed)
+void handleMovement(int16_t left, int16_t right)
 {
     // Values already mapped between -255 and 255
-
+    // Clamp the speeds to the valid range just in case
+    
+    int16_t leftSpeed = constrain(left, -MAX_PWM, MAX_PWM);
+    int16_t rightSpeed = constrain(right, -MAX_PWM, MAX_PWM);
+    
     if (!motorsEnabled){
         digitalWrite(STBY, HIGH);
         motorsEnabled = true;
@@ -443,7 +443,7 @@ void handleMovement(int16_t leftSpeed, int16_t rightSpeed)
         analogWrite(EN2, 0);
     }
     
-    if (left != 0 || right != 0){
+    if (leftSpeed != 0 || rightSpeed != 0){
         motorsRunning = true;
     } else {
         motorsRunning = false;
@@ -463,17 +463,36 @@ void updateLCD()
 
 void loop()
 {
+    unsigned long now = micros();
+    const unsigned long PID_INTERVAL_US = (unsigned long)PID_INTERVAL * 1000UL;
 
+    if (now - lastPIDComputeTime >= PID_INTERVAL_US)
+    {
+        lastPIDComputeTime += PID_INTERVAL_US;
+        pidLoop();
+    }
+    
     handleIncomingData();
 
     if (millis() - lastUltrasonicSampleTime >= ULTRASONIC_INTERVAL){
-      getUltrasonicData(lastDistance);
+      triggerUltrasonicPulse();
       lastUltrasonicSampleTime = millis();
     }
 
     if (millis() - lastMPUSampleTime >= MPU_INTERVAL){
       getMPUData(ax, ay, az, gx, gy, gz, tempC);
       lastMPUSampleTime = millis();
+    }
+    
+    if (echoReady) {
+        echoReady = false;
+        if (echoDuration == 0 || echoDuration > 25000) {
+            lastDistance = -1;
+        } else if (echoDuration < 100) {
+            lastDistance = -2;
+        } else {
+            lastDistance = (echoDuration / 2.0) * 0.0343;
+        }
     }
 
     if (millis() - lastLCDUpdateTime >= LCD_UPDATE_INTERVAL){
@@ -484,8 +503,8 @@ void loop()
        lastLCDUpdateTime = millis();  
     }
     
-    if (bufferSensorSending)
-    {
+    if (millis() - lastSensorSendTime >= SENSOR_SEND_INTERVAL){
         sendSensorData();
+        lastSensorSendTime = millis();
     }
 }

@@ -4,7 +4,7 @@ import struct
 from collections import deque
 from datetime import datetime
 import asyncio
-from . import SerialManager, SensorData, Command, CommandType, LCDCommand, StateEstimator
+from . import SerialManager, SensorData, Command, CommandType, LCDCommand, StateEstimator, Mode
 from ..ai.get_commands import text_to_command
 
 
@@ -30,6 +30,9 @@ class Robot:
         self.obstacle_avoid_threshold = 10 # Distance threshold for obstacle avoidance (cm)
         self._logger = logging.getLogger("RobotManager")
         self.motor_lock = asyncio.Lock()
+        
+        self.state = Mode.MANUAL
+        self.state_lock = asyncio.Lock()  # Lock to protect access to the robot's state (manual, autonomous, stopped)
 
         self.sensor_lock = threading.Lock()          # shared between serial thread and asyncio
         self.latest_sensor_data = None               # written by serial thread, read by pose loop
@@ -69,6 +72,24 @@ class Robot:
     async def _reset_obstacle_clear(self):
         await asyncio.sleep(self.backup_time)  # Wait for backup duration before allowing new obstacle detection
         self.obstacle_clear.set()
+        
+    async def emergency_stop(self):
+        """Immediately stop the robot and clear any pending commands."""
+        await self.send_safe_command(Command.estop())
+        
+        with self.state_lock:
+            self.state = Mode.STOPPED
+            
+        await self.socketio.emit('emergency_stop', {"status": "success"})
+        
+        
+    async def resume(self):
+        """Resume normal operation after an emergency stop."""
+        with self.state_lock:
+            self.state = Mode.MANUAL
+        self.state_estimator.reset()  # Reset state estimator to clear any erroneous state from before the stop
+        await self.socketio.emit('resume', {"status": "success"})
+            
 
     async def backup(self):
         """Backup the robot for a short duration when an obstacle is detected."""
@@ -148,7 +169,9 @@ class Robot:
         else:
             avg_distance = distance
             
-        if not sensor_data.is_obstacle_detected(self.obstacle_threshold) or not self.obstacle_clear.is_set():
+        with self.state_lock:
+            cur_state = self.state
+        if not sensor_data.is_obstacle_detected(self.obstacle_threshold) or not self.obstacle_clear.is_set() or cur_state == Mode.STOPPED:
             return avg_distance
     
         await self.socketio.emit('obstacle_detected', {"distance": distance})
@@ -164,8 +187,10 @@ class Robot:
     
     async def handle_cliff(self, sensor_data: SensorData):
         """Handle cliff detection and stop motors if cliff is detected."""
-        
-        if not sensor_data.check_cliff() or not self.cliff_clear.is_set():
+        with self.state_lock:
+            cur_state = self.state
+            
+        if not sensor_data.check_cliff() or not self.cliff_clear.is_set() or cur_state == Mode.STOPPED:
             return 
         
         self.cliff_clear.clear()
@@ -191,9 +216,15 @@ class Robot:
     async def send_sensor_update(self, current_time, sensor_data: SensorData):
         if current_time - self.last_emit_time >= self.emit_interval:
             self.last_emit_time = current_time
+            
+            with self.state_lock:
+                current_mode = self.state
+                
             await self.socketio.emit(
                 'sensor_data',
-                sensor_data.model_dump(),
+                sensor_data.model_dump() + {
+                    "mode": current_mode.name
+                },
             )
     
     async def main_loop(self):
@@ -202,16 +233,24 @@ class Robot:
         
         while self.running:
             start = asyncio.get_event_loop().time()
-            
+                    
             with self.sensor_lock:
                 sensor_data = self.latest_sensor_data
+                
+            with self.state_lock:
+                cur_state = self.state
                 
             if not sensor_data:
                 elapsed = asyncio.get_event_loop().time() - start
                 await asyncio.sleep(max(0, dt - elapsed)) # 100Hz loop
                 continue
-
-            self.state_estimator.update(sensor_data)
+                
+            if cur_state == Mode.PATH_FOLLOWING:
+                # TODO: Implement path following logic here
+                pass
+            
+            if cur_state != Mode.STOPPED: # Only update state estimator if not stopped
+                self.state_estimator.update(sensor_data)
             
             if (start - self.last_obstacle_detect_time) >= self.obstacle_check_interval:
                 self.last_obstacle_detect_time = start
@@ -230,6 +269,12 @@ class Robot:
         """
         Handle joystick input and send motor commands.
         """
+        
+        with self.state_lock:
+            cur_state = self.state
+            
+        if cur_state != Mode.MANUAL or cur_state == Mode.STOPPED:
+            return
 
         left_y = data.get('left_y', 0)
         right_x = data.get('right_x', 0)
@@ -259,7 +304,6 @@ class Robot:
                 "error": str(e)
             })
             
-
     async def handle_query(self, query):
         await self.send_safe_command(
             Command(

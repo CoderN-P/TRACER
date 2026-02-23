@@ -39,6 +39,7 @@ const int PWR_MGMT_1 = 0x6B; // Power management register for MPU6050
 // Command definitions
 const uint8_t CMD_MOVE = 0x01;
 const uint8_t CMD_LCD_UPDATE = 0x02;
+const uint8_t CMD_ENABLE = 0x03;
 const uint8_t CMD_STOP = 0x04;
 
 // Timing intervals (in milliseconds)
@@ -342,7 +343,6 @@ void handleCommand(byte *buffer, size_t length)
         lcdLine2[16] = '\0';
         return;
     }
-
     if (cmd == CMD_MOVE && length == 6)
     {
         // Command 0x01: Handle movement
@@ -368,6 +368,15 @@ void handleCommand(byte *buffer, size_t length)
         // Command 0x02: Update LCD with two lines of text
         memcpy(lcdLine1, &buffer[1], 16);
         memcpy(lcdLine2, &buffer[17], 16);
+    } else if (cmd == CMD_ENABLE && length == 2){
+        // Command 0x03: ENABLE
+        motorsEnabled = true;
+        digitalWrite(STBY, HIGH);
+        
+        strncpy(lcdLine1, "ENABLE CMD", sizeof(lcdLine1));
+        lcdLine1[16] = '\0';
+        strncpy(lcdLine2, "Motors enabled", sizeof(lcdLine2));
+        lcdLine2[16] = '\0';
     } else if (cmd == CMD_STOP && length == 2){
       // Command 0x04: STOP
         motorsEnabled = false;
@@ -401,8 +410,7 @@ void handleMovement(int16_t left, int16_t right)
     int16_t rightSpeed = constrain(right, -MAX_PWM, MAX_PWM);
     
     if (!motorsEnabled){
-        digitalWrite(STBY, HIGH);
-        motorsEnabled = true;
+        return; // Ignore movement commands if motors are disabled
     }
 
     if (leftSpeed > 0)

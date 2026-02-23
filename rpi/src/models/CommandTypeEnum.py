@@ -7,6 +7,7 @@ class CommandType(str, Enum):
     BUZZER = "BUZZER"
     SENSOR = "SENSOR"
     STOP = "STOP"
+    ENABLE = "ENABLE" 
     
 
     def __str__(self):

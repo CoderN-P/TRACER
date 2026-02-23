@@ -105,16 +105,6 @@ class Controller:
         moved_enough = abs(left_y) > 0.15 or abs(right_x) > 0.15
         return moved_enough
 
-    def _reset_stop_motor(self):
-        """
-        Reset the stop motor flag after a short delay.
-        """
-
-        def reset():
-            self.stopped = False
-
-        threading.Timer(2, reset).start()
-
     def _reset_cooldown(self, attr):
         """
         Generic cooldown reset helper.
@@ -310,18 +300,22 @@ class Controller:
         if pygame.joystick.get_count() == 0 and not self.reconnecting:
             self.reconnecting = True
             threading.Thread(self.reconnect_controller()).start()
+            return 
         
 
         pygame.event.pump()  # Process events to update joystick state
         if self.controller.get_button(1):  # Button B is at index 1
             if self.stop_motor:
-                self.socketio.emit('stop', {})
-                self.socketio_server.emit('stop', {})
-                print("Stopping motors due to Button B press")
-                self.stop_motor = False  # Reset flag to avoid sending stop command repeatedly
-                self.stopped = True
-                self._reset_stop_motor()
-            return
+                if self.stopped:
+                    self.socketio.emit('enable', {})
+                    self.socketio_server.emit('enable', {})
+                    self.stopped = False
+                else:
+                    self.socketio.emit('stop', {})
+                    self.socketio_server.emit('stop', {})
+                    
+                    self.stop_motor = False  # Reset flag to avoid sending stop command repeatedly
+                    self.stopped = True
         else:
             self.stop_motor = True
 

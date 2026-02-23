@@ -100,6 +100,11 @@ class SerialManager:
             full = bytes([0xAA]) + packet
             checksum = sum(full) & 0xFF
             self.serial.write(full + bytes([checksum]))
+        elif data.command_type == CommandType.ENABLE:
+            packet = struct.pack("<B", 0x03)
+            full = bytes([0xAA]) + packet
+            checksum = sum(full) & 0xFF
+            self.serial.write(full + bytes([checksum]))
         elif data.command_type == CommandType.STOP:
             packet = struct.pack("<B", 0x04)
             full = bytes([0xAA]) + packet

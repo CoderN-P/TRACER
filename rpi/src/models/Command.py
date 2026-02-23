@@ -60,9 +60,43 @@ class Command(BaseModel):
         )
 
         return command
+    
+    @classmethod
+    def enable(cls):
+        """
+        Create an enable command to enable motors after estop.
+        """
+        command = cls(
+            ID="",
+            command_type=CommandType.ENABLE,
+            command=None,  # Enable command has no specific motor values
+            pause_duration=0,
+            duration=0
+        )
         
+        return command
+    
     @classmethod
     def stop(cls):
+        """
+        Create a stop command with zero motor values.
+        """
+        command = cls(
+            ID="",
+            command_type=CommandType.MOTOR,
+            command=MotorCommand(
+                left_motor=0,
+                right_motor=0,
+            ),
+            pause_duration=0,
+            duration=0
+        )
+        
+        return command
+    
+    
+    @classmethod
+    def estop(cls):
         """
         Send a stop command to the robot.
         """

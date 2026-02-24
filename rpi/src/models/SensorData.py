@@ -12,6 +12,7 @@ class SensorData(BaseModel):
     ir_back: bool = Field(..., description="Back IR sensor status (True if floor is detected)")
     battery: int = Field(..., description="Battery level in percentage (0-100)")
     timestamp: str = Field(..., description="Timestamp of the sensor data in ISO 8601 format") 
+    packet_num: int = Field(..., description="Packet number for tracking sensor data updates")
     
     def is_obstacle_detected(self, threshold: float = 10.0) -> bool:
         """

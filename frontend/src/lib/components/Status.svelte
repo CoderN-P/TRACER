@@ -1,18 +1,18 @@
 <script lang="ts">
     import { Skeleton } from '$lib/components/ui/skeleton';
     import { onMount } from 'svelte';
-    import { Clock } from 'lucide-svelte';
-    import type { LogEntry } from '$lib/types';
+    import { UserRound, Spline, Brain, OctagonX } from 'lucide-svelte';
+    import { type LogEntry, Mode } from '$lib/types';
     
-    let { lastSensorUpdate, logs = $bindable() } : { lastSensorUpdate: number, logs: LogEntry[] } = $props();
+    let { lastSensorUpdate, mode, logs = $bindable() } : { lastSensorUpdate: number, mode: Mode, logs: LogEntry[] } = $props();
     
-    let status: 'Online' | 'Stale' | 'Offline' = $state('Offline');
+    let status: 'Online' | 'Stale' | 'Offline' = $state('Online');
     let prevStatus: 'Online' | 'Stale' | 'Offline' = $state('Offline');
     
     onMount(() => {
         setInterval(() => {
             prevStatus = status;
-            if (lastSensorUpdate === 0) {
+            if (lastSensorUpdate === 1) {
                 status = 'Offline';
                 return;
             }
@@ -63,13 +63,29 @@
     }
 </script>
 
-{#if lastSensorUpdate === 0}
+{#if lastSensorUpdate === 1}
     <Skeleton class="h-10 w-full rounded-sm" />
 {:else}
-    <div class="flex w-full flex-row items-center bg-white border border-gray-100 rounded-lg p-2 px-4 gap-2">
+    <div class="flex w-full flex-row items-center bg-white border border-gray-100 rounded-lg py-1.5 pl-4 pr-2 gap-2">
         {#if status === 'Online'}
-            <div class="h-2 w-2 bg-green-500 rounded-full"></div>
-            <span class="text-green-500">Online</span>
+            <div class="flex flex-row justify-between gap-2 w-full">
+                <div class="flex flex-row items-center gap-2">
+                    <div class="h-2 w-2 bg-green-500 rounded-full"></div>
+                    <span class="text-green-500">Online</span>
+                </div>
+                <div class="flex flex-row items-center gap-1 rounded-md border border-gray-100 px-2 py-0.5 bg-gray-50 text-gray-900">
+                    {#if mode === Mode.MANUAL}
+                        <UserRound class="w-4 h-4" />
+                    {:else if mode === Mode.AUTONOMOUS}
+                        <Brain class="w-4 h-4" />
+                    {:else if mode === Mode.PATH_FOLLOWING}
+                        <Spline class="w-4 h-4" />
+                    {:else if mode === Mode.STOPPED}
+                        <OctagonX class="w-4 h-4" />
+                    {/if}
+                    <span class="">{mode.charAt(0) + mode.toLowerCase().slice(1)}</span>
+                </div>
+            </div>
         {:else if status === 'Stale'}
             <div class="h-2 w-2 bg-yellow-500 rounded-full"></div>
             <span class="text-yellow-500">Stale</span>

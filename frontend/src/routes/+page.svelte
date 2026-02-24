@@ -1,17 +1,18 @@
 <script lang="ts">
-    import { io as socket } from '$lib/api/socket';
-    import { onMount } from 'svelte';
+    import {io as socket} from '$lib/api/socket';
+    import {onMount} from 'svelte';
     import {
-        type SensorData,
-        type GestureData,
         type Command,
-        type Joystick,
-        SensorDataSchema,
-        GestureDataSchema,
-        JoystickSchema,
         type DistanceEntry,
         DistanceEntrySchema,
-        type LogEntry
+        type GestureData,
+        GestureDataSchema,
+        type Joystick,
+        JoystickSchema,
+        type LogEntry,
+        Mode,
+        type SensorData,
+        SensorDataSchema
     } from "$lib/types";
     import Status from '$lib/components/Status.svelte';
     import Uptime from '$lib/components/Uptime.svelte';
@@ -27,10 +28,11 @@
     import CommandList from "$lib/components/CommandList.svelte";
     import Recordings from "$lib/components/Recordings.svelte";
     import GestureController from "$lib/components/GestureController.svelte";
-    
+
     let sensorData = $state<SensorData | null>(null);
     let gestureData = $state<GestureData | null>(null);
     let previousSensorData = $state<SensorData | null>(null);
+    let mode = $state<Mode>(Mode.MANUAL);
     let logs = $state<LogEntry[]>([]);
     let joystickInput = $state<Joystick>({
         left_y: 0,
@@ -128,6 +130,7 @@
         
         socket.on('sensor_data', (data) => {
             previousSensorData = sensorData;
+            mode = data.mode;
             sensorData = SensorDataSchema.parse(data);
 
             packetCount++;
@@ -229,7 +232,7 @@
 <div class="flex flex-col gap-2 p-4 ">
     <!-- Status bar - Keep row on mobile but make it wrap -->
     <div class="w-full flex flex-col md:flex-row items-center gap-2 justify-between">
-        <Status {lastSensorUpdate} bind:logs={logs}/>
+        <Status {lastSensorUpdate} {mode} bind:logs={logs}/>
         <BatteryPercentage percent={sensorData?.battery ?? 0} 
                           lastSensorUpdateTime={lastSensorUpdate} />
         <div class="flex flex-row gap-2 w-full justify-between md:justify-end">

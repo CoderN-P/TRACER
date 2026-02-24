@@ -15,9 +15,6 @@ class StateEstimator:
             angular_velocity=0.0
         )
         self.alpha = alpha  # Complementary filter coefficient
-        self.wheel_base = 0.21  # Distance between the wheels in meters
-        self.wheel_diameter = 0.05  # Diameter of the wheels in meters
-        self.last_timestep = None
     
     def reset(self):
         self.state = RobotState(
@@ -30,9 +27,29 @@ class StateEstimator:
             linear_velocity_y=0.0,
             angular_velocity=0.0
         )
-        self.last_timestep = None
+
+    # Python logic to find how many packets were missed
+    @staticmethod
+    def calculate_missed_packets(current_seq, last_seq):
+        # This handles the rollover (255 -> 0)
+        diff = (current_seq - last_seq) & 0xFF
+        return diff - 1 # If diff is 1, 0 packets were missed
+    
+    @staticmethod
+    def calculate_dt(cur_raw: float, previous_raw: float):
+        current_time = cur_raw / 1_000_000.0
+        previous_time = previous_raw / 1_000_000.0
         
-    def update(self, sensor_data: SensorData):
+        if current_time < previous_time:
+            dt = (current_time + (4294.9673 - previous_time))  # Handle rollover (4.2949673 seconds for 32-bit microsecond timer)
+        else:
+            dt = current_time - previous_time
+            
+        return dt
+            
+        
+    def update(self, sensor_data: SensorData, previous_sensor_data: SensorData):
+        # Previous sensor data is needed to determine 
         # TODO: Install encoders to allow for state estimation
         return
 

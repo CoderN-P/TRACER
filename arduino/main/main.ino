@@ -44,15 +44,11 @@ const uint8_t CMD_STOP = 0x04;
 
 // Timing intervals (in milliseconds)
 const unsigned long ULTRASONIC_INTERVAL = 50; // Sample ultrasonic sensor every 50 ms (20 hz)
-const unsigned long MPU_INTERVAL = 10;        // Sample MPU-6050 every 10 ms (100 hz)
 const unsigned long LCD_UPDATE_INTERVAL = 500; // Update LCD every 500ms
-const unsigned long SENSOR_SEND_INTERVAL = 10; // Send sensor data every 10 ms (100 hz)
 
 // Timing variables
 unsigned long lastUltrasonicSampleTime = 0;
-unsigned long lastMPUSampleTime = 0;
 unsigned long lastLCDUpdateTime = 0;
-unsigned long lastSensorSendTime = 0;
 unsigned long lastPIDComputeTime = 0;
 
 bool motorsEnabled = true;
@@ -65,6 +61,7 @@ int storedBatteryPercent = -1;
 volatile unsigned long echoStart = 0;
 volatile unsigned long echoDuration = 0;
 volatile bool echoReady = false;
+int packetSeq = 0;
 
 // LCD Display buffers
 char lastLine1[17] = "";
@@ -103,6 +100,7 @@ void setup()
     pinMode(BATTERY, INPUT);
 
     Wire.begin();
+    Wire.setClock(400000); // Set I2C to 400kHz (Fast Mode)
     Serial.begin(BAUD_RATE);
     Serial.setTimeout(50);
 
@@ -290,10 +288,11 @@ void sendSensorData()
         storedBatteryPercent = batteryPercent; // Store it for future use
     }
 
-    byte buffer[28];
+    byte buffer[29];
     int i = 0;
 
-    buffer[i++] = 0xAA; // Start byte
+    buffer[i++] = 0xAA; // Start byte 
+    buffer[i++] = packetSeq++; // Packet sequence number (wraps at 255)
     memcpy(&buffer[i], &distance, 4); // Store distance as float
     i += 4; // Store distance as float
     memcpy(&buffer[i], &ax, 2);
@@ -462,7 +461,16 @@ void updateLCD()
 {
     strncpy(lastLine1, lcdLine1, sizeof(lastLine1));
     strncpy(lastLine2, lcdLine2, sizeof(lastLine2));
-    lcd.clear();
+    
+    // Pad with spaces to clear old content
+    for (int i = strlen(lastLine1); i < 16; i++) {
+        lastLine1[i] = ' ';
+    }
+    
+    for (int i = strlen(lastLine2); i < 16; i++) {
+        lastLine2[i] = ' ';
+    }
+    
     lcd.setCursor(0, 0);
     lcd.print(lcdLine1);
     lcd.setCursor(0, 1);
@@ -473,23 +481,26 @@ void loop()
 {
     unsigned long now = micros();
     const unsigned long PID_INTERVAL_US = (unsigned long)PID_INTERVAL * 1000UL;
-
+    
+    
+    // High priority: Run PID loop and send sensor data at 100 Hz
+    
     if (now - lastPIDComputeTime >= PID_INTERVAL_US)
     {
         lastPIDComputeTime += PID_INTERVAL_US;
+        getMPUData(ax, ay, az, gx, gy, gz, tempC);
         pidLoop();
+        sendSensorData();
     }
     
     handleIncomingData();
 
+
+    // Medium priority: Sample ultrasonic sensor at 20 Hz
+    
     if (millis() - lastUltrasonicSampleTime >= ULTRASONIC_INTERVAL){
       triggerUltrasonicPulse();
       lastUltrasonicSampleTime = millis();
-    }
-
-    if (millis() - lastMPUSampleTime >= MPU_INTERVAL){
-      getMPUData(ax, ay, az, gx, gy, gz, tempC);
-      lastMPUSampleTime = millis();
     }
     
     if (echoReady) {
@@ -502,6 +513,8 @@ void loop()
             lastDistance = (echoDuration / 2.0) * 0.0343;
         }
     }
+    
+    // Low priority: Update LCD at 2 Hz, but only if content has changed
 
     if (millis() - lastLCDUpdateTime >= LCD_UPDATE_INTERVAL){
         // Update LCD only if the content has changed'
@@ -509,10 +522,5 @@ void loop()
             updateLCD();
         }
        lastLCDUpdateTime = millis();  
-    }
-    
-    if (millis() - lastSensorSendTime >= SENSOR_SEND_INTERVAL){
-        sendSensorData();
-        lastSensorSendTime = millis();
     }
 }

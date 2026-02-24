@@ -1,3 +1,7 @@
+from .Config import RobotConfig
+
+ROBOT_CONFIG = RobotConfig() # Create a global instance of the config for easy access, Singleton pattern
+
 from .LCDCommand import LCDCommand
 from .SerialManager import SerialManager
 from .MotorCommand import MotorCommand

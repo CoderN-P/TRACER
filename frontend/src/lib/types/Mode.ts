@@ -1,0 +1,6 @@
+export enum Mode {
+    MANUAL = 'MANUAL',
+    AUTONOMOUS = 'AUTONOMOUS',
+    PATH_FOLLOWING = 'PATH_FOLLOWING',
+    STOPPED = 'STOPPED',
+}

@@ -3,7 +3,7 @@ import uuid
 from .LCDCommand import LCDCommand
 from .MotorCommand import MotorCommand
 from .CommandTypeEnum import CommandType
-
+from . import ROBOT_CONFIG
 
 
 class Command(BaseModel):
@@ -21,15 +21,11 @@ class Command(BaseModel):
         self.ID = str(uuid.uuid4())
         
     @staticmethod
-    def scale(value):
-        wheel_diameter = 0.05 # in m
-        max_rpm = 178 # Max RPM of the motor
-        max_speed = (wheel_diameter * 3.1416 * max_rpm) / 60 # V = r*omega
-        
+    def scale(value): 
         sign = 1 if value > 0 else -1
         scaled = min(1, max(0, abs(value)))  # Clamp to [0, 1]
         
-        return int(sign * (scaled*max_speed))
+        return int(sign * (scaled*ROBOT_CONFIG.MAX_LINEAR_VEL))
         
     
     @classmethod
@@ -37,16 +33,13 @@ class Command(BaseModel):
         """
         Calculate the differential drive values based on the controller input.
         """
-        wheel_diameter = 0.05 # in m
-        max_rpm = 178 # Max RPM of the motor
-        max_speed = (wheel_diameter * 3.1416 * max_rpm) / 60 # V = r*omega
         
         forward = cls.apply_deadzone_and_scale(left_y)
         turn = cls.apply_deadzone_and_scale(right_x)
         
         # Calculate motor values (arcade drive)
-        left_motor = min(max_speed, max(-max_speed, forward - turn))
-        right_motor = min(max_speed, max(-max_speed, forward + turn))
+        left_motor = min(ROBOT_CONFIG.MAX_LINEAR_VEL, max(-ROBOT_CONFIG.MAX_LINEAR_VEL, forward - turn))
+        right_motor = min(ROBOT_CONFIG.MAX_LINEAR_VEL, max(-ROBOT_CONFIG.MAX_LINEAR_VEL, forward + turn))
 
         command = cls(
             ID="",

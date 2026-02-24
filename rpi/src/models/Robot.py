@@ -35,6 +35,7 @@ class Robot:
         self.state_lock = asyncio.Lock()  # Lock to protect access to the robot's state (manual, autonomous, stopped)
 
         self.sensor_lock = threading.Lock()          # shared between serial thread and asyncio
+        self.previous_sensor_data = None             # for any processing that needs to compare current and previous sensor data, only accessed within main loop
         self.latest_sensor_data = None               # written by serial thread, read by pose loop
         self.main_loop_task = None                   
         
@@ -108,6 +109,7 @@ class Robot:
 
         # Unpack the data according to the Arduino's sendSensorData format
         # <B    - start byte (0xAA)
+        # B     - packet number (uint8_t) 
         # B     - distance (uint8_t)
         # h     - ax (int16_t)
         # h     - ay (int16_t)
@@ -122,7 +124,7 @@ class Robot:
         # B     - checksum (uint8_t)
         
         fields = struct.unpack('<BfhhhhhhfBBIB', data)
-        start, distance, ax, ay, az, gx, gy, gz, temp, ir_flags, battery, timestamp, received_checksum = fields
+        start, packet_num, distance, ax, ay, az, gx, gy, gz, temp, ir_flags, battery, timestamp, received_checksum = fields
 
         # Calculate checksum (sum of all bytes except start byte and checksum byte)
         calculated_checksum = sum(data[1:-1]) & 0xFF
@@ -152,7 +154,8 @@ class Robot:
             "ir_front": ir_front,
             "ir_back": ir_back,
             "battery": battery,
-            "timestamp": timestamp
+            "timestamp": timestamp,
+            "packet_num": packet_num
         }
         
         return SensorData.model_validate(data)
@@ -207,6 +210,7 @@ class Robot:
     async def process_sensor_data(self, data: bytes):
         try:
             with self.sensor_lock: # Ensure thread-safe access to latest_sensor_data
+                self.previous_sensor_data = self.latest_sensor_data
                 self.latest_sensor_data = self.bytes_to_sensor_data(data)
         except Exception as e:
             self._logger.error(f"Error processing sensor data: {e}")
@@ -250,7 +254,7 @@ class Robot:
                 pass
             
             if cur_state != Mode.STOPPED: # Only update state estimator if not stopped
-                self.state_estimator.update(sensor_data)
+                self.state_estimator.update(sensor_data, self.previous_sensor_data)
             
             if (start - self.last_obstacle_detect_time) >= self.obstacle_check_interval:
                 self.last_obstacle_detect_time = start

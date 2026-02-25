@@ -2,7 +2,6 @@ import logging
 import threading
 import struct
 from collections import deque
-from datetime import datetime
 import asyncio
 from . import SerialManager, SensorData, Command, CommandType, LCDCommand, StateEstimator, Mode
 from ..ai.get_commands import text_to_command
@@ -67,7 +66,7 @@ class Robot:
 
     async def _reset_cliff_detected(self):
         """Reset the cliff clear flag after a short duration."""
-        await asyncio.sleep(0.5)  # Wait for half a second before resetting cliff detection to ensure backup completes
+        await asyncio.sleep(self.backup_time)  # Wait for half a second before resetting cliff detection to ensure backup completes
         self.cliff_clear.set()
         
     async def _reset_obstacle_clear(self):
@@ -78,7 +77,7 @@ class Robot:
         """Immediately stop the robot and clear any pending commands."""
         await self.send_safe_command(Command.estop())
         
-        with self.state_lock:
+        async with self.state_lock:
             self.state = Mode.STOPPED
             
         await self.socketio.emit('emergency_stop', {"status": "success"})
@@ -86,8 +85,10 @@ class Robot:
         
     async def resume(self):
         """Resume normal operation after an emergency stop."""
-        with self.state_lock:
+        async with self.state_lock:
             self.state = Mode.MANUAL
+        await self.send_safe_command(Command.stop())   # clear any stale setpoint
+        await self.send_safe_command(Command.enable())
         self.state_estimator.reset()  # Reset state estimator to clear any erroneous state from before the stop
         await self.socketio.emit('resume', {"status": "success"})
             
@@ -104,7 +105,7 @@ class Robot:
         # Look for start byte (0xAA)
         start_byte = data[0]
         if start_byte != 0xAA:
-            self._logger.error(f"Invalid start byte: {hex(start_byte[0])}, searching for 0xAA")
+            self._logger.error(f"Invalid start byte: {hex(start_byte)}, searching for 0xAA")
             raise ValueError("Invalid start byte")
 
         # Unpack the data according to the Arduino's sendSensorData format
@@ -123,11 +124,11 @@ class Robot:
         # I     - timestamp (uint32_t, microseconds)
         # B     - checksum (uint8_t)
         
-        fields = struct.unpack('<BfhhhhhhfBBIB', data)
+        fields = struct.unpack('<BBfhhhhhhfBBIB', data)
         start, packet_num, distance, ax, ay, az, gx, gy, gz, temp, ir_flags, battery, timestamp, received_checksum = fields
 
-        # Calculate checksum (sum of all bytes except start byte and checksum byte)
-        calculated_checksum = sum(data[1:-1]) & 0xFF
+        # Calculate checksum (sum of all bytes except checksum byte)
+        calculated_checksum = sum(data[:-1]) & 0xFF
         valid = calculated_checksum == received_checksum
 
         if not valid:
@@ -172,7 +173,7 @@ class Robot:
         else:
             avg_distance = distance
             
-        with self.state_lock:
+        async with self.state_lock:
             cur_state = self.state
         if not sensor_data.is_obstacle_detected(self.obstacle_threshold) or not self.obstacle_clear.is_set() or cur_state == Mode.STOPPED:
             return avg_distance
@@ -190,7 +191,7 @@ class Robot:
     
     async def handle_cliff(self, sensor_data: SensorData):
         """Handle cliff detection and stop motors if cliff is detected."""
-        with self.state_lock:
+        async with self.state_lock:
             cur_state = self.state
             
         if not sensor_data.check_cliff() or not self.cliff_clear.is_set() or cur_state == Mode.STOPPED:
@@ -200,7 +201,6 @@ class Robot:
         asyncio.create_task(self.backup())
         asyncio.create_task(self._reset_cliff_detected())  # Reset cliff detection after 0.5 seconds, basically halting commands
 
-        await self.send_safe_command(Command.stop())  # Stop motors if cliff is detected
         await self.socketio.emit('cliff_detected', {
             "ir_front": sensor_data.ir_front,
             "ir_back": sensor_data.ir_back
@@ -209,9 +209,10 @@ class Robot:
             
     async def process_sensor_data(self, data: bytes):
         try:
+            new_data = self.bytes_to_sensor_data(data)
             with self.sensor_lock: # Ensure thread-safe access to latest_sensor_data
                 self.previous_sensor_data = self.latest_sensor_data
-                self.latest_sensor_data = self.bytes_to_sensor_data(data)
+                self.latest_sensor_data = new_data
         except Exception as e:
             self._logger.error(f"Error processing sensor data: {e}")
             return
@@ -221,12 +222,13 @@ class Robot:
         if current_time - self.last_emit_time >= self.emit_interval:
             self.last_emit_time = current_time
             
-            with self.state_lock:
+            async with self.state_lock:
                 current_mode = self.state
                 
             await self.socketio.emit(
                 'sensor_data',
-                sensor_data.model_dump() + {
+                {
+                    **sensor_data.model_dump(), 
                     "mode": current_mode.name
                 },
             )
@@ -241,7 +243,7 @@ class Robot:
             with self.sensor_lock:
                 sensor_data = self.latest_sensor_data
                 
-            with self.state_lock:
+            async with self.state_lock:
                 cur_state = self.state
                 
             if not sensor_data:
@@ -274,10 +276,10 @@ class Robot:
         Handle joystick input and send motor commands.
         """
         
-        with self.state_lock:
+        async with self.state_lock:
             cur_state = self.state
             
-        if cur_state != Mode.MANUAL or cur_state == Mode.STOPPED:
+        if cur_state != Mode.MANUAL:
             return
 
         left_y = data.get('left_y', 0)

@@ -12,7 +12,7 @@
     onMount(() => {
         setInterval(() => {
             prevStatus = status;
-            if (lastSensorUpdate === 1) {
+            if (lastSensorUpdate === 0) {
                 status = 'Offline';
                 return;
             }
@@ -63,7 +63,7 @@
     }
 </script>
 
-{#if lastSensorUpdate === 1}
+{#if lastSensorUpdate === 0}
     <Skeleton class="h-10 w-full rounded-sm" />
 {:else}
     <div class="flex w-full flex-row items-center bg-white border border-gray-100 rounded-lg py-1.5 pl-4 pr-2 gap-2">

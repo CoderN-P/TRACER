@@ -53,11 +53,13 @@ class PurePursuit:
         max_y = max(pt1[1], pt2[1])
         
         out = []
+
+        EPS = 1e-6
         
-        if min_x <= sol_x_1 <= max_x and min_y <= sol_y_1 <= max_y:
+        if min_x - EPS <= sol_x_1 <= max_x + EPS and min_y - EPS <= sol_y_1 <= max_y + EPS:
             out.append((sol_x_1, sol_y_1,))
 
-        if min_x <= sol_x_2 <= max_x and min_y <= sol_y_2 <= max_y:
+        if min_x - EPS <= sol_x_2 <= max_x + EPS and min_y - EPS <= sol_y_2 <= max_y + EPS:
             out.append((sol_x_2, sol_y_2,))
     
         return out
@@ -78,8 +80,19 @@ class PurePursuit:
                     goal_point = intersection_pts[1]
             else:
                 goal_point = intersection_pts[0]
-                
-            if math.dist(goal_point, pt2) < math.dist(current_pos, pt2):
+
+            # parameterize the segment
+            seg_dx = pt2[0] - pt1[0]
+            seg_dy = pt2[1] - pt1[1]
+            seg_len_sq = seg_dx**2 + seg_dy**2
+            
+            if seg_len_sq == 0:
+                continue
+            
+            t_robot = ((current_pos[0] - pt1[0]) * seg_dx + (current_pos[1] - pt1[1]) * seg_dy) / seg_len_sq
+            t_goal  = ((goal_point[0]  - pt1[0]) * seg_dx + (goal_point[1]  - pt1[1]) * seg_dy) / seg_len_sq
+            
+            if t_goal > t_robot:
                 self.last_found_index = i
                 return goal_point
         
@@ -109,11 +122,24 @@ class PurePursuit:
         """
         Calculate the control command (linear and angular velocity) based on the current robot state and the path.
         """
+        
         current_pos = (robot_state.x, robot_state.y,)
+
+        if math.dist(current_pos, self.path[-1]) <= ROBOT_CONFIG.COMPLETION_THRESHOLD:
+            return Command(
+                command_type=CommandType.MOTOR,
+                command=MotorCommand(
+                    left_motor=0.0,
+                    right_motor=0.0,
+                ),
+                pause_duration=0,
+                duration=0
+            )
+        
         goal_point = self.find_goal_point(current_pos)
         
         if not goal_point:
-            if math.dist(current_pos, self.path[-1]) < ROBOT_CONFIG.LOOKAHEAD_DISTANCE * 1.5:
+            if math.dist(current_pos, self.path[-1]) < ROBOT_CONFIG.LOOKAHEAD_DISTANCE * ROBOT_CONFIG.END_LOOKAHEAD_MULTIPLIER:
                 goal_point = self.path[-1]
             else:
                 return None # The main loop will fall back to manual control
@@ -122,7 +148,7 @@ class PurePursuit:
         
         lateral_y = local_target[1]
         
-        curvature = 2*lateral_y / (ROBOT_CONFIG.LOOKAHEAD_DISTANCE ** 2)
+        curvature = 2*lateral_y / (math.hypot(*local_target) ** 2)
         
         linear_velocity = ROBOT_CONFIG.MAX_LINEAR_VEL
         angular_velocity = curvature * linear_velocity

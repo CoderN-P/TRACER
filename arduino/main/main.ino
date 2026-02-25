@@ -98,6 +98,8 @@ void setup()
     pinMode(ECHO, INPUT);
     pinMode(STBY, OUTPUT);
     pinMode(BATTERY, INPUT);
+    
+    attachInterrupt(digitalPinToInterrupt(ECHO), echoISR, CHANGE);
 
     Wire.begin();
     Wire.setClock(400000); // Set I2C to 400kHz (Fast Mode)
@@ -116,7 +118,7 @@ void setup()
     {
         strncpy(lcdLine1, "MPU OK", sizeof(lcdLine1));
         lcdLine1[16] = '\0';
-        getUltrasonicData(lastDistance);
+        triggerUltrasonicPulse();
         getMPUData(ax, ay, az, gx, gy, gz, tempC);
     }
     else
@@ -124,15 +126,19 @@ void setup()
         strncpy(lcdLine1, "MPU Error", sizeof(lcdLine1));
         lcdLine1[16] = '\0';
     }
+    
+    lastPIDComputeTime = micros();
 }
 
-uint8_t expected_command_length(uint8_t cmd)
+uint8_t expectedCommandLength(uint8_t cmd)
 {
     if (cmd == CMD_MOVE)
         return 7;
     if (cmd == CMD_LCD_UPDATE)
         return 35;
     if (cmd == CMD_STOP)
+        return 3;
+    if (cmd == CMD_ENABLE)
         return 3;
     return 255; // invalid
 }
@@ -147,13 +153,13 @@ void handleIncomingData()
             if (cmdIdx == 0 && b != 0xAA) {
                 continue; // discard until valid start byte
             }
-            cmdBuf[cmdIdx++] = Serial.read();
+            cmdBuf[cmdIdx++] = b;
             
             if (cmdIdx >= MAX_BUFFER_SIZE) {
                 cmdIdx = 0; // reset if we exceed buffer size
                 continue;
             }
-            if (cmdIdx == expected_command_length(cmdBuf[1]))
+            if (cmdIdx == expectedCommandLength(cmdBuf[1]))
             {
                 handleCommand(cmdBuf, cmdIdx);
                 cmdIdx = 0;
@@ -224,7 +230,9 @@ int applyDeadband(float pwm) {
     float mag = abs(pwm);
 
     if (mag == 0) return 0;
-
+    
+    if (mag > MAX_PWM) mag = MAX_PWM; // Cap the magnitude to max PWM
+    
     // Scale 0–255 PID output into 50–255 motor range
     float scaled = MIN_PWM + (mag / MAX_PWM) * (MAX_PWM - MIN_PWM);
 
@@ -282,7 +290,7 @@ void sendSensorData()
         if (storedBatteryPercent == -1) {
             batteryPercent = getBatteryPercent(); // Get the battery percentage if not stored
         } else {
-            batteryPercent = (uint8_t)(0.8*getBatteryPercent() + 0.2*storedBatteryPercent); // Smooth the battery percentage
+            batteryPercent = (uint8_t)(0.2*getBatteryPercent() + 0.8*storedBatteryPercent); // Smooth the battery percentage
         }
         
         storedBatteryPercent = batteryPercent; // Store it for future use
@@ -315,7 +323,7 @@ void sendSensorData()
     i += 4;
 
     uint8_t checksum = 0;
-    for (int j = 1; j < i; j++)
+    for (int j = 0; j < i; j++)
         checksum += buffer[j];
     buffer[i++] = checksum;
 
@@ -342,16 +350,16 @@ void handleCommand(byte *buffer, size_t length)
         lcdLine2[16] = '\0';
         return;
     }
-    if (cmd == CMD_MOVE && length == 6)
+    if (cmd == CMD_MOVE && length == 7)
     {
         // Command 0x01: Handle movement
         int16_t leftVel, rightVel; // mm/s
         
-        memcpy(&leftVel, &buffer[1], 2);
-        memcpy(&rightVel, &buffer[3], 2);
+        memcpy(&leftVel, &buffer[2], 2);
+        memcpy(&rightVel, &buffer[4], 2);
         
-        pidLeft.setSetpoint(leftVel/1000);
-        pidRight.setSetpoint(rightVel/1000);
+        pidLeft.setSetpoint(leftVel / 1000.0f); // Convert mm/s to m/s for PID setpoint
+        pidRight.setSetpoint(rightVel / 1000.0f);
         
         char lcd_buffer[17];
         sprintf(lcd_buffer, "L:%d R:%d", leftVel, rightVel);
@@ -362,12 +370,15 @@ void handleCommand(byte *buffer, size_t length)
         strncpy(lcdLine2, "Moving", sizeof(lcdLine2));
         lcdLine2[16] = '\0';
     }
-    else if (cmd == CMD_LCD_UPDATE && length == 34)
+    else if (cmd == CMD_LCD_UPDATE && length == 35)
     {
         // Command 0x02: Update LCD with two lines of text
-        memcpy(lcdLine1, &buffer[1], 16);
-        memcpy(lcdLine2, &buffer[17], 16);
-    } else if (cmd == CMD_ENABLE && length == 2){
+        memcpy(lcdLine1, &buffer[2], 16);
+        lcdLine1[16] = '\0';
+        memcpy(lcdLine2, &buffer[18], 16);
+        lcdLine2[16] = '\0';
+        
+    } else if (cmd == CMD_ENABLE && length == 3){
         // Command 0x03: ENABLE
         motorsEnabled = true;
         digitalWrite(STBY, HIGH);
@@ -376,7 +387,7 @@ void handleCommand(byte *buffer, size_t length)
         lcdLine1[16] = '\0';
         strncpy(lcdLine2, "Motors enabled", sizeof(lcdLine2));
         lcdLine2[16] = '\0';
-    } else if (cmd == CMD_STOP && length == 2){
+    } else if (cmd == CMD_STOP && length == 3){
       // Command 0x04: STOP
         motorsEnabled = false;
         motorsRunning = false;

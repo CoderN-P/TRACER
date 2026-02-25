@@ -14,3 +14,5 @@ class RobotConfig:
 
     # Pure Pursuit
     LOOKAHEAD_DISTANCE: float = 0.3 # Meters
+    COMPLETION_THRESHOLD: float = 0.1 # Meters
+    END_LOOKAHEAD_MULTIPLIER: float = 1.5 # Increase lookahead distance near the end of the path

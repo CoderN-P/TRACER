@@ -40,7 +40,7 @@ class SerialManager:
         thread = threading.Thread(target=self.read_loop, daemon=True)
         thread.start()
         self._logger.info(f"SerialManager started on {self.serial.portstr} at {self.serial.baudrate} baud")
-        asyncio.create_task(robot.start())
+        asyncio.run_coroutine_threadsafe(robot.start(), loop)
 
     def stop(self):
         self.running = False
@@ -66,12 +66,10 @@ class SerialManager:
                         if len(self._buffer) < self._PACKET_LENGTH:
                             break
 
-                        packet = self._buffer[:self._PACKET_LENGTH]
+                        packet = bytes(self._buffer[:self._PACKET_LENGTH])
                         del self._buffer[:self._PACKET_LENGTH]
 
-                        self.loop.call_soon_threadsafe(
-                            lambda p=packet: self.robot.process_sensor_data(p)
-                        )
+                        asyncio.run_coroutine_threadsafe(self.robot.process_sensor_data(bytes(packet)), self.loop)
                 else:
                     time.sleep(0.001)
         except Exception as e:
@@ -81,8 +79,8 @@ class SerialManager:
     def send(self, data: Command):
         # Check if data is a string or pydantic model
         if data.command_type == CommandType.MOTOR:
-            data.command.left_motor = int(max(-32767, min(32767, data.command.left_motor * 1000))) # Convert from m/s to mm/s to fit in int16
-            data.command.right_motor = int(max(-32767, min(32767, data.command.right_motor * 1000))) # Convert from m/s to mm/s to fit in int16
+            left = max(-32767, min(32767, int(data.command.left_motor * 1000))) # Convert from m/s to mm/s to fit in int16
+            right = max(-32767, min(32767, int(data.command.right_motor * 1000))) # Convert from m/s to mm/s to fit in int16
             packet = struct.pack("<Bhh", 0x01, data.command.left_motor, data.command.right_motor)
             full = bytes([0xAA]) + packet
             checksum = sum(full) & 0xFF

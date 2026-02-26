@@ -111,7 +111,7 @@ class Robot:
         # Unpack the data according to the Arduino's sendSensorData format
         # <B    - start byte (0xAA)
         # B     - packet number (uint8_t) 
-        # B     - distance (uint8_t)
+        # f     - distance (float)
         # h     - ax (int16_t)
         # h     - ay (int16_t)
         # h     - az (int16_t)
@@ -119,13 +119,18 @@ class Robot:
         # h     - gy (int16_t)
         # h     - gz (int16_t)
         # f     - tempC (float)
+        # f     - magnetometer x (float, microtesla)
+        # f     - magnetometer y (float, microtesla)
+        # f     - magnetometer z (float, microtesla)
+        # I     - left encoder ticks (uint32_t)
+        # I     - right encoder ticks (uint32_t)
         # B     - ir_flags (uint8_t)
         # B     - battery percentage (uint8_t)
         # I     - timestamp (uint32_t, microseconds)
         # B     - checksum (uint8_t)
         
-        fields = struct.unpack('<BBfhhhhhhfBBIB', data)
-        start, packet_num, distance, ax, ay, az, gx, gy, gz, temp, ir_flags, battery, timestamp, received_checksum = fields
+        fields = struct.unpack('<BBfhhhhhhffffIIBBIB', data)
+        start, packet_num, distance, ax, ay, az, gx, gy, gz, temp, left_encoder_ticks, right_encoder_ticks, ir_flags, battery, timestamp, received_checksum = fields
 
         # Calculate checksum (sum of all bytes except checksum byte)
         calculated_checksum = sum(data[:-1]) & 0xFF
@@ -152,6 +157,8 @@ class Robot:
                 "gyroscope_z": gz/131,  # Convert to degrees per second
                 "temperature": temp
             },
+            "left_encoder": left_encoder_ticks,
+            "right_encoder": right_encoder_ticks,
             "ir_front": ir_front,
             "ir_back": ir_back,
             "battery": battery,

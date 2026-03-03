@@ -5,11 +5,21 @@
 
 
 // Constants for motor control
-const float WHEEL_DIAMETER = 0.05; // wheel diameter in meters
+const float WHEEL_DIAMETER = 0.05411268; // wheel diameter in meters
 const int MIN_PWM = 50; // Minimum PWM value
 const int MAX_PWM = 255; // Max PWM Value
 const int REDUCTION_RATIO = 56;
 const int MAX_OUTPUT_RPM = 178;
+
+// Encoder constants
+const int ENCODER_PPR = 11;
+const int ENCODER_TICKS_PER_REV = ENCODER_PPR * REDUCTION_RATIO * 4; // Total ticks per wheel revolution
+const int8_t encoder_lut[] = {
+    0, -1,  1,  0,  // 00 -> 00, 01, 10, 11
+    1,  0,  0, -1,  // 01 -> 00, 01, 10, 11
+   -1,  0,  0,  1,  // 10 -> 00, 01, 10, 11
+    0,  1, -1,  0   // 11 -> 00, 01, 10, 11
+};
 
 // Pin definitions
 const int EN1 = 9; // Enable pin for motor 1
@@ -23,13 +33,19 @@ const int IR_BACK = 12; // IR sensor at the back
 const int STBY = 13; // Standby pin for motor driver
 const int BATTERY = A3; // Battery voltage pin
 const int TRIGGER = 11; // Trigger pin for ultrasonic sensor
-const int ECHO = 2;   // Echo pin for ultrasonic sensor
+const int ECHO = 2;   // Echo pin for ultrasonic sensor // Must be interrupt-capable pin
+const int ENCODER_LEFT_A = 18; // Left encoder pin channel A (must be interrupt-capable)
+const int ENCODER_LEFT_B = 19; // Left encoder pin channel B (must be interrupt-capable)
+const int ENCODER_RIGHT_A = 20; // Right encoder pin channel A (must be interrupt-capable)
+const int ENCODER_RIGHT_B = 21; // Right encoder pin channel B (must be interrupt-capable)
 
 // System constants
 const int MAX_BUFFER_SIZE = 64;
-byte cmdBuf[64];
+byte cmdBuf[MAX_BUFFER_SIZE];
 size_t cmdIdx = 0;
 const int BAUD_RATE = 115200;
+
+
 
 // I2C addresses and Register addresses
 const int MPU_ADDRESS = 0x68; // I2C address for MPU6050
@@ -58,8 +74,14 @@ bool motorsRunning = false;
 int ax, ay, az, gx, gy, gz;
 float lastDistance, tempC;
 int storedBatteryPercent = -1;
+volatile int32_t leftEncoderCount = 0;
+volatile int32_t rightEncoderCount = 0;
+volatile int32_t lastLeftEncoderCount = 0;
+volatile int32_t lastRightEncoderCount = 0;
+volatile unsigned int8_t leftPrevAB = 0;
+volatile unsigned int8_t rightPrevAB = 0;
 volatile unsigned long echoStart = 0;
-volatile unsigned long echoDuration = 0;
+volatile unsigned long echoDuration = 0; // Can be negative to indicate errors: -1 = timeout, -2 = too close
 volatile bool echoReady = false;
 int packetSeq = 0;
 
@@ -70,6 +92,23 @@ char lcdLine1[17] = "Init...";
 char lcdLine2[17] = "";
 LiquidCrystal_I2C lcd(LCD_ADDRESS, 16, 2);
 
+// Sensor packet struct
+
+struct SensorPacket {
+    uint8_t startByte; // 0xAA
+    uint8_t packetSeq; // Incrementing sequence number
+    float distance; // Ultrasonic distance in meters
+    int16_t ax, ay, az; // Accelerometer data
+    int16_t gx, gy, gz; // Gyroscope data
+    float tempC; // Temperature in Celsius
+    float magX, magY, magZ; // Magnetometer data
+    int32_t leftEncoder; // Left wheel encoder count
+    int32_t rightEncoder; // Right wheel encoder count
+    uint8_t flags; // Bit 0 = front IR, Bit 1 = back IR, Bit 2 = new magnetometer data available
+    uint8_t batteryPercent; // Battery voltage percentage (0-100)
+    uint32_t timestamp; // Timestamp in microseconds
+    uint8_t checksum; // Checksum for data integrity
+} __attribute__((packed)); // Packed to avoid padding bytes
 // PID Controllers
 
 PIDController pidLeft(1.0, 0.0, 0.1, 100);
@@ -100,6 +139,10 @@ void setup()
     pinMode(BATTERY, INPUT);
     
     attachInterrupt(digitalPinToInterrupt(ECHO), echoISR, CHANGE);
+    attachInterrupt(digitalPinToInterrupt(ENCODER_LEFT_A), leftEncoderISR, CHANGE);
+    attachInterrupt(digitalPinToInterrupt(ENCODER_LEFT_B), leftEncoderISR, CHANGE);
+    attachInterrupt(digitalPinToInterrupt(ENCODER_RIGHT_A), rightEncoderISR, CHANGE);
+    attachInterrupt(digitalPinToInterrupt(ENCODER_RIGHT_B), rightEncoderISR, CHANGE);
 
     Wire.begin();
     Wire.setClock(400000); // Set I2C to 400kHz (Fast Mode)
@@ -140,30 +183,41 @@ uint8_t expectedCommandLength(uint8_t cmd)
         return 3;
     if (cmd == CMD_ENABLE)
         return 3;
-    return 255; // invalid
+    return 0; // invalid
 }
 
-void handleIncomingData()
-{
-    if (Serial.available() > 0)
-    {
-        while (Serial.available())
-        {
-            byte b = Serial.read();
-            if (cmdIdx == 0 && b != 0xAA) {
-                continue; // discard until valid start byte
-            }
-            cmdBuf[cmdIdx++] = b;
-            
-            if (cmdIdx >= MAX_BUFFER_SIZE) {
-                cmdIdx = 0; // reset if we exceed buffer size
-                continue;
-            }
-            if (cmdIdx == expectedCommandLength(cmdBuf[1]))
-            {
-                handleCommand(cmdBuf, cmdIdx);
-                cmdIdx = 0;
-            }
+void handleIncomingData() {
+    uint8_t processed = 0;
+
+    while (Serial.available() && processed < MAX_BUFFER_SIZE) {
+        processed++;
+        uint8_t b = Serial.read();
+
+        // reset on overflow before writing
+        
+        if (cmdIdx >= MAX_BUFFER_SIZE) {
+            cmdIdx = 0;
+        }
+
+        // hunt for start byte
+        if (cmdIdx == 0 && b != 0xAA) continue;
+
+        cmdBuf[cmdIdx++] = b;
+
+        // need at least 2 bytes before checking length
+        if (cmdIdx < 2) continue;
+
+        uint8_t expected = expectedCommandLength(cmdBuf[1]);
+
+        // guard against expectedCommandLength returning 0 or 1
+        if (expected < 2) {
+            cmdIdx = 0;
+            continue;
+        }
+
+        if (cmdIdx == expected) {
+            handleCommand(cmdBuf, expected);
+            cmdIdx = 0;
         }
     }
 }
@@ -178,6 +232,23 @@ uint8_t getIRBack()
     return digitalRead(IR_BACK);
 }
 
+void leftEncoderISR(){
+    lastLeftEncoderCount = leftEncoderCount;
+    
+    uint8_t currentState = (digitalRead(ENCODER_LEFT_A) << 1) | digitalRead(ENCODER_LEFT_B); // Current state of Left A and B
+    uint8_t index = (leftPrevAB << 2) | currentState; // Combine previous and current state to get the index for the lookup table
+    leftEncoderCount += encoder_lut[index];
+    leftPrevAB = currentState; // Update the previous state to current state for the next interrupt
+}
+
+void rightEncoderISR(){
+    lastRightEncoderCount = rightEncoderCount;
+    
+    uint8_t currentState = (digitalRead(ENCODER_RIGHT_A) << 1) | digitalRead(ENCODER_RIGHT_B); // Current state of Right A and B
+    uint8_t index = (rightPrevAB << 2) | currentState; // Combine previous and current state to get the index for the lookup table
+    rightEncoderCount += encoder_lut[index];
+    rightPrevAB = currentState; // Update the previous state to current state for the next interrupt
+}
 
 void triggerUltrasonicPulse()
 {
@@ -213,16 +284,18 @@ void getMPUData(int &ax, int &ay, int &az, int &gx, int &gy, int &gz, float &tem
 }
 
 
-float getLeftMotorSpeed()
+float getLeftMotorSpeed(int32_t left, int32_t lastLeft)
 {
-    // Placeholder: Replace with actual encoder reading when motors arrive
-    return 0.0;
+    deltaLeftTicks = left - lastLeft;
+    deltaLeft = (deltaLeftTicks * (PI * WHEEL_DIAMETER) / ENCODER_TICKS_PER_REV);
+    return deltaLeft / (PID_INTERVAL / 1000.0); // Convert to m/s
 }
 
-float getRightMotorSpeed()
+float getRightMotorSpeed(int32_t right, int32_t lastRight)
 {
-    // Placeholder: Replace with actual encoder reading when motors arrive
-    return 0.0;
+    deltaRightTicks = right - lastRight;
+    deltaRight = (deltaRightTicks * (PI * WHEEL_DIAMETER) / ENCODER_TICKS_PER_REV);
+    return deltaRight / (PID_INTERVAL / 1000.0); // Convert to m/s
 }
 
 int applyDeadband(float pwm) {
@@ -239,9 +312,9 @@ int applyDeadband(float pwm) {
     return sign * (int)scaled;
 }
 
-void pidLoop(){
-    float leftSpeed = getLeftMotorSpeed();
-    float rightSpeed = getRightMotorSpeed();
+void pidLoop(int32_t left, int32_t lastLeft, int32_t right, int32_t lastRight){
+    float leftSpeed = getLeftMotorSpeed(left, lastLeft);
+    float rightSpeed = getRightMotorSpeed(right, lastRight);
     
     float leftOutput = pidLeft.compute(leftSpeed);
     float rightOutput = pidRight.compute(rightSpeed);
@@ -254,6 +327,12 @@ void echoISR() {
         echoStart = micros();
     } else {
         echoDuration = micros() - echoStart;
+        if (echoDuration > 25000) {
+            echoDuration = -1; // Timeout, no echo received
+        } else if (echoDuration < 100) {
+            echoDuration = -2; // Too close, likely noise
+        }
+        
         echoReady = true;
     }
 }
@@ -270,15 +349,14 @@ uint8_t getBatteryPercent()
     return constrain((uint8_t)percent, 0, 100);
 }
 
-void sendSensorData()
+void sendSensorData(int32_t leftEncoder, int32_t rightEncoder)
 {
-
     // Get ultrasonic data
     float distance = lastDistance;
 
     uint8_t ir_front = getIRFront();
     uint8_t ir_back = getIRBack();
-    uint8_t ir_flags = (ir_front << 0) | (ir_back << 1); // bit 0 = front, bit 1 = back
+    uint8_t flags = (ir_front << 0) | (ir_back << 1); // bit 0 = front, bit 1 = back
     uint8_t batteryPercent = 0;
     
     uint32_t now = micros();
@@ -296,40 +374,34 @@ void sendSensorData()
         storedBatteryPercent = batteryPercent; // Store it for future use
     }
 
-    byte buffer[29];
-    int i = 0;
-
-    buffer[i++] = 0xAA; // Start byte 
-    buffer[i++] = packetSeq++; // Packet sequence number (wraps at 255)
-    memcpy(&buffer[i], &distance, 4); // Store distance as float
-    i += 4; // Store distance as float
-    memcpy(&buffer[i], &ax, 2);
-    i += 2;
-    memcpy(&buffer[i], &ay, 2);
-    i += 2;
-    memcpy(&buffer[i], &az, 2);
-    i += 2;
-    memcpy(&buffer[i], &gx, 2);
-    i += 2;
-    memcpy(&buffer[i], &gy, 2);
-    i += 2;
-    memcpy(&buffer[i], &gz, 2);
-    i += 2;
-    memcpy(&buffer[i], &tempC, 4);
-    i += 4;                 // Store temperature as float
-    buffer[i++] = ir_flags; // Store IR flags
-    buffer[i++] = batteryPercent; // Store battery voltage percentage
-    memcpy(&buffer[i], &now, 4); // Store timestamp
-    i += 4;
-
-    uint8_t checksum = 0;
-    for (int j = 0; j < i; j++)
-        checksum += buffer[j];
-    buffer[i++] = checksum;
-
-    Serial.write(buffer, i); // Send the data over Serial
+    SensorPacket packet;
+    packet.start = 0xAA;
+    packet.packetSeq = packetSeq++;
+    packet.distance = distance;
+    packet.ax = ax;
+    packet.ay = ay;
+    packet.az = az;
+    packet.gx = gx;
+    packet.gy = gy;
+    packet.gz = gz;
+    packet.leftEncoder = leftEncoder;
+    packet.rightEncoder = rightEncoder;
+    packet.tempC = tempC;
+    packet.flags = flags;
+    packet.batteryPercent = batteryPercent;
+    packet.timestamp = now;
+    packet.checksum = computeChecksum((uint8_t*)&packet, sizeof(packet)); // Exclude checksum byte
+    
+    Serial.write((uint8_t*)&packet, sizeof(packet));
 }
 
+uint8_t computeChecksum(uint8_t* data, uint8_t len) {
+    uint8_t sum = 0;
+    for (uint8_t i = 0; i < len; i++) {
+        sum += data[i];
+    }
+    return sum;
+}
 
 void handleCommand(byte *buffer, size_t length)
 {
@@ -499,13 +571,24 @@ void loop()
     if (now - lastPIDComputeTime >= PID_INTERVAL_US)
     {
         lastPIDComputeTime += PID_INTERVAL_US;
+        int32_t currentLeftEncoder;
+        int32_t currentRightEncoder;
+        int32_t lastLeftEncoder;
+        int32_t lastRightEncoder;
+        
+        noInterrupts();
+        currentLeftEncoder = leftEncoderCount;
+        currentRightEncoder = rightEncoderCount;
+        lastLeftEncoder = lastLeftEncoderCount;
+        lastRightEncoder = lastRightEncoderCount;
+        interrupts();
+        
         getMPUData(ax, ay, az, gx, gy, gz, tempC);
-        pidLoop();
-        sendSensorData();
+        pidLoop(currentLeftEncoder, lastLeftEncoder, currentRightEncoder, lastRightEncoder);
+        sendSensorData(currentLeftEncoder, currentRightEncoder);
     }
     
     handleIncomingData();
-
 
     // Medium priority: Sample ultrasonic sensor at 20 Hz
     

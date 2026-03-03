@@ -2,6 +2,8 @@ from .Config import RobotConfig
 
 ROBOT_CONFIG = RobotConfig() # Create a global instance of the config for easy access, Singleton pattern
 
+from .QuinticHermiteSpline import QuinticHermiteSpline
+from .Path import Path
 from .LCDCommand import LCDCommand
 from .Magnetometer import MagnetometerData
 from .SerialManager import SerialManager

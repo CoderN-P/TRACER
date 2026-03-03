@@ -7,16 +7,22 @@ from .CommandTypeEnum import CommandType
 from .MotorCommand import MotorCommand
 from . import ROBOT_CONFIG
 
+
+"""
+Used for hand drawn paths and simple waypoints.
+"""
+
 class PurePursuit:
     def __init__(self, path: List[tuple]):
         self.path = path
         self.last_found_index = 0 # to prevent the robot from going backwards along the path
 
-    def twist_to_wheel_speeds(self, v, w):
+    @classmethod
+    def twist_to_wheel_speeds(cls, v, w):
         left = v - (w * ROBOT_CONFIG.WHEEL_BASE / 2.0)
         right = v + (w * ROBOT_CONFIG.WHEEL_BASE / 2.0)
     
-        return self.scale_to_max(left, right)
+        return cls.scale_to_max(left, right)
     
     @staticmethod
     def sgn(num):
@@ -66,7 +72,7 @@ class PurePursuit:
     
     def find_goal_point(self, current_pos) -> tuple | None:
         
-        for i in range(self.last_found_index, len(self.path) - 1):
+        for i in range(self.last_found_index, min(self.last_found_index + ROBOT_CONFIG.MAX_SEARCH_POINTS, len(self.path) - 1)):
             pt1 = self.path[i]
             pt2 = self.path[i + 1]
             intersection_pts = self.circle_intersection(current_pos, pt1, pt2)
@@ -103,8 +109,8 @@ class PurePursuit:
         dx = goal_point[0] - robot_state.x
         dy = goal_point[1] - robot_state.y
         
-        local_x = math.cos(math.radians(robot_state.yaw)) * dx + math.sin(math.radians(robot_state.yaw)) * dy
-        local_y = -math.sin(math.radians(robot_state.yaw)) * dx + math.cos(math.radians(robot_state.yaw)) * dy
+        local_x = math.cos(robot_state.yaw) * dx + math.sin(robot_state.yaw) * dy
+        local_y = -math.sin(robot_state.yaw) * dx + math.cos(robot_state.yaw) * dy
         
         return local_x, local_y,
     
@@ -126,15 +132,7 @@ class PurePursuit:
         current_pos = (robot_state.x, robot_state.y,)
 
         if math.dist(current_pos, self.path[-1]) <= ROBOT_CONFIG.COMPLETION_THRESHOLD:
-            return Command(
-                command_type=CommandType.MOTOR,
-                command=MotorCommand(
-                    left_motor=0.0,
-                    right_motor=0.0,
-                ),
-                pause_duration=0,
-                duration=0
-            )
+            return Command.stop()
         
         goal_point = self.find_goal_point(current_pos)
         

@@ -11,7 +11,7 @@ class HeadingFilter:
         )
         # Process noise covariance matrix Q, representing the uncertainty in the process model
         self.Q = np.array( 
-            [[ROBOT_CONFIG.Q_THETA, 0], 
+            [[ROBOT_CONFIG.Q_THETA_1, 0], 
              [0, ROBOT_CONFIG.Q_BIAS]]
         )
         
@@ -31,6 +31,9 @@ class HeadingFilter:
     def predict(self, gyro_z, dt):
         theta_pred = self.state[0] + (gyro_z - self.state[1]) * dt
         bias_pred = self.state[1]
+        
+        # Normalize theta_pred to be within [-pi, pi]
+        theta_pred = (theta_pred + math.pi) % (2 * math.pi) - math.pi
         return np.array([theta_pred, bias_pred])
         
     def update(self, theta_meas, predicted_state, P_pred, mag_heading=None):
@@ -58,10 +61,10 @@ class HeadingFilter:
             self.state = mid_state
             self.P = P_mid
         
-    def step(self, theta_meas, gyro_z, dt):
+    def step(self, theta_meas, gyro_z, dt, mag_heading=None):
         predicted_state = self.predict(gyro_z, dt)
         P_pred = self.predict_covariance(dt)
-        self.update(theta_meas, predicted_state, P_pred)
+        self.update(theta_meas, predicted_state, P_pred, mag_heading)
         return self.state[0]
     
     

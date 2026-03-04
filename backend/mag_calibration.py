@@ -188,14 +188,22 @@ class MagnetometerCalibrator:
             parts = line.split(',')
             if len(parts) >= 3:
                 # Parse the q8_7 int16 format values
+                '''
                 x_raw = int(parts[0].strip())
                 y_raw = int(parts[1].strip())
                 z_raw = int(parts[2].strip())
+                '''
                 
                 # Convert to μT using the helper function
+                '''
                 x = q8_7_to_float(x_raw)
                 y = q8_7_to_float(y_raw)
                 z = q8_7_to_float(z_raw)
+                '''
+                # Already floats in μT, just use the raw values directly
+                x = float(parts[0].strip())
+                y = float(parts[1].strip())
+                z = float(parts[2].strip())
                 
                 self.last_data_time = time.time()
                 
@@ -214,7 +222,7 @@ class MagnetometerCalibrator:
                 # Print received data with guidance
                 sample_count = len(self.mag_data)
                 if sample_count % 10 == 0:  # Only print every 10th sample to reduce console spam
-                    print(f"Received: X={x:.2f} μT, Y={y:.2f} μT, Z={z:.2f} μT (raw: {x_raw}, {y_raw}, {z_raw}) - Total samples: {sample_count}")
+                    print(f"Received: X={x:.2f} μT, Y={y:.2f} μT, Z={z:.2f} μT - Total samples: {sample_count}")
                     
                     # Progress indicators
                     if sample_count < 50:
@@ -252,7 +260,7 @@ class MagnetometerCalibrator:
             ])
             
             # Calculate the soft iron transformation matrix
-            # We'll use PCA (Principal Component Analysis) to get the ellipsoid axes
+            # PCA (Principal Component Analysis) to get the ellipsoid axes
             offset = np.mean(data, axis=0)
             centered_data = data - offset
 

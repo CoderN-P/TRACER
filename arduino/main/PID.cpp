@@ -17,6 +17,10 @@ void PIDController::setSetpoint(float setpoint) {
     this->lastError = 0;
 }
 
+void PIDController::getSetpoint() {
+    return this->setpoint;
+}
+
 float PIDController::compute(float input){
     float error = this->setpoint - input;
     this->integral += error;

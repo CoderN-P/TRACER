@@ -1,15 +1,20 @@
+#include <FreeRTOS.h>
+#include <task.h>
 #include <LiquidCrystal_I2C.h>
 #include <Wire.h>
 #include <PulseInput.h>   
 #include "PID.h"
+#include <queue.h>
+
 
 
 // Constants for motor control
 const float WHEEL_DIAMETER = 0.05411268; // wheel diameter in meters
-const int MIN_PWM = 50; // Minimum PWM value
-const int MAX_PWM = 255; // Max PWM Value
-const int REDUCTION_RATIO = 56;
+const int MIN_PWM = 100; // Minimum PWM value
+const int MAX_PWM = 4095; // Max PWM Value (12 bit resolution)
+const int REDUCTION_RATIO = 56; 
 const int MAX_OUTPUT_RPM = 178;
+const int MAX_OUTPUT_SPEED = (MAX_OUTPUT_RPM / 60.0) * (PI * WHEEL_DIAMETER); // in m/s
 
 // Encoder constants
 const int ENCODER_PPR = 11;
@@ -21,19 +26,31 @@ const int8_t encoder_lut[] = {
     0,  1, -1,  0   // 11 -> 00, 01, 10, 11
 };
 
+// Command queue
+QueueHandle_t commandQueue;
+
+// RTOS task handles
+TaskHandle_t ultrasonicTaskHandle;
+TaskHandle_t mainLoopHandle;
+TaskHandle_t serialTaskHandle;
+TaskHandle_t commandProcessorHandle;
+TaskHandle_t lcdUpdateHandle;
+
 // Pin definitions
 const int EN1 = 9; // Enable pin for motor 1
-const int IN1 = 3; // Input pin 1 for motor 1
-const int IN2 = 4; // Input pin 2 for motor 1
+const int IN1 = 3; // Input pin 1 for motor 1 
+const int IN2 = 4; // Input pin 2 for motor 1 
 const int EN2 = 5; // Enable pin for motor 2
-const int IN3 = 6; // Input pin 1 for motor 2
-const int IN4 = 7; // Input pin 2 for motor 2
+const int IN3 = 6; // Input pin 1 for motor 2 
+const int IN4 = 7; // Input pin 2 for motor 2 
 const int IR_FRONT = 8; // IR sensor at the front
 const int IR_BACK = 12; // IR sensor at the back
 const int STBY = 13; // Standby pin for motor driver
 const int BATTERY = A3; // Battery voltage pin
-const int TRIGGER = 11; // Trigger pin for ultrasonic sensor
-const int ECHO = 2;   // Echo pin for ultrasonic sensor // Must be interrupt-capable pin
+const int TRIGGER_1 = 11; // Trigger pin for ultrasonic sensor
+const int ECHO_1 = 2;   // Echo pin for ultrasonic sensor // Must be interrupt-capable pin
+const int TRIGGER_2 = 10; // Trigger pin for second ultrasonic sensor (if used)
+const int ECHO_2 = 22;   // Echo pin for second ultrasonic sensor (
 const int ENCODER_LEFT_A = 18; // Left encoder pin channel A (must be interrupt-capable)
 const int ENCODER_LEFT_B = 19; // Left encoder pin channel B (must be interrupt-capable)
 const int ENCODER_RIGHT_A = 20; // Right encoder pin channel A (must be interrupt-capable)
@@ -45,44 +62,52 @@ byte cmdBuf[MAX_BUFFER_SIZE];
 size_t cmdIdx = 0;
 const int BAUD_RATE = 115200;
 
-
-
 // I2C addresses and Register addresses
 const int MPU_ADDRESS = 0x68; // I2C address for MPU6050
 const int LCD_ADDRESS = 0x27; // I2C address for LCD
+const int MAG_ADDRESS = 0x0D; // I2C address for magnetometer 
 const int PWR_MGMT_1 = 0x6B; // Power management register for MPU6050
+const int MAG_DATA_REG = 0x00; // Starting register for magnetometer data
+const int MAG_CTRL_REG = 0x09; // Control register for magnetometer
+
+
+// Sensor constants
+float LSB_uT = 0.0244; // ±8G full-scale
 
 // Command definitions
 const uint8_t CMD_MOVE = 0x01;
 const uint8_t CMD_LCD_UPDATE = 0x02;
 const uint8_t CMD_ENABLE = 0x03;
 const uint8_t CMD_STOP = 0x04;
+const int NUM_TYPES = 4; // Number of command types (MOVE, LCD_UPDATE, ENABLE, STOP)
 
 // Timing intervals (in milliseconds)
 const unsigned long ULTRASONIC_INTERVAL = 50; // Sample ultrasonic sensor every 50 ms (20 hz)
 const unsigned long LCD_UPDATE_INTERVAL = 500; // Update LCD every 500ms
-
-// Timing variables
-unsigned long lastUltrasonicSampleTime = 0;
-unsigned long lastLCDUpdateTime = 0;
-unsigned long lastPIDComputeTime = 0;
+const unsigned long MAIN_INTERVAL = 10; // Run main loop every 10 ms (100 Hz)
 
 bool motorsEnabled = true;
 bool motorsRunning = false;
 
 // Sensor data variables
 int ax, ay, az, gx, gy, gz;
-float lastDistance, tempC;
+float magX, magY, magZ;
+float lastDistance1, lastDistance2, tempC;
 int storedBatteryPercent = -1;
 volatile int32_t leftEncoderCount = 0;
 volatile int32_t rightEncoderCount = 0;
 volatile int32_t lastLeftEncoderCount = 0;
 volatile int32_t lastRightEncoderCount = 0;
-volatile unsigned int8_t leftPrevAB = 0;
-volatile unsigned int8_t rightPrevAB = 0;
-volatile unsigned long echoStart = 0;
-volatile unsigned long echoDuration = 0; // Can be negative to indicate errors: -1 = timeout, -2 = too close
-volatile bool echoReady = false;
+volatile uint8_t leftPrevAB = 0;
+volatile uint8_t rightPrevAB = 0;
+
+volatile unsigned long echoStart1 = 0;
+volatile unsigned long echoDuration1 = 0; // Can be negative to indicate errors: -1 = timeout, -2 = too close
+
+volatile unsigned long echoStart2 = 0;
+volatile unsigned long echoDuration2 = 0; // Can be negative to indicate errors: -1 = timeout, -2 = too close
+
+
 int packetSeq = 0;
 
 // LCD Display buffers
@@ -111,8 +136,8 @@ struct SensorPacket {
 } __attribute__((packed)); // Packed to avoid padding bytes
 // PID Controllers
 
-PIDController pidLeft(1.0, 0.0, 0.1, 100);
-PIDController pidRight(1.0, 0.0, 0.1, 100);
+PIDController pidLeft(1.0, 0.0, 0, 0.2*MAX_PWM);
+PIDController pidRight(1.0, 0.0, 0, 0.2*MAX_PWM);
 
 bool initMPU6050()
 {
@@ -121,6 +146,17 @@ bool initMPU6050()
     Wire.write(0);    // Wake up the MPU-6050 (0 = wake up)
     byte status = Wire.endTransmission(true);
     return status == 0; // Return true if successful
+}
+
+void setup_magnetometer(){
+  uint8_t MODE_CONTINUOUS = 0b00000001;
+  uint8_t ODR_50Hz = 0b00000100;
+  uint8_t LSB_8G = 0b00010000;
+  uint8_t OSR_512 = 0x00;
+  Wire.beginTransmission(MAG_ADDRESS);
+  Wire.write(MAG_CTRL_REG);
+  Wire.write(MODE_CONTINUOUS | ODR_50Hz | LSB_8G | OSR_512);
+  Wire.endTransmission();
 }
 
 void setup()
@@ -133,12 +169,20 @@ void setup()
     pinMode(IN4, OUTPUT);
     pinMode(IR_FRONT, INPUT);
     pinMode(IR_BACK, INPUT);
-    pinMode(TRIGGER, OUTPUT);
-    pinMode(ECHO, INPUT);
+    pinMode(TRIGGER_1, OUTPUT);
+    pinMode(TRIGGER_2, OUTPUT);
+    pinMode(ECHO_1, INPUT);
+    pinMode(ECHO_2, INPUT);
     pinMode(STBY, OUTPUT);
     pinMode(BATTERY, INPUT);
+    pinMode(ENCODER_LEFT_A, INPUT_PULLUP);
+    pinMode(ENCODER_LEFT_B, INPUT_PULLUP);  
+    pinMode(ENCODER_RIGHT_A, INPUT_PULLUP);
+    pinMode(ENCODER_RIGHT_B, INPUT_PULLUP);
     
-    attachInterrupt(digitalPinToInterrupt(ECHO), echoISR, CHANGE);
+    
+    attachInterrupt(digitalPinToInterrupt(ECHO_1), echoISR1, CHANGE);
+    attachInterrupt(digitalPinToInterrupt(ECHO_2), echoISR2, CHANGE);
     attachInterrupt(digitalPinToInterrupt(ENCODER_LEFT_A), leftEncoderISR, CHANGE);
     attachInterrupt(digitalPinToInterrupt(ENCODER_LEFT_B), leftEncoderISR, CHANGE);
     attachInterrupt(digitalPinToInterrupt(ENCODER_RIGHT_A), rightEncoderISR, CHANGE);
@@ -156,6 +200,10 @@ void setup()
     delay(1000); // Allow time for sensors to stabilize
     digitalWrite(STBY, HIGH);
     
+    // Create the command queue (10 commands deep, each command can be up to MAX_BUFFER_SIZE bytes)
+    commandQueue = xQueueCreate(10, sizeof(byte) * MAX_BUFFER_SIZE);
+    
+    setup_magnetometer();
     
     if (initMPU6050())
     {
@@ -170,7 +218,28 @@ void setup()
         lcdLine1[16] = '\0';
     }
     
-    lastPIDComputeTime = micros();
+    // Setup PWM channels
+    ledcAttach(EN1, 20000, 12); // 20 kHz, 12-bit resolution
+    ledcAttach(EN2, 20000, 12); // 20 kHz, 12-bit resolution
+    
+    // Create RTOS tasks
+    
+    // Medium priority task for triggering ultrasonic sensors at 20 Hz
+    xTaskCreate(ultrasonicTask, "Ultrasonic Task", 2048, NULL, 3, &ultrasonicTaskHandle);
+    
+    // High priority task for main loop (PID, sensor reading, sending data) at 100 Hz
+    xTaskCreate(mainLoop, "Main Loop", 4096, NULL, 4, &mainLoopHandle);
+    
+    // High priority task for serial listening
+    xTaskCreate(vSerialTask, "Serial Task", 2048, NULL, 4, &serialTaskHandle);
+    
+    // Medium priority task for processing commands from the command queue
+    xTaskCreate(commandProcessorTask, "Command Processor Task", 4096, NULL, 3, &commandProcessorHandle);
+    
+    // Low priority task for updating the LCD at 2 Hz
+    xTaskCreate(lcdUpdateTask, "LCD Update Task", 2048, NULL, 2, &lcdUpdateHandle);
+    
+
 }
 
 uint8_t expectedCommandLength(uint8_t cmd)
@@ -184,42 +253,6 @@ uint8_t expectedCommandLength(uint8_t cmd)
     if (cmd == CMD_ENABLE)
         return 3;
     return 0; // invalid
-}
-
-void handleIncomingData() {
-    uint8_t processed = 0;
-
-    while (Serial.available() && processed < MAX_BUFFER_SIZE) {
-        processed++;
-        uint8_t b = Serial.read();
-
-        // reset on overflow before writing
-        
-        if (cmdIdx >= MAX_BUFFER_SIZE) {
-            cmdIdx = 0;
-        }
-
-        // hunt for start byte
-        if (cmdIdx == 0 && b != 0xAA) continue;
-
-        cmdBuf[cmdIdx++] = b;
-
-        // need at least 2 bytes before checking length
-        if (cmdIdx < 2) continue;
-
-        uint8_t expected = expectedCommandLength(cmdBuf[1]);
-
-        // guard against expectedCommandLength returning 0 or 1
-        if (expected < 2) {
-            cmdIdx = 0;
-            continue;
-        }
-
-        if (cmdIdx == expected) {
-            handleCommand(cmdBuf, expected);
-            cmdIdx = 0;
-        }
-    }
 }
 
 uint8_t getIRFront()
@@ -250,13 +283,22 @@ void rightEncoderISR(){
     rightPrevAB = currentState; // Update the previous state to current state for the next interrupt
 }
 
-void triggerUltrasonicPulse()
+void triggerUltrasonicPulse1()
 {
-    digitalWrite(TRIGGER, LOW);
+    digitalWrite(TRIGGER_1, LOW);
     delayMicroseconds(2);
-    digitalWrite(TRIGGER, HIGH);
+    digitalWrite(TRIGGER_1, HIGH);
     delayMicroseconds(10);
-    digitalWrite(TRIGGER, LOW);
+    digitalWrite(TRIGGER_1, LOW);
+}
+
+void triggerUltrasonicPulse2()
+{
+    digitalWrite(TRIGGER_2, LOW);
+    delayMicroseconds(2);
+    digitalWrite(TRIGGER_2, HIGH);
+    delayMicroseconds(10);  
+    digitalWrite(TRIGGER_2, LOW);
 }
 
 void getMPUData(int &ax, int &ay, int &az, int &gx, int &gy, int &gz, float &tempC)
@@ -271,6 +313,7 @@ void getMPUData(int &ax, int &ay, int &az, int &gx, int &gy, int &gz, float &tem
         return;
     }
 
+    // Big endian data: MSB comes first
     ax = (Wire.read() << 8) | Wire.read();
     ay = (Wire.read() << 8) | Wire.read();
     az = (Wire.read() << 8) | Wire.read();
@@ -284,33 +327,41 @@ void getMPUData(int &ax, int &ay, int &az, int &gx, int &gy, int &gz, float &tem
 }
 
 
+void getMagnetometerData(float &magX, float &magY, float &magZ)
+{
+    Wire.beginTransmission(MAG_ADDRESS);
+    Wire.write(MAG_DATA_REG); // Starting register for magnetometer data
+    Wire.endTransmission(false);
+    Wire.requestFrom(MAG_ADDRESS, 6); // Request 6 bytes (2 for each axis)
+
+    if (Wire.available() < 6)
+    {
+        return;
+    }
+
+    uint16_t x_u =  (uint16_t)(Wire.read() | (Wire.read() << 8)); // LSB comes first
+    uint16_t y_u =  (uint16_t)(Wire.read() | (Wire.read() << 8));
+    uint16_t z_u =  (uint16_t)(Wire.read() | (Wire.read() << 8));
+
+    magX = ((int16_t) x_u) * LSB_uT;
+    magY = ((int16_t) y_u) * LSB_uT;
+    magZ = ((int16_t) z_u) * LSB_uT;
+}
+
 float getLeftMotorSpeed(int32_t left, int32_t lastLeft)
 {
-    deltaLeftTicks = left - lastLeft;
-    deltaLeft = (deltaLeftTicks * (PI * WHEEL_DIAMETER) / ENCODER_TICKS_PER_REV);
+    int32_t deltaLeftTicks = left - lastLeft;
+    float deltaLeft = (deltaLeftTicks * (PI * WHEEL_DIAMETER) / ENCODER_TICKS_PER_REV);
     return deltaLeft / (PID_INTERVAL / 1000.0); // Convert to m/s
 }
 
 float getRightMotorSpeed(int32_t right, int32_t lastRight)
 {
-    deltaRightTicks = right - lastRight;
-    deltaRight = (deltaRightTicks * (PI * WHEEL_DIAMETER) / ENCODER_TICKS_PER_REV);
+    int32_t deltaRightTicks = right - lastRight;
+    float deltaRight = (deltaRightTicks * (PI * WHEEL_DIAMETER) / ENCODER_TICKS_PER_REV);
     return deltaRight / (PID_INTERVAL / 1000.0); // Convert to m/s
 }
 
-int applyDeadband(float pwm) {
-    int sign = (pwm >= 0) ? 1 : -1;
-    float mag = abs(pwm);
-
-    if (mag == 0) return 0;
-    
-    if (mag > MAX_PWM) mag = MAX_PWM; // Cap the magnitude to max PWM
-    
-    // Scale 0–255 PID output into 50–255 motor range
-    float scaled = MIN_PWM + (mag / MAX_PWM) * (MAX_PWM - MIN_PWM);
-
-    return sign * (int)scaled;
-}
 
 void pidLoop(int32_t left, int32_t lastLeft, int32_t right, int32_t lastRight){
     float leftSpeed = getLeftMotorSpeed(left, lastLeft);
@@ -319,44 +370,78 @@ void pidLoop(int32_t left, int32_t lastLeft, int32_t right, int32_t lastRight){
     float leftOutput = pidLeft.compute(leftSpeed);
     float rightOutput = pidRight.compute(rightSpeed);
     
-    handleMovement(applyDeadband(leftOutput), applyDeadband(rightOutput));
+    float ffLeft = pidLeft.getSetpoint() * MAX_PWM / MAX_OUTPUT_SPEED;
+    float ffRight = pidRight.getSetpoint() * MAX_PWM / MAX_OUTPUT_SPEED;
+    
+    float totalLeft = leftOutput + ffLeft;
+    float totalRight = rightOutput + ffRight;
+    
+    int signLeft = (totalLeft >= 0) ? 1 : -1;
+    int signRight = (totalRight >= 0) ? 1 : -1;
+    
+   
+    int outputLeft; 
+    int outputRight;
+    
+    if (totalLeft == 0){    
+        outputLeft = 0;
+    } else {
+        outputLeft = signLeft * (int)(min(abs(totalLeft) + MIN_PWM, MAX_PWM));
+    }
+    
+    if (totalRight == 0){
+        outputRight = 0;
+    } else {
+        int outputRight; = signRight * (int)(min(abs(totalRight) + MIN_PWM, MAX_PWM));
+    }
+   
+    handleMovement(outputLeft, outputRight);
 }
 
-void echoISR() {
-    if (digitalRead(ECHO) == HIGH) {
-        echoStart = micros();
+void echoISR1() {
+    if (digitalRead(ECHO_1) == HIGH) {
+        echoStart1 = micros();
     } else {
-        echoDuration = micros() - echoStart;
-        if (echoDuration > 25000) {
-            echoDuration = -1; // Timeout, no echo received
-        } else if (echoDuration < 100) {
-            echoDuration = -2; // Too close, likely noise
+        echoDuration1 = micros() - echoStart1;
+        if (echoDuration1 > 25000) {
+            echoDuration1 = -1; // Timeout, no echo received
+        } else if (echoDuration1 < 100) {
+            echoDuration1 = -2; // Too close, likely noise
         }
-        
-        echoReady = true;
+    }
+}
+
+void echoISR2() {
+    if (digitalRead(ECHO_2) == HIGH) {
+        echoStart2 = micros();
+    } else {
+        echoDuration2 = micros() - echoStart2;
+        if (echoDuration2 > 25000) {
+            echoDuration2 = -1; // Timeout, no echo received
+        } else if (echoDuration2 < 100) {
+            echoDuration2 = -2; // Too close, likely noise
+        }
     }
 }
 
 uint8_t getBatteryPercent()
 {
-    int raw = analogRead(BATTERY);  // 0–1023
-    float voltageAtPin = raw * (5.0 / 1023.0);
+    int raw = analogRead(BATTERY);  // 0–4095
+    float voltageAtPin = raw * (3.3 / 4095.0);
     float batteryVoltage = voltageAtPin * 13.0 / 3.0; // because of 10k & 3k
-    float maxV = 8.4; // 2S LiPo max voltage
-    float minV = 6.0; // 2S LiPo min voltage
+    float maxV = 12.6; // 2S LiPo max voltage
+    float minV = 9.0; // 3S LiPo min voltage
     
     float percent = (batteryVoltage - minV) / (maxV - minV) * 100.0;
     return constrain((uint8_t)percent, 0, 100);
 }
 
-void sendSensorData(int32_t leftEncoder, int32_t rightEncoder)
+void sendSensorData(int32_t leftEncoder, int32_t rightEncoder, bool newMagData)
 {
     // Get ultrasonic data
-    float distance = lastDistance;
-
     uint8_t ir_front = getIRFront();
     uint8_t ir_back = getIRBack();
-    uint8_t flags = (ir_front << 0) | (ir_back << 1); // bit 0 = front, bit 1 = back
+    uint8_t flags = (ir_front << 0) | (ir_back << 1) | ((int) newMagData << 2); // bit 0 = front, bit 1 = back, bit 2 = new magnetometer data
     uint8_t batteryPercent = 0;
     
     uint32_t now = micros();
@@ -375,15 +460,18 @@ void sendSensorData(int32_t leftEncoder, int32_t rightEncoder)
     }
 
     SensorPacket packet;
-    packet.start = 0xAA;
+    packet.startByte = 0xAA;
     packet.packetSeq = packetSeq++;
-    packet.distance = distance;
+    packet.distance = lastDistance1;
     packet.ax = ax;
     packet.ay = ay;
     packet.az = az;
     packet.gx = gx;
     packet.gy = gy;
     packet.gz = gz;
+    packet.magX = magX;
+    packet.magY = magY;
+    packet.magZ = magZ;
     packet.leftEncoder = leftEncoder;
     packet.rightEncoder = rightEncoder;
     packet.tempC = tempC;
@@ -483,6 +571,16 @@ void handleCommand(byte *buffer, size_t length)
     }
 }
 
+int getTypeIndex(uint8_t cmd) {
+    switch (cmd) {
+        case CMD_MOVE: return 0;
+        case CMD_LCD_UPDATE: return 1;
+        case CMD_ENABLE: return 2;
+        case CMD_STOP: return 3;
+        default: return -1; // Invalid command type
+    }
+}
+
 void handleMovement(int16_t left, int16_t right)
 {
     // Values already mapped between -255 and 255
@@ -499,38 +597,38 @@ void handleMovement(int16_t left, int16_t right)
     {
         digitalWrite(IN1, HIGH);
         digitalWrite(IN2, LOW);
-        analogWrite(EN1, leftSpeed);
+        ledcWrite(EN1, leftSpeed);
     }
     else if (leftSpeed < 0)
     {
         digitalWrite(IN1, LOW);
         digitalWrite(IN2, HIGH);
-        analogWrite(EN1, -leftSpeed);
+        ledcWrite(EN1, -leftSpeed);
     }
     else
     {
         digitalWrite(IN1, LOW);
         digitalWrite(IN2, LOW);
-        analogWrite(EN1, 0);
+        ledcWrite(EN1, 0);
     }
 
     if (rightSpeed > 0)
     {
         digitalWrite(IN3, HIGH);
         digitalWrite(IN4, LOW);
-        analogWrite(EN2, rightSpeed);
+        ledcWrite(EN2, rightSpeed);
     }
     else if (rightSpeed < 0)
     {
         digitalWrite(IN3, LOW);
         digitalWrite(IN4, HIGH);
-        analogWrite(EN2, -rightSpeed);
+        ledcWrite(EN2, -rightSpeed);
     }
     else
     {
         digitalWrite(IN3, LOW);
         digitalWrite(IN4, LOW);
-        analogWrite(EN2, 0);
+        ledcWrite(EN2, 0);
     }
     
     if (leftSpeed != 0 || rightSpeed != 0){
@@ -560,61 +658,182 @@ void updateLCD()
     lcd.print(lcdLine2);
 }
 
-void loop()
-{
-    unsigned long now = micros();
-    const unsigned long PID_INTERVAL_US = (unsigned long)PID_INTERVAL * 1000UL;
+// RTOS Tasks
+
+// 1. Ultrasonic trigger loop (20 Hz)
+
+void ultrasonicTask(void *pvParameters) {
+    const TickType_t xFrequency = pdMS_TO_TICKS(ULTRASONIC_INTERVAL);
+    TickType_t xLastWakeTime = xTaskGetTickCount();
+    while (true) {
+        vTaskDelayUntil(&xLastWakeTime, xFrequency);
+        triggerUltrasonicPulse1();
+        
+        vTaskDelay(pdMS_TO_TICKS(20)); // Short delay to avoid triggering the second sensor too soon
+        
+        triggerUltrasonicPulse2();
+    }
+}
+
+// 2. Main Loop - Handles PID, read IMU, calculate ultrasonic distance, send sensor data at 100 Hz,
+
+void mainLoop(void *pvParameters) {
+    const TickType_t xFrequency = pdMS_TO_TICKS(MAIN_INTERVAL);
+    TickType_t xLastWakeTime = xTaskGetTickCount();
     
+    uint8_t loopCounter = 0;
     
-    // High priority: Run PID loop and send sensor data at 100 Hz
-    
-    if (now - lastPIDComputeTime >= PID_INTERVAL_US)
-    {
-        lastPIDComputeTime += PID_INTERVAL_US;
+    while (true) {
+        vTaskDelayUntil(&xLastWakeTime, xFrequency);
+        
         int32_t currentLeftEncoder;
         int32_t currentRightEncoder;
         int32_t lastLeftEncoder;
         int32_t lastRightEncoder;
+        long echoDurationCopy1;
+        long echoDurationCopy2;
         
-        noInterrupts();
-        currentLeftEncoder = leftEncoderCount;
-        currentRightEncoder = rightEncoderCount;
-        lastLeftEncoder = lastLeftEncoderCount;
-        lastRightEncoder = lastRightEncoderCount;
-        interrupts();
+        
+        taskENTER_CRITICAL();
+        {
+            currentLeftEncoder = leftEncoderCount;
+            currentRightEncoder = rightEncoderCount;
+            lastLeftEncoder = lastLeftEncoderCount;
+            lastRightEncoder = lastRightEncoderCount;
+            echoDurationCopy1 = echoDuration1;
+            echoDurationCopy2 = echoDuration2;
+        }
+        taskEXIT_CRITICAL();
         
         getMPUData(ax, ay, az, gx, gy, gz, tempC);
+        
+        if (loopCounter % 2 == 0) { // Read magnetometer at 50 Hz
+            getMagnetometerData(magX, magY, magZ);
+        }
+        
         pidLoop(currentLeftEncoder, lastLeftEncoder, currentRightEncoder, lastRightEncoder);
-        sendSensorData(currentLeftEncoder, currentRightEncoder);
-    }
-    
-    handleIncomingData();
-
-    // Medium priority: Sample ultrasonic sensor at 20 Hz
-    
-    if (millis() - lastUltrasonicSampleTime >= ULTRASONIC_INTERVAL){
-      triggerUltrasonicPulse();
-      lastUltrasonicSampleTime = millis();
-    }
-    
-    if (echoReady) {
-        echoReady = false;
-        if (echoDuration == 0 || echoDuration > 25000) {
-            lastDistance = -1;
-        } else if (echoDuration < 100) {
-            lastDistance = -2;
+        
+        if (echoDurationCopy1 == 0 || echoDurationCopy1 > 25000) {
+            lastDistance1 = -1;
+        } else if (echoDurationCopy1 < 100) {
+            lastDistance1 = -2;
         } else {
-            lastDistance = (echoDuration / 2.0) * 0.0343;
+            lastDistance1 = (echoDurationCopy1 / 2.0) * 0.0343;
         }
-    }
-    
-    // Low priority: Update LCD at 2 Hz, but only if content has changed
-
-    if (millis() - lastLCDUpdateTime >= LCD_UPDATE_INTERVAL){
-        // Update LCD only if the content has changed'
-       if (strncmp(lcdLine1, lastLine1, sizeof(lcdLine1)) != 0 || strncmp(lcdLine2, lastLine2, sizeof(lcdLine2)) != 0) {
-            updateLCD();
+        
+        if (echoDurationCopy2 == 0 || echoDurationCopy2 > 25000) {
+             lastDistance2 = -1;
+        } else if (echoDurationCopy2 < 100) {
+            lastDistance2 = -2;
+        } else {
+            lastDistance2 = (echoDurationCopy2 / 2.0) * 0.0343;
         }
-       lastLCDUpdateTime = millis();  
+        
+        
+        sendSensorData(currentLeftEncoder, currentRightEncoder, loopCounter % 2 == 0); // Send magnetometer data every other loop (50 Hz)
     }
 }
+
+// 3. Serial listener task - Handles incoming serial data and commands
+void vSerialTask(void *pvParameters) {
+    const TickType_t xFrequency = pdMS_TO_TICKS(5); // Check for serial data every 5 ms
+    TickType_t xLastWakeTime = xTaskGetTickCount();
+    
+    while (true) {
+        vTaskDelayUntil(&xLastWakeTime, xFrequency);
+        uint8_t processed = 0;
+    
+        while (Serial.available() && processed < MAX_BUFFER_SIZE) {
+            processed++;
+            uint8_t b = Serial.read();
+    
+            // reset on overflow before writing
+            
+            if (cmdIdx >= MAX_BUFFER_SIZE) {
+                cmdIdx = 0;
+            }
+    
+            // hunt for start byte
+            if (cmdIdx == 0 && b != 0xAA) continue;
+    
+            cmdBuf[cmdIdx++] = b;
+    
+            // need at least 2 bytes before checking length
+            if (cmdIdx < 2) continue;
+    
+            uint8_t expected = expectedCommandLength(cmdBuf[1]);
+    
+            // guard against expectedCommandLength returning 0 or 1
+            if (expected < 2) {
+                cmdIdx = 0;
+                continue;
+            }
+    
+            if (cmdIdx == expected) {
+                if (xQueueSend(commandQueue, cmdBuf, 0) != pdPASS) {
+                    // Queue full, command lost
+                    strncpy(lcdLine1, "Cmd Queue Full", sizeof(lcdLine1));
+                    lcdLine1[16] = '\0';
+                    strncpy(lcdLine2, "Cmd Lost", sizeof(lcdLine2));
+                    lcdLine2[16] = '\0';
+                }
+                cmdIdx = 0;
+            }
+        }
+    }
+}
+
+// 4. Command processor task - Processes commands from the command queue and updates system state accordingly
+
+void commandProcessorTask(void *pvParameters) {
+    byte buffer[MAX_BUFFER_SIZE];
+    
+    static uint8_t latestCmds[NUM_TYPES][MAX_BUFFER_SIZE];
+    bool typeReceived[NUM_TYPES];
+    
+    while (true) {
+        if (xQueueReceive(commandQueue, buffer, portMAX_DELAY) == pdPASS) {
+            memset(typeReceived, 0, sizeof(typeReceived)); // Reset received flags for all command types
+            
+             // Update the latest command for this type
+             
+             do {
+                uint8_t type = buffer[1]; // Command byte is the second byte (after start byte)
+                
+                int typeIndex = getTypeIndex(type); // maps command byte to an index (0 to NUM_TYPES-1)
+                
+                if (typeIndex != -1) {
+                    memcpy(latestCmds[typeIndex], buffer, expectedCommandLength(type));
+                    typeReceived[typeIndex] = true; // Mark that we've received a command of this type
+                }
+                
+             } while (xQueueReceive(commandQueue, buffer, 0) == pdPASS); // Keep reading until the queue is empty to get the latest command of each type
+             
+             
+             // Process the latest command of each type, if received
+             
+             for (int i = 0; i < NUM_TYPES; i++) {
+                if (typeReceived[i]) {
+                    handleCommand(buffer, expectedCommandLength(buffer[1]));
+                }
+             }
+        }
+    }
+}
+
+// 5. LCD Update Task - Updates the LCD display at 2 Hz, but only if the content has changed
+
+void lcdUpdateTask(void *pvParameters) {
+    const TickType_t xFrequency = pdMS_TO_TICKS(LCD_UPDATE_INTERVAL);
+    TickType_t xLastWakeTime = xTaskGetTickCount();
+    
+    while (true) {
+        vTaskDelayUntil(&xLastWakeTime, xFrequency);
+        
+        if (strncmp(lcdLine1, lastLine1, sizeof(lcdLine1)) != 0 || strncmp(lcdLine2, lastLine2, sizeof(lcdLine2)) != 0) {
+            updateLCD();
+        }
+    }
+}
+
+void loop(){}

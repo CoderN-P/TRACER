@@ -37,25 +37,26 @@ TaskHandle_t commandProcessorHandle;
 TaskHandle_t lcdUpdateHandle;
 
 // Pin definitions
-const int EN1 = 9; // Enable pin for motor 1
-const int IN1 = 3; // Input pin 1 for motor 1 
-const int IN2 = 4; // Input pin 2 for motor 1 
-const int EN2 = 5; // Enable pin for motor 2
-const int IN3 = 6; // Input pin 1 for motor 2 
-const int IN4 = 7; // Input pin 2 for motor 2 
+const int EN1 = 26; // Enable pin for motor 1 - wired
+const int IN1 = 18; // Input pin 1 for motor 1  - wired
+const int IN2 = 33; // Input pin 2 for motor 1  - wired
+const int EN2 = 32; // Enable pin for motor 2 - wired
+const int IN3 = 25; // Input pin 1 for motor 2  - wired
+const int IN4 = 19; // Input pin 2 for motor 2 - wired
 const int IR_FRONT = 8; // IR sensor at the front
 const int IR_BACK = 12; // IR sensor at the back
-const int STBY = 13; // Standby pin for motor driver
+const int STBY = 26; // Standby pin for motor driver - wired
 const int BATTERY = A3; // Battery voltage pin
 const int TRIGGER_1 = 11; // Trigger pin for ultrasonic sensor
-const int ECHO_1 = 2;   // Echo pin for ultrasonic sensor // Must be interrupt-capable pin
+const int ECHO_1 = 5;   // Echo pin for ultrasonic sensor // Must be interrupt-capable pin
 const int TRIGGER_2 = 10; // Trigger pin for second ultrasonic sensor (if used)
 const int ECHO_2 = 22;   // Echo pin for second ultrasonic sensor (
 const int ENCODER_LEFT_A = 18; // Left encoder pin channel A (must be interrupt-capable)
 const int ENCODER_LEFT_B = 19; // Left encoder pin channel B (must be interrupt-capable)
-const int ENCODER_RIGHT_A = 20; // Right encoder pin channel A (must be interrupt-capable)
+const int ENCODER_RIGHT_A = 17; // Right encoder pin channel A (must be interrupt-capable)
 const int ENCODER_RIGHT_B = 21; // Right encoder pin channel B (must be interrupt-capable)
 
+// NOTE: 
 // System constants
 const int MAX_BUFFER_SIZE = 64;
 byte cmdBuf[MAX_BUFFER_SIZE];

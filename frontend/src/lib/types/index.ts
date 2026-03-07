@@ -9,4 +9,6 @@ export { type UltrasonicSensor, UltrasonicSensorSchema } from './UltrasonicSenso
 export { type DistanceEntry, DistanceEntrySchema } from './DistanceEntry';
 export { type LogEntry, LogEntrySchema } from './LogEntry';
 export { Mode } from './Mode';
+export { QuinticHermiteSplineSvelte } from './QuinticHermiteSpline.svelte';
+export { SplinePathSvelte } from './SplinePath.svelte';
 export { type GestureData, GestureDataSchema } from './GestureData';

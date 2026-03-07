@@ -34,9 +34,11 @@
 		"@types/three": "^0.178.0",
 		"d3-scale": "^4.0.2",
 		"d3-shape": "^3.2.0",
+		"konva": "^10.2.0",
 		"lucide-svelte": "^0.513.0",
 		"socket.io": "^4.8.1",
 		"socket.io-client": "^4.8.1",
+		"svelte-konva": "^1.0.1",
 		"three": "^0.178.0",
 		"zod": "^3.25.51"
 	}

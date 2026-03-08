@@ -114,4 +114,4 @@ class StateEstimator:
     def heading_delta_from_encoders(left_ticks, right_ticks):
         delta_left = left_ticks * ROBOT_CONFIG.METERS_PER_TICK_LEFT
         delta_right = right_ticks * ROBOT_CONFIG.METERS_PER_TICK_RIGHT
-        return (delta_right - delta_left) / ROBOT_CONFIG.WHEEL_BASE_WIDTH
+        return (delta_right - delta_left) / ROBOT_CONFIG.WHEEL_BASE

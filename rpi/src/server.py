@@ -32,9 +32,7 @@ def setup_routes(robot):
     # TODO: Implement the following events: "set_state" (if new state = PATH_FOLLOWING, a path must be provided, "
     @sio.on('set_state') # Manual, path following, LLM control
     async def on_set_state(sid, data):
-        new_state = data["state"]
-        path = data.get("path", None)  # Optional path data, only needed if new_state is "PATH_FOLLOWING"
-        await robot.set_state(new_state, path)
+        await robot.set_state(data)
         
     @sio.event
     async def connect(sid, environ):

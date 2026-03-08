@@ -285,13 +285,13 @@ class Robot:
                     async with self.state_lock:
                         self.state = Mode.MANUAL
                 else:
+                    exit_path = False
                     if isinstance(self.cur_path, Path): # Quintic Hermite spline path using RAMSETE
                         ready = self.cur_path.is_ready()
                         
                         if ready:
                             if self.cur_path.complete():
-                                await self.send_safe_command(Command.stop())
-                                self.cur_path = None
+                                exit_path = True
                             else:
                                 sensor_dt = StateEstimator.calculate_dt(sensor_data.timestamp, prev_data.timestamp)
                                 await self.send_safe_command(self.cur_path.get_command(self.state_estimator.state, sensor_dt))
@@ -301,14 +301,19 @@ class Robot:
                         command = self.cur_path.calculate_control_command(self.state_estimator.state)
                         
                         if not command:
-                            self.cur_path = None
-                            async with self.state_lock:
-                                self.state = Mode.MANUAL
+                            exit_path = True
                         else:
                             await self.send_safe_command(command)
                     else:
+                        self._logger.error(f"Unknown path type: {type(self.cur_path)}")
+                        exit_path = True
+                        
+                    if exit_path:
                         async with self.state_lock:
                             self.state = Mode.MANUAL
+                        self.cur_path = None
+                        await self.send_safe_command(Command.stop())
+                        await self.socketio.emit('path_complete', {"status": "success"})
             
             obstacle_dt = 1 / ROBOT_CONFIG.CHECK_OBSTACLE_FREQ
             cliff_dt = 1 / ROBOT_CONFIG.CHECK_CLIFF_FREQ
@@ -328,25 +333,33 @@ class Robot:
             elapsed = asyncio.get_event_loop().time() - start
             await asyncio.sleep(max(0, dt - elapsed)) # 100Hz loop
     
-    async def set_state(self, new_state, path_data=None):
+    async def set_state(self, data):
         """Set the robot's state (manual, path following, stopped)"""
         async with self.state_lock:
-            self.state = Mode(new_state)
+            cur_state = self.state
+            next_state = Mode[data["state"]]
             
-            if self.state == Mode.PATH_FOLLOWING and path_data:
-                if path_data["type"] == "spline":
+            if next_state == Mode.PATH_FOLLOWING:
+                if data["path_type"] == "spline":
                     try:
-                        self.cur_path = Path.from_raw(path_data["splines"])
+                        self.cur_path = Path.from_raw(data["path"]["splines"])
+                        self.state = Mode.PATH_FOLLOWING
                     except ValueError:
                         self._logger.error("Invalid path data for spline path")
                         self.state = Mode.MANUAL
-                elif path_data["type"] == "freehand":
-                    self.cur_path = PurePursuit(path_data["path"])
+                elif data["path_type"] == "freehand":
+                    self.cur_path = PurePursuit.from_xy_points(data["path"])
                 else:
-                    self._logger.error(f"Unknown path type: {path_data['type']}")
+                    self._logger.error(f"Unknown path type: {data['type']}")
                     self.state = Mode.MANUAL
-            else:
-                self.cur_path = None
+                
+            elif next_state == Mode.MANUAL:
+                if cur_state == Mode.STOPPED:
+                    await self.resume()
+                self.state = Mode.MANUAL
+            elif next_state == Mode.STOPPED:
+                await self.emergency_stop()
+        
                 
     async def handle_joystick_input(self, data):
         """

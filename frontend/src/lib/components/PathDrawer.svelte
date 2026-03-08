@@ -15,29 +15,56 @@
     SplinePathSvelte,
   } from "$lib/types/index.js";
 
+  export type RunPathPayload =
+    | { type: "freehand"; path: { x: number; y: number }[] }
+    | {
+        type: "spline";
+        path: ReturnType<SplinePathSvelte["exportToJSON"]>;
+      };
+
   /** Robot position in meters, updated at ~10 Hz. Pass null to hide the robot. */
   let {
     robotPos = null,
     freehandPath: freehandPathProp = $bindable([]),
     pathComplete = false,
-    onRunPath = (_pts: { x: number; y: number }[]) => {},
+    onRunPath = (_payload: RunPathPayload) => {},
   }: {
     robotPos?: { x: number; y: number; theta: number } | null;
     freehandPath?: { x: number; y: number }[];
     /** Set to true by the parent when the robot confirms path completion. */
     pathComplete?: boolean;
-    /** Called with the final point array (meters) when the run button is pressed. */
-    onRunPath?: (pts: { x: number; y: number }[]) => void;
+    /** Called with the typed path payload when the run button is pressed. */
+    onRunPath?: (payload: RunPathPayload) => void;
   } = $props();
 
   let path = new SplinePathSvelte();
 
-  const WIDTH = 800; // canvas width in pixels
-  const HEIGHT = 400; // canvas height in pixels
+  // Canvas dimensions — WIDTH tracks the container element width reactively.
+  let containerEl = $state<HTMLDivElement | null>(null);
+  let WIDTH = $state(800);
+  const ASPECT = 0.5; // height = WIDTH * ASPECT
+  let HEIGHT = $derived(Math.round(WIDTH * ASPECT));
   const GRID_SPACING = 100; // pixels between grid lines (in world pixels at zoom=1)
   const TICK_LENGTH = 10; // length of axis ticks
   const PATH_RENDER_INTERVAL = 0.01; // seconds (dt)
   const SCALE = 100; // pixels per meter
+
+  $effect(() => {
+    if (!containerEl) return;
+    const ro = new ResizeObserver(([entry]) => {
+      const w = Math.floor(entry.contentRect.width);
+      if (w > 0 && w !== WIDTH) {
+        // Keep the camera origin centred after resize.
+        const dx = (w - WIDTH) / 2;
+        const dh = (Math.round(w * ASPECT) - HEIGHT) / 2;
+        stageX += dx;
+        stageY += dh;
+        WIDTH = w;
+      }
+    });
+    ro.observe(containerEl);
+    return () => ro.disconnect();
+  });
 
   // Pan & zoom state — default to origin at canvas center
   let stageX = $state(WIDTH / 2);
@@ -327,25 +354,39 @@
     }
     running = true;
 
-    // Collect the path points to send, applying the world offset.
-    let pts: { x: number; y: number }[] = [];
+    // Build a typed payload and hand it off to the parent.
+    let payload: RunPathPayload;
     if (runSource === "freehand") {
-      pts = freehandPath.map((p) => ({
-        x: p.x + runOffsetX,
-        y: p.y + runOffsetY,
-      }));
+      payload = {
+        type: "freehand",
+        path: freehandPath.map((p) => ({
+          x: p.x + runOffsetX,
+          y: p.y + runOffsetY,
+        })),
+      };
     } else {
-      // Sample the spline path at PATH_RENDER_INTERVAL
-      const raw = path.render(PATH_RENDER_INTERVAL, SCALE, WIDTH, HEIGHT);
-      for (let i = 0; i < raw.length; i += 2) {
-        pts.push({
-          x: raw[i] / SCALE + runOffsetX,
-          y: -raw[i + 1] / SCALE + runOffsetY,
-        });
-      }
+      // Export the spline definition (control points + derivatives) directly —
+      // no need to pre-sample; the RPi can integrate at its own resolution.
+      const splineJSON = path.exportToJSON();
+      // Apply run offset to every spline's start/end positions.
+      payload = {
+        type: "spline",
+        path: {
+          splines: splineJSON.splines.map((s) => ({
+            ...s,
+            start: [s.start[0] + runOffsetX, s.start[1] + runOffsetY] as [
+              number,
+              number,
+            ],
+            end: [s.end[0] + runOffsetX, s.end[1] + runOffsetY] as [
+              number,
+              number,
+            ],
+          })),
+        },
+      };
     }
-    // TODO: replace with real socket emit
-    onRunPath(pts);
+    onRunPath(payload);
   }
 
   function stopRun() {
@@ -545,6 +586,7 @@
     {/if}
 
     <div
+      bind:this={containerEl}
       style="cursor: {mode === 'freehand'
         ? isDrawing
           ? 'crosshair'

@@ -148,20 +148,28 @@ export class SplinePathSvelte {
     }
         
 
-    public exportToJSON(): string {
+    public exportToJSON(): {
+        splines: {
+            start: [number, number];
+            end: [number, number];
+            start_velocity: [number, number];
+            end_velocity: [number, number];
+            start_acceleration: [number, number];
+            end_acceleration: [number, number];
+        }[]
+    } {
         const splines = this.QuinticHermiteSplines.map(spline => ({
-            start: [spline.x0, spline.y0],
-            end: [spline.x1, spline.y1],
-            start_velocity: [spline.dx0, spline.dy0],
-            end_velocity: [spline.dx1, spline.dy1],
-            start_acceleration: [spline.ddx0, spline.ddy0],
-            end_acceleration: [spline.ddx1, spline.ddy1]
+            start: [spline.x0, spline.y0] as [number, number],
+            end: [spline.x1, spline.y1] as [number, number],
+            start_velocity: [spline.dx0, spline.dy0] as [number, number],
+            end_velocity: [spline.dx1, spline.dy1] as [number, number],
+            start_acceleration: [spline.ddx0, spline.ddy0] as [number, number],
+            end_acceleration: [spline.ddx1, spline.ddy1] as [number, number],
         }));
         
-        const data = {
+        return {
             splines
         }
-        return JSON.stringify(data, null, 2);
     }
 }
     

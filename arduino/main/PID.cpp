@@ -1,11 +1,10 @@
 #include "PID.h"
 
 
-PIDController::PIDController(float kp, float ki, float kd, float maxIntegral) {
+PIDController::PIDController(float kp, float ki, float kd) {
     this->kp = kp;
     this->ki = ki;
     this->kd = kd;
-    this->maxIntegral = maxIntegral;
     this->setpoint = 0;
     this->lastError = 0;
     this->integral = 0;
@@ -24,6 +23,8 @@ void PIDController::getSetpoint() {
 float PIDController::compute(float input, float feedforward) {
     float error = this->setpoint - input;
     this->integral += error;
+    
+    float integral_max = 1 - std::abs(feedforward + this->kp*error); // Max integral contribution to avoid windup
     this->integral = constrain(this->integral, -maxIntegral, maxIntegral);
     
     float proportional_t = kp*error;

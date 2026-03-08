@@ -17,6 +17,12 @@ class PurePursuit:
         self.path = path
         self.last_found_index = 0 # to prevent the robot from going backwards along the path
 
+
+    @classmethod
+    def from_xy_points(cls, points: List[dict]) -> 'PurePursuit':
+        path = [(point['x'], point['y'],) for point in points]
+        return cls(path)
+    
     @classmethod
     def twist_to_wheel_speeds(cls, v, w):
         left = v - (w * ROBOT_CONFIG.WHEEL_BASE / 2.0)
@@ -117,12 +123,13 @@ class PurePursuit:
     
     @staticmethod
     def scale_to_max(left, right) -> tuple:
-        max_speed = max(abs(left), abs(right))
-        if max_speed > ROBOT_CONFIG.MAX_LINEAR_VEL:
-            scale = ROBOT_CONFIG.MAX_LINEAR_VEL / max_speed
-            left *= scale
-            right *= scale
-        return left, right,
+        scale = min(
+            ROBOT_CONFIG.MAX_LINEAR_VEL_LEFT / abs(left),
+            ROBOT_CONFIG.MAX_LINEAR_VEL_RIGHT / abs(right),
+            1
+        )
+
+        return left * scale, right * scale,
     
     def calculate_control_command(self, robot_state: RobotState) -> Command | None:
         """

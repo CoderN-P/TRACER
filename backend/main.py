@@ -24,6 +24,25 @@ def setup_routes(controller: Controller):
         """
         sio_client.emit('query', data)
         
+    @socket.on('set_state')
+    def handle_state(data):
+        """
+        Handle a state change command from the UI.
+        Expected payload for PATH_FOLLOWING:
+          {
+            state: "PATH_FOLLOWING",
+            path_type: "freehand" | "spline",
+            path: [{x, y}, ...]           # freehand: array of {x, y} points in meters
+                | {splines: [...]}        # spline: exportToJSON() structure
+          }
+        """
+        controller.rumble(0.5, 0.5, 500) # Rumble for feedback
+        
+        if data.get("state") == "PATH_FOLLOWING" and not data.get("path"):
+            return
+        
+        sio_client.emit('set_state', data)
+        
     @socket.on('joystick_input')
     def handle_ui_joystick_input(data):
         """
@@ -48,6 +67,14 @@ def setup_routes(controller: Controller):
     @sio_client.on('active_command')
     def handle_active_command(data):
         socket.emit('active_command', data)
+        
+    @sio_client.on('path_complete')
+    def handle_path_complete(data):
+        """
+        Forwarded from the RPi when the robot finishes executing a path.
+        """
+        controller.rumble(0.5, 0.5, 500)
+        socket.emit('path_complete', data)
         
     @socket.on('play_recording')
     def handle_play_recording(data):

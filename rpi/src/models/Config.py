@@ -4,16 +4,22 @@ from dataclasses import dataclass
 @dataclass(frozen=True) # frozen=True makes it read-only for safety
 class RobotConfig:
     # Physical Dimensions (Meters)
-    WHEEL_BASE: float = 0.21
+    MEASURED_WHEEL_BASE: float = 0.21
     WHEEL_DIAMETER: float = 0.05411268
     WHEEL_RADIUS: float = WHEEL_DIAMETER / 2.0
     WHEEL_CIRCUMFERENCE: float = math.pi * WHEEL_DIAMETER
 
+    WHEEL_BASE_CORRECTION: float = 1.0 # Ratio between true distance and encoder distance, to be calibrated
+    WHEEL_BASE: float = MEASURED_WHEEL_BASE * WHEEL_BASE_CORRECTION
     # Motor Limits
     MAX_RPM: int = 178
     # Max speed in m/s: (RPM * pi * D) / 60
     MAX_LINEAR_VEL: float = (MAX_RPM * math.pi * WHEEL_DIAMETER) / 60.0
+    
     REDUCTION_RATIO: float = 56.0 
+    
+    # Manual Control
+    JOYSTICK_DEADZONE: float = 0.15 # Minimum joystick input to register movement
     
     # Environment
     MAX_LATERAL_ACCEL: float = 0.5 # m/s^2, for path following constraints
@@ -45,9 +51,16 @@ class RobotConfig:
     ENCODER_TICKS_PER_REV: int = ENCODER_PPR * REDUCTION_RATIO * 4 # Pulses per revolution of the wheel 
     METERS_PER_TICK: float = WHEEL_CIRCUMFERENCE / ENCODER_TICKS_PER_REV
     
+    LEFT_CORRECTION = 1 # Ratio between true distance and left encoder dist
+    RIGHT_CORRECTION = 1 # Ratio between true distance and left encoder dist
+    
     # TODO: Calibrate correction factors for each
-    METERS_PER_TICK_LEFT: float = METERS_PER_TICK
-    METERS_PER_TICK_RIGHT: float = METERS_PER_TICK
+    METERS_PER_TICK_LEFT: float = METERS_PER_TICK * LEFT_CORRECTION
+    METERS_PER_TICK_RIGHT: float = METERS_PER_TICK * RIGHT_CORRECTION
+    
+    MAX_LINEAR_VEL_LEFT: float = MAX_LINEAR_VEL * LEFT_CORRECTION
+    MAX_LINEAR_VEL_RIGHT: float = MAX_LINEAR_VEL * RIGHT_CORRECTION
+    
     
     # State Estimation
     P_THETA: float = 0.1 # Uncertainty in heading (radians)

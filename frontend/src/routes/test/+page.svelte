@@ -22,13 +22,13 @@
 
 <div class="p-4">
   <h1 class="text-2xl font-bold mb-4">Test Page</h1>
-  
-    <PathDrawer
-      {robotPos}
-      {pathComplete}
-      onRunPath={handleRunPath}
-      bind:freehandPath
-    />
+
+  <PathDrawer
+    {robotPos}
+    {pathComplete}
+    onRunPath={handleRunPath}
+    bind:freehandPath
+  />
   {#if freehandPath.length > 0}
     <p class="mt-2 text-xs text-gray-500">
       Freehand path: {freehandPath.length} points &nbsp;·&nbsp; first ({freehandPath[0].x.toFixed(

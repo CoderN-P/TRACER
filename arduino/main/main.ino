@@ -5,16 +5,26 @@
 #include <PulseInput.h>   
 #include "PID.h"
 #include <queue.h>
+#include "driver/mcpwm.h"
 
 
 
 // Constants for motor control
 const float WHEEL_DIAMETER = 0.05411268; // wheel diameter in meters
-const int MIN_PWM = 100; // Minimum PWM value
-const int MAX_PWM = 4095; // Max PWM Value (12 bit resolution)
+const int MAX_PWM = 1; // Max PWM Value (scaled 0-1)
 const int REDUCTION_RATIO = 56; 
 const int MAX_OUTPUT_RPM = 178;
-const int MAX_OUTPUT_SPEED = (MAX_OUTPUT_RPM / 60.0) * (PI * WHEEL_DIAMETER); // in m/s
+const int ppr = 11; // Pulses per revolution of the encoder
+const int ENCODER_TICKS_PER_REV = ppr * REDUCTION_RATIO * 4; // Total ticks per wheel revolution (4x counting)
+const float MAX_OUTPUT_SPEED = (MAX_OUTPUT_RPM / 60.0) * (PI * WHEEL_DIAMETER); // in m/s
+const float METERS_PER_TICK = (PI * WHEEL_DIAMETER) / ENCODER_TICKS_PER_REV; // Distance traveled per encoder tick
+const float LEFT_CORRECTION = 1.0; // Correction factor for left motor speed (accounts for slight differences in motors/wheels)
+const float RIGHT_CORRECTION = 1.0; // Correction factor for right motor speed (accounts for slight differences in motors/wheels)
+const float MAX_OUTPUT_SPEED_LEFT = MAX_OUTPUT_SPEED * LEFT_CORRECTION;
+const float MAX_OUTPUT_SPEED_RIGHT = MAX_OUTPUT_SPEED * RIGHT_CORRECTION;
+const float METERS_PER_TICK_LEFT = METERS_PER_TICK * LEFT_CORRECTION;
+const float METERS_PER_TICK_RIGHT = METERS_PER_TICK * RIGHT_CORRECTION;
+
 
 // Encoder constants
 const int ENCODER_PPR = 11;
@@ -63,6 +73,21 @@ byte cmdBuf[MAX_BUFFER_SIZE];
 size_t cmdIdx = 0;
 const int BAUD_RATE = 115200;
 
+// PID + Feedforward constants
+const float kS_LEFT;
+const float kS_RIGHT;
+const float kV_LEFT = (1.0 - kS_LEFT)/MAX_OUTPUT_SPEED_LEFT; // Velocity feedforward term for left motor (V = kS + kV * velocity)
+const float kV_RIGHT = (1.0 - kS_RIGHT)/MAX_OUTPUT_SPEED_RIGHT; // Velocity feedforward term for right motor (V = kS + kV * velocity)
+const float kA_LEFT;
+const float kA_RIGHT;
+
+const float P_LEFT = 0.0;
+const float P_RIGHT = 0.0;
+const float I_LEFT = 0.0;
+const float I_RIGHT = 0.0;
+const float D_LEFT = 0.0;
+const float D_RIGHT = 0.0;
+
 // I2C addresses and Register addresses
 const int MPU_ADDRESS = 0x68; // I2C address for MPU6050
 const int LCD_ADDRESS = 0x27; // I2C address for LCD
@@ -73,7 +98,7 @@ const int MAG_CTRL_REG = 0x09; // Control register for magnetometer
 
 
 // Sensor constants
-float LSB_uT = 0.0244; // ±8G full-scale
+float LSB_uT = 0.0244; // ±8G full-scale for magnetometer
 
 // Command definitions
 const uint8_t CMD_MOVE = 0x01;
@@ -135,10 +160,11 @@ struct SensorPacket {
     uint32_t timestamp; // Timestamp in microseconds
     uint8_t checksum; // Checksum for data integrity
 } __attribute__((packed)); // Packed to avoid padding bytes
-// PID Controllers
 
-PIDController pidLeft(1.0, 0.0, 0, 0.2*MAX_PWM);
-PIDController pidRight(1.0, 0.0, 0, 0.2*MAX_PWM);
+// PID Controllers
+// Start with only feedforward for tuning
+PIDController pidLeft(kP_LEFT, kI_LEFT, kD_LEFT);
+PIDController pidRight(kP_RIGHT, kI_RIGHT, kD_RIGHT);
 
 bool initMPU6050()
 {
@@ -158,6 +184,21 @@ void setup_magnetometer(){
   Wire.write(MAG_CTRL_REG);
   Wire.write(MODE_CONTINUOUS | ODR_50Hz | LSB_8G | OSR_512);
   Wire.endTransmission();
+}
+
+void setup_pwm(){
+    mcpwm_config_t pwm_config;
+    
+    pwm_config.frequency = 20000;     // 20 kHz motor PWM
+    pwm_config.cmpr_a = 0;            // duty cycle A
+    pwm_config.cmpr_b = 0;            // duty cycle B
+    pwm_config.counter_mode = MCPWM_UP_COUNTER;
+    pwm_config.duty_mode = MCPWM_DUTY_MODE_0;
+    
+    mcpwm_gpio_init(MCPWM_UNIT_0, MCPWM0A, EN1);
+    mcpwm_gpio_init(MCPWM_UNIT_0, MCPWM0B, EN2);
+    
+    mcpwm_init(MCPWM_UNIT_0, MCPWM_TIMER_0, &pwm_config);
 }
 
 void setup()
@@ -205,6 +246,7 @@ void setup()
     commandQueue = xQueueCreate(10, sizeof(byte) * MAX_BUFFER_SIZE);
     
     setup_magnetometer();
+    setup_pwm();
     
     if (initMPU6050())
     {
@@ -218,10 +260,6 @@ void setup()
         strncpy(lcdLine1, "MPU Error", sizeof(lcdLine1));
         lcdLine1[16] = '\0';
     }
-    
-    // Setup PWM channels
-    ledcAttach(EN1, 20000, 12); // 20 kHz, 12-bit resolution
-    ledcAttach(EN2, 20000, 12); // 20 kHz, 12-bit resolution
     
     // Create RTOS tasks
     
@@ -239,8 +277,6 @@ void setup()
     
     // Low priority task for updating the LCD at 2 Hz
     xTaskCreate(lcdUpdateTask, "LCD Update Task", 2048, NULL, 2, &lcdUpdateHandle);
-    
-
 }
 
 uint8_t expectedCommandLength(uint8_t cmd)
@@ -352,14 +388,14 @@ void getMagnetometerData(float &magX, float &magY, float &magZ)
 float getLeftMotorSpeed(int32_t left, int32_t lastLeft)
 {
     int32_t deltaLeftTicks = left - lastLeft;
-    float deltaLeft = (deltaLeftTicks * (PI * WHEEL_DIAMETER) / ENCODER_TICKS_PER_REV);
+    float deltaLeft = deltaLeftTicks * METERS_PER_TICK_LEFT;
     return deltaLeft / (PID_INTERVAL / 1000.0); // Convert to m/s
 }
 
 float getRightMotorSpeed(int32_t right, int32_t lastRight)
 {
     int32_t deltaRightTicks = right - lastRight;
-    float deltaRight = (deltaRightTicks * (PI * WHEEL_DIAMETER) / ENCODER_TICKS_PER_REV);
+    float deltaRight = deltaRightTicks * METERS_PER_TICK_RIGHT;
     return deltaRight / (PID_INTERVAL / 1000.0); // Convert to m/s
 }
 
@@ -369,37 +405,12 @@ void pidLoop(int32_t left, int32_t lastLeft, int32_t right, int32_t lastRight){
     float rightSpeed = getRightMotorSpeed(right, lastRight);
     
     // Simple feedforward model 
-    float leftFeedforward = pidLeft.getSetpoint() * MAX_PWM / MAX_OUTPUT_SPEED;
-    float rightFeedforward = pidRight.getSetpoint() * MAX_PWM / MAX_OUTPUT_SPEED;
+    float leftFeedforward = pidLeft.getSetpoint() * MAX_PWM / MAX_OUTPUT_SPEED_LEFT;
+    float rightFeedforward = pidRight.getSetpoint() * MAX_PWM / MAX_OUTPUT_SPEED_RIGHT;
     
-    float leftOutput = pidLeft.compute(leftSpeed, leftFeedforward);
-    float rightOutput = pidRight.compute(rightSpeed, rightFeedforward);
+    int outputLeft = constrain((pidLeft.compute(leftSpeed, leftFeedforward);, -MAX_PWM, MAX_PWM);
+    int outputRight = constrain(pidRight.compute(rightSpeed, rightFeedforward);, -MAX_PWM, MAX_PWM);
     
-    float ffLeft = pidLeft.getSetpoint() * MAX_PWM / MAX_OUTPUT_SPEED;
-    float ffRight = pidRight.getSetpoint() * MAX_PWM / MAX_OUTPUT_SPEED;
-    
-    float totalLeft = leftOutput + ffLeft;
-    float totalRight = rightOutput + ffRight;
-    
-    int signLeft = (totalLeft >= 0) ? 1 : -1;
-    int signRight = (totalRight >= 0) ? 1 : -1;
-    
-   
-    int outputLeft; 
-    int outputRight;
-    
-    if (totalLeft == 0){    
-        outputLeft = 0;
-    } else {
-        outputLeft = signLeft * (int)(min(abs(totalLeft) + MIN_PWM, MAX_PWM));
-    }
-    
-    if (totalRight == 0){
-        outputRight = 0;
-    } else {
-        int outputRight; = signRight * (int)(min(abs(totalRight) + MIN_PWM, MAX_PWM));
-    }
-   
     handleMovement(outputLeft, outputRight);
 }
 
@@ -602,38 +613,38 @@ void handleMovement(int16_t left, int16_t right)
     {
         digitalWrite(IN1, HIGH);
         digitalWrite(IN2, LOW);
-        ledcWrite(EN1, leftSpeed);
+        mcpwm_set_duty(MCPWM_UNIT_0, MCPWM_TIMER_0, MCPWM_OPR_A, leftSpeed * 100);
     }
     else if (leftSpeed < 0)
     {
         digitalWrite(IN1, LOW);
         digitalWrite(IN2, HIGH);
-        ledcWrite(EN1, -leftSpeed);
+        mcpwm_set_duty(MCPWM_UNIT_0, MCPWM_TIMER_0, MCPWM_OPR_A, -leftSpeed * 100);
     }
     else
     {
         digitalWrite(IN1, LOW);
         digitalWrite(IN2, LOW);
-        ledcWrite(EN1, 0);
+        mcpwm_set_duty(MCPWM_UNIT_0, MCPWM_TIMER_0, MCPWM_OPR_A, 0);
     }
 
     if (rightSpeed > 0)
     {
         digitalWrite(IN3, HIGH);
         digitalWrite(IN4, LOW);
-        ledcWrite(EN2, rightSpeed);
+        mcpwm_set_duty(MCPWM_UNIT_0, MCPWM_TIMER_0, MCPWM_OPR_B, rightSpeed * 100);
     }
     else if (rightSpeed < 0)
     {
         digitalWrite(IN3, LOW);
         digitalWrite(IN4, HIGH);
-        ledcWrite(EN2, -rightSpeed);
+        mcpwm_set_duty(MCPWM_UNIT_0, MCPWM_TIMER_0, MCPWM_OPR_B, -rightSpeed * 100);
     }
     else
     {
         digitalWrite(IN3, LOW);
         digitalWrite(IN4, LOW);
-        ledcWrite(EN2, 0);
+        mcpwm_set_duty(MCPWM_UNIT_0, MCPWM_TIMER_0, MCPWM_OPR_B, 0);
     }
     
     if (leftSpeed != 0 || rightSpeed != 0){

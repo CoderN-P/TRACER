@@ -10,9 +10,8 @@ class PIDController {
         float setpoint;
         float lastError;
         float integral;
-        float maxIntegral;
     public:
-        PIDController(float kp, float ki, float kd, float maxIntegral);
+        PIDController(float kp, float ki, float kd);
         void reset();     
         void getSetpoint(); // Get the current setpoint of the PID controller
         void setSetpoint(float setpoint); // Set the desired setpoint for the PID controller

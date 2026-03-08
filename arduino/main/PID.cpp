@@ -21,7 +21,7 @@ void PIDController::getSetpoint() {
     return this->setpoint;
 }
 
-float PIDController::compute(float input){
+float PIDController::compute(float input, float feedforward) {
     float error = this->setpoint - input;
     this->integral += error;
     this->integral = constrain(this->integral, -maxIntegral, maxIntegral);
@@ -32,7 +32,7 @@ float PIDController::compute(float input){
     
     this->lastError = error;
     
-    return proportional_t + integral_t + derivative_t; 
+    return feedforward + proportional_t + integral_t + derivative_t; 
 }
 void PIDController::reset(){
     this->lastError = 0;

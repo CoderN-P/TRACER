@@ -41,12 +41,18 @@ class SerialManager:
         thread.start()
         self._logger.info(f"SerialManager started on {self.serial.portstr} at {self.serial.baudrate} baud")
         asyncio.run_coroutine_threadsafe(robot.start(), loop)
+        
+    def start_read(self, callback=None):
+        self.running = True
+        thread = threading.Thread(target=self.read_loop, args=(callback,), daemon=True)
+        thread.start()
+        self._logger.info("SerialManager read loop started")
 
     def stop(self):
         self.running = False
         self._logger.info("SerialManager stopping...")
 
-    def read_loop(self):
+    def read_loop(self, callback=None):
         try:
             while self.running:
                 if self.serial.in_waiting:
@@ -68,8 +74,11 @@ class SerialManager:
 
                         packet = bytes(self._buffer[:self._PACKET_LENGTH])
                         del self._buffer[:self._PACKET_LENGTH]
-
-                        asyncio.run_coroutine_threadsafe(self.robot.process_sensor_data(bytes(packet)), self.loop)
+                        
+                        if not callback:
+                            asyncio.run_coroutine_threadsafe(self.robot.process_sensor_data(bytes(packet)), self.loop)
+                        else:
+                            callback(bytes(packet))
                 else:
                     time.sleep(0.001)
         except Exception as e:
@@ -81,7 +90,7 @@ class SerialManager:
         if data.command_type == CommandType.MOTOR:
             left = max(-32767, min(32767, int(data.command.left_motor * 1000))) # Convert from m/s to mm/s to fit in int16
             right = max(-32767, min(32767, int(data.command.right_motor * 1000))) # Convert from m/s to mm/s to fit in int16
-            packet = struct.pack("<Bhh", 0x01, data.command.left_motor, data.command.right_motor)
+            packet = struct.pack("<Bhh", 0x01, left, right)
             full = bytes([0xAA]) + packet
             checksum = sum(full) & 0xFF
             self.serial.write(full + bytes([checksum]))

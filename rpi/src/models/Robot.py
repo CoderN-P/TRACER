@@ -250,8 +250,8 @@ class Robot:
             await self.socketio.emit(
                 'sensor_data',
                 {
-                    **sensor_data.model_dump(), 
-                    **self.state_estimator.state.model_dump(),
+                    "sensors": sensor_data.model_dump(), 
+                    "state": self.state_estimator.state.model_dump(),
                     "mode": current_mode.name
                 },
             )
@@ -302,7 +302,7 @@ class Robot:
                         
                         if not command:
                             self.cur_path = None
-                            with self.state_lock:
+                            async with self.state_lock:
                                 self.state = Mode.MANUAL
                         else:
                             await self.send_safe_command(command)
@@ -327,7 +327,27 @@ class Robot:
             await self.send_sensor_update(start, sensor_data)
             elapsed = asyncio.get_event_loop().time() - start
             await asyncio.sleep(max(0, dt - elapsed)) # 100Hz loop
-
+    
+    async def set_state(self, new_state, path_data=None):
+        """Set the robot's state (manual, path following, stopped)"""
+        async with self.state_lock:
+            self.state = Mode(new_state)
+            
+            if self.state == Mode.PATH_FOLLOWING and path_data:
+                if path_data["type"] == "spline":
+                    try:
+                        self.cur_path = Path.from_raw(path_data["splines"])
+                    except ValueError:
+                        self._logger.error("Invalid path data for spline path")
+                        self.state = Mode.MANUAL
+                elif path_data["type"] == "freehand":
+                    self.cur_path = PurePursuit(path_data["path"])
+                else:
+                    self._logger.error(f"Unknown path type: {path_data['type']}")
+                    self.state = Mode.MANUAL
+            else:
+                self.cur_path = None
+                
     async def handle_joystick_input(self, data):
         """
         Handle joystick input and send motor commands.

@@ -9,18 +9,7 @@ export class SplinePathSvelte {
     public addSpline(spline: QuinticHermiteSplineSvelte) {
         this.QuinticHermiteSplines.push(spline);
     }
-
-    public evaluate(t: number): { x: number; y: number } {
-        if (this.QuinticHermiteSplines.length === 0) {
-            throw new Error("No splines in path");
-        }
-
-        const n = this.QuinticHermiteSplines.length;
-        const segment = Math.floor(t / n); 
-        const localT = t - segment * n;
-
-        return this.QuinticHermiteSplines[segment].evaluate(localT);
-    }
+    
     
     public render(dt: number = 0.01, scale: number = 100, canvasWidth: number = 800, canvasHeight: number = 800): number[] {
         const points: number[] = [];
@@ -29,7 +18,7 @@ export class SplinePathSvelte {
             const spline = this.QuinticHermiteSplines[i];
             for (let t = 0; t <= 1; t += dt) {
                 const { x, y } = spline.evaluate(t);
-                points.push(x * scale, canvasHeight - y * scale);
+                points.push(x * scale, -y * scale);
             }
         }
         return points;
@@ -40,25 +29,22 @@ export class SplinePathSvelte {
         
         for (let i = 0; i < this.QuinticHermiteSplines.length; i++) {
             const spline = this.QuinticHermiteSplines[i];
-            controlPoints.push({ x: scale*spline.x0, y: canvasHeight - scale*spline.y0 });
-            controlPoints.push({ x: scale*(spline.x0 + spline.dx0), y: canvasHeight - scale*(spline.y0 + spline.dy0) });
-            controlPoints.push({ x: scale*(spline.x0 + 0.5 * spline.ddx0), y: canvasHeight - scale*(spline.y0 + 0.5 * spline.ddy0)});
+            controlPoints.push({ x: scale * spline.x0, y: -scale * spline.y0 });
+            controlPoints.push({ x: scale * (spline.x0 + spline.dx0), y: -scale * (spline.y0 + spline.dy0) });
+            controlPoints.push({ x: scale * (spline.x0 + 0.5 * spline.ddx0), y: -scale * (spline.y0 + 0.5 * spline.ddy0) });
             
             // Only draw final control points for the last spline to avoid duplicates
-            
             if (i === this.QuinticHermiteSplines.length - 1) {
-                controlPoints.push({x: scale * spline.x1, y: canvasHeight - scale * spline.y1});
+                controlPoints.push({ x: scale * spline.x1, y: -scale * spline.y1 });
                 controlPoints.push({
                     x: scale * (spline.x1 + spline.dx1),
-                    y: canvasHeight - scale * (spline.y0 + spline.dy1)
+                    y: -scale * (spline.y1 + spline.dy1)
                 });
                 controlPoints.push({
                     x: scale * (spline.x1 + 0.5 * spline.ddx1),
-                    y: canvasHeight - scale * (spline.y1 + 0.5 * spline.ddy1)
+                    y: -scale * (spline.y1 + 0.5 * spline.ddy1)
                 });
             }
-            
-            
         }
         return controlPoints;
     }
@@ -68,23 +54,22 @@ export class SplinePathSvelte {
         
         for (let i = 0; i < this.QuinticHermiteSplines.length; i++) {
             const spline = this.QuinticHermiteSplines[i];
-            controlLines.push({ x1: scale*spline.x0, y1: canvasHeight - scale*spline.y0, x2: scale*(spline.x0 + spline.dx0), y2: canvasHeight - scale*(spline.y0 + spline.dy0), label: "vel" });
-            controlLines.push({ x1: scale*spline.x0, y1: canvasHeight - scale*spline.y0, x2: scale*(spline.x0 + 0.5 * spline.ddx0), y2: canvasHeight - scale*(spline.y0 + 0.5 * spline.ddy0), label: "accel" });
-            
+            controlLines.push({ x1: scale * spline.x0, y1: -scale * spline.y0, x2: scale * (spline.x0 + spline.dx0), y2: -scale * (spline.y0 + spline.dy0), label: "vel" });
+            controlLines.push({ x1: scale * spline.x0, y1: -scale * spline.y0, x2: scale * (spline.x0 + 0.5 * spline.ddx0), y2: -scale * (spline.y0 + 0.5 * spline.ddy0), label: "accel" });
             
             if (i === this.QuinticHermiteSplines.length - 1) {
                 controlLines.push({
                     x1: scale * spline.x1,
-                    y1: canvasHeight - scale * spline.y1,
+                    y1: -scale * spline.y1,
                     x2: scale * (spline.x1 + spline.dx1),
-                    y2: canvasHeight - scale * (spline.y1 + spline.dy1),
+                    y2: -scale * (spline.y1 + spline.dy1),
                     label: "vel"
                 });
                 controlLines.push({
                     x1: scale * spline.x1,
-                    y1: canvasHeight - scale * spline.y1,
+                    y1: -scale * spline.y1,
                     x2: scale * (spline.x1 + 0.5 * spline.ddx1),
-                    y2: canvasHeight - scale * (spline.y1 + 0.5 * spline.ddy1),
+                    y2: -scale * (spline.y1 + 0.5 * spline.ddy1),
                     label: "accel"
                 });
             }
@@ -114,7 +99,7 @@ export class SplinePathSvelte {
         const spline = this.QuinticHermiteSplines[splineIndex];
         
         const scaledX = newX / scale;
-        const scaledY = (canvasHeight - newY) / scale; // Invert Y
+        const scaledY = -newY / scale; // Invert Y (canvas Y-down → world Y-up)
         
         switch (pointType) {
             case 0:
@@ -164,7 +149,19 @@ export class SplinePathSvelte {
         
 
     public exportToJSON(): string {
-        return JSON.stringify(this.QuinticHermiteSplines);
+        const splines = this.QuinticHermiteSplines.map(spline => ({
+            start: [spline.x0, spline.y0],
+            end: [spline.x1, spline.y1],
+            start_velocity: [spline.dx0, spline.dy0],
+            end_velocity: [spline.dx1, spline.dy1],
+            start_acceleration: [spline.ddx0, spline.ddy0],
+            end_acceleration: [spline.ddx1, spline.ddy1]
+        }));
+        
+        const data = {
+            splines
+        }
+        return JSON.stringify(data, null, 2);
     }
 }
     

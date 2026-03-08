@@ -61,14 +61,17 @@ class StateEstimator:
 
     @staticmethod
     def estimate_linear_velocity(left_ticks, right_ticks, dt):
-        delta_left = left_ticks * ROBOT_CONFIG.METERS_PER_TICK
-        delta_right = right_ticks * ROBOT_CONFIG.METERS_PER_TICK
+        delta_left = left_ticks * ROBOT_CONFIG.METERS_PER_TICK_LEFT
+        delta_right = right_ticks * ROBOT_CONFIG.METERS_PER_TICK_RIGHT
         linear_velocity = (delta_left + delta_right) / (2 * dt)
         return linear_velocity
     
     @staticmethod 
     def get_position_delta(left_ticks, right_ticks, heading):
-        delta_s = (left_ticks + right_ticks) * ROBOT_CONFIG.METERS_PER_TICK
+        delta_l = left_ticks * ROBOT_CONFIG.METERS_PER_TICK_LEFT
+        delta_r = right_ticks * ROBOT_CONFIG.METERS_PER_TICK_RIGHT
+        
+        delta_s = ( delta_l + delta_r ) / 2
         
         # Heading must be in radians
         return delta_s * math.cos(heading), delta_s * math.sin(heading),
@@ -77,7 +80,11 @@ class StateEstimator:
         # Previous sensor data is needed to determine dt
         self.prev_state = self.state.model_copy()
         dt = self.calculate_dt(sensor_data.timestamp, previous_sensor_data.timestamp)
-        self.theta_encoders += self.heading_delta_from_encoders(sensor_data.left_encoder_ticks, sensor_data.right_encoder_ticks)
+        
+        delta_left_ticks = sensor_data.left_encoder_ticks - previous_sensor_data.left_encoder_ticks
+        delta_right_ticks = sensor_data.right_encoder_ticks - previous_sensor_data.right_encoder_ticks
+        
+        self.theta_encoders += self.heading_delta_from_encoders(delta_left_ticks, delta_right_ticks)
         
         if sensor_data.magnetometer.new:
             mag_heading_rad = math.radians(sensor_data.magnetometer.heading)
@@ -92,8 +99,7 @@ class StateEstimator:
             
         self.state.yaw = self.heading_filter.step(self.theta_encoders, sensor_data.gyro_z, dt, mag_heading_rad)
     
-        delta_left_ticks = sensor_data.left_encoder_ticks - previous_sensor_data.left_encoder_ticks
-        delta_right_ticks = sensor_data.right_encoder_ticks - previous_sensor_data.right_encoder_ticks
+        
         self.state.linear_velocity = self.estimate_linear_velocity(delta_left_ticks, delta_right_ticks, dt)
         self.state.angular_velocity = ((self.state.yaw - self.prev_state.yaw) % (2 * math.pi) - math.pi) / dt
         
@@ -106,6 +112,6 @@ class StateEstimator:
         
     @staticmethod
     def heading_delta_from_encoders(left_ticks, right_ticks):
-        delta_left = left_ticks * ROBOT_CONFIG.METERS_PER_TICK
-        delta_right = right_ticks * ROBOT_CONFIG.METERS_PER_TICK
+        delta_left = left_ticks * ROBOT_CONFIG.METERS_PER_TICK_LEFT
+        delta_right = right_ticks * ROBOT_CONFIG.METERS_PER_TICK_RIGHT
         return (delta_right - delta_left) / ROBOT_CONFIG.WHEEL_BASE_WIDTH

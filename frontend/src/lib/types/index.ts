@@ -12,3 +12,5 @@ export { Mode } from './Mode';
 export { QuinticHermiteSplineSvelte } from './QuinticHermiteSpline.svelte';
 export { SplinePathSvelte } from './SplinePath.svelte';
 export { type GestureData, GestureDataSchema } from './GestureData';
+export { type Magnetometer, MagnetometerSchema } from './Magnetometer';
+export { type RobotState, RobotStateSchema } from './RobotState';

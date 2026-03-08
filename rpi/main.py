@@ -1,11 +1,22 @@
+import argparse
 import asyncio
 import logging
 from dotenv import load_dotenv
+
 load_dotenv()
 from src import text_to_command
 import os
 
-from src import Robot, SerialManager, run_socket_server, socketio
+from src import Robot, SerialManager, run_socket_server, socketio, ROBOT_CONFIG, calibrate_wheel
+
+parser = argparse.ArgumentParser(
+    prog="TRACER RPI",
+    description="Main control program for TRACER robot running on Raspberry Pi. Handles serial communication with the robot's microcontroller and serves a Socket.IO API for remote control and telemetry.",
+)
+
+parser.add_argument('--calibrate-wheel', action='store_true', help="Run the wheel calibration routine to determine correction factor (d_true / d_encoder) for accurate distance measurements.")
+parser.add_argument('--calibrate-wheel-speed', type=float, default=ROBOT_CONFIG.MAX_LINEAR_VEL, help="Speed in m/s to run the motors during wheel calibration (default: Robot max vel).")
+parser.add_argument('--calibrate-wheel-duration', type=float, default=2.0, help="Duration in seconds to run the motors during wheel calibration (default: 2 seconds).")
 
 async def main():
     port = SerialManager.find_port()
@@ -23,5 +34,13 @@ async def main():
 if __name__ == "__main__":
     hostname = os.uname().nodename
     print(f"Running on hostname: {hostname}")
+    
     if hostname == "tracer":
-        asyncio.run(main())
+        args = parser.parse_args()
+        
+        if args.calibrate_wheel:
+            calibrate_wheel(args.calibrate_wheel_speed, args.calibrate_wheel_duration)
+        else:
+            asyncio.run(main())
+    else:
+        print("Not running on TRACER robot. To run the main control program, please run this script on the Raspberry Pi connected to the robot.")

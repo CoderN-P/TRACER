@@ -51,10 +51,10 @@ const int TRIGGER_1 = 11; // Trigger pin for ultrasonic sensor
 const int ECHO_1 = 5;   // Echo pin for ultrasonic sensor // Must be interrupt-capable pin
 const int TRIGGER_2 = 10; // Trigger pin for second ultrasonic sensor (if used)
 const int ECHO_2 = 22;   // Echo pin for second ultrasonic sensor (
-const int ENCODER_LEFT_A = 18; // Left encoder pin channel A (must be interrupt-capable)
-const int ENCODER_LEFT_B = 19; // Left encoder pin channel B (must be interrupt-capable)
+const int ENCODER_LEFT_A = 16; // Left encoder pin channel A (must be interrupt-capable)
+const int ENCODER_LEFT_B = 35; // Left encoder pin channel B (must be interrupt-capable)
 const int ENCODER_RIGHT_A = 17; // Right encoder pin channel A (must be interrupt-capable)
-const int ENCODER_RIGHT_B = 21; // Right encoder pin channel B (must be interrupt-capable)
+const int ENCODER_RIGHT_B = 34; // Right encoder pin channel B (must be interrupt-capable)
 
 // NOTE: 
 // System constants
@@ -368,8 +368,12 @@ void pidLoop(int32_t left, int32_t lastLeft, int32_t right, int32_t lastRight){
     float leftSpeed = getLeftMotorSpeed(left, lastLeft);
     float rightSpeed = getRightMotorSpeed(right, lastRight);
     
-    float leftOutput = pidLeft.compute(leftSpeed);
-    float rightOutput = pidRight.compute(rightSpeed);
+    // Simple feedforward model 
+    float leftFeedforward = pidLeft.getSetpoint() * MAX_PWM / MAX_OUTPUT_SPEED;
+    float rightFeedforward = pidRight.getSetpoint() * MAX_PWM / MAX_OUTPUT_SPEED;
+    
+    float leftOutput = pidLeft.compute(leftSpeed, leftFeedforward);
+    float rightOutput = pidRight.compute(rightSpeed, rightFeedforward);
     
     float ffLeft = pidLeft.getSetpoint() * MAX_PWM / MAX_OUTPUT_SPEED;
     float ffRight = pidRight.getSetpoint() * MAX_PWM / MAX_OUTPUT_SPEED;

@@ -12,7 +12,9 @@
         type LogEntry,
         Mode,
         type SensorData,
-        SensorDataSchema
+        SensorDataSchema,
+        type RobotState,
+        RobotStateSchema,
     } from "$lib/types";
     import Status from '$lib/components/Status.svelte';
     import Uptime from '$lib/components/Uptime.svelte';
@@ -30,6 +32,7 @@
     import GestureController from "$lib/components/GestureController.svelte";
 
     let sensorData = $state<SensorData | null>(null);
+    let robotState = $state<RobotState | null>(null);
     let gestureData = $state<GestureData | null>(null);
     let previousSensorData = $state<SensorData | null>(null);
     let mode = $state<Mode>(Mode.MANUAL);
@@ -131,7 +134,8 @@
         socket.on('sensor_data', (data) => {
             previousSensorData = sensorData;
             mode = data.mode;
-            sensorData = SensorDataSchema.parse(data);
+            sensorData = SensorDataSchema.parse(data.sensors);
+            robotState = RobotStateSchema.parse(data.state);
 
             packetCount++;
             const now = new Date().getTime();
@@ -155,7 +159,6 @@
         });
 
         socket.on('gesture_data', (data) => {
-            console.log('Received gesture data:', data);
             gestureData = GestureDataSchema.parse(data); // Assuming gestureData is already in the correct format
         });
 

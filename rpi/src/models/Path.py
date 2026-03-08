@@ -18,6 +18,9 @@ class Path:
         self._meta_queue = mp.Queue()
         self.ramsete = None
         
+        if not self.check_c2_continuity():
+            raise ValueError("Splines must be C2 continuous")
+        
         process = mp.Process(
             target=self._build_trajectory_worker,
             args=(splines, self._meta_queue, self._ready),
@@ -25,16 +28,36 @@ class Path:
         )
         
         process.start()
+    
+    @classmethod
+    def from_raw(cls, splines):
+        spline_objects = [
+            QuinticHermiteSpline(
+                start=s['start'],
+                end=s['end'],
+                start_velocity=s['start_velocity'],
+                end_velocity=s['end_velocity'],
+                start_acceleration=s['start_acceleration'],
+                end_acceleration=s['end_acceleration']
+            ) for s in splines
+        ]
         
+        return cls(spline_objects)
+    
     def check_c2_continuity(self):
         for i in range(len(self.splines) - 1):
             end_spline = self.splines[i]
-            start_next_spline = self.splines[i + 1]
+            start_spline = self.splines[i + 1]
             
-            # Check position continuity
+            if not np.isclose(end_spline.end, start_spline.start).all():
+                return False
             
-        
-        print("Path is C2 continuous")
+            if not np.isclose(end_spline.end_velocity, start_spline.start_velocity).all():
+                return False
+            
+            if not np.isclose(end_spline.end_acceleration, start_spline.start_acceleration).all():
+                return False
+            
         return True
     
     def _build_trajectory_worker(self):

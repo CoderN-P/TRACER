@@ -45,6 +45,10 @@ class RobotConfig:
     ENCODER_TICKS_PER_REV: int = ENCODER_PPR * REDUCTION_RATIO * 4 # Pulses per revolution of the wheel 
     METERS_PER_TICK: float = WHEEL_CIRCUMFERENCE / ENCODER_TICKS_PER_REV
     
+    # TODO: Calibrate correction factors for each
+    METERS_PER_TICK_LEFT: float = METERS_PER_TICK
+    METERS_PER_TICK_RIGHT: float = METERS_PER_TICK
+    
     # State Estimation
     P_THETA: float = 0.1 # Uncertainty in heading (radians)
     P_GYRO_BIAS: float = 1.0e-4 # Uncertainty in gyro bias (rad/s)
@@ -52,9 +56,12 @@ class RobotConfig:
     
     Q_THETA_1: float = 1.0e-4 # Process noise in heading (radians^2/s)
     Q_BIAS: float = 1.0e-6 # Process noise in gyro
-    Q_THETA_2: float = 5.0e-5 # Process noise in layer 2 heading
+    
+    
+    # not currently used, but could be added to the Kalman filter for better position estimation
     Q_X: float = 0.01 # Process noise in x position (meters^2/s)
-    Q_Y: float = 0.01 # Process noise in y position (meters^
+    Q_Y: float = 0.01 # Process noise in y position (meters^2/s)
+    Q_THETA_2: float = 5.0e-5 # Process noise in layer 2 heading
     
     R_THETA_ENCODER: float = 0.01 # Measurement noise from encoders (radians^2)
     R_THETA_MAGNETOMETER: float = 0.1

@@ -7,7 +7,7 @@ load_dotenv()
 from src import text_to_command
 import os
 
-from src import Robot, SerialManager, run_socket_server, socketio, ROBOT_CONFIG, calibrate_wheel
+from src import Robot, SerialManager, run_socket_server, socketio, ROBOT_CONFIG, calibrate_wheel, calibrate_wheelbase
 
 parser = argparse.ArgumentParser(
     prog="TRACER RPI",
@@ -15,9 +15,11 @@ parser = argparse.ArgumentParser(
 )
 
 parser.add_argument('--calibrate-wheel', action='store_true', help="Run the wheel calibration routine to determine correction factor (d_true / d_encoder) for accurate distance measurements.")
-parser.add_argument('--calibrate-wheel-speed', type=float, default=ROBOT_CONFIG.MAX_LINEAR_VEL, help="Speed in m/s to run the motors during wheel calibration (default: Robot max vel).")
-parser.add_argument('--calibrate-wheel-duration', type=float, default=2.0, help="Duration in seconds to run the motors during wheel calibration (default: 2 seconds).")
-
+parser.add_argument('--calibrate-wheelbase', action='store_true', help="Run the wheelbase calibration routine to determine correction factor for accurate heading change measurements.")
+parser.add_argument('--speed', type=float, default=ROBOT_CONFIG.MAX_LINEAR_VEL, help="Speed in m/s to run the motors during wheel calibration (default: Robot max vel).")
+parser.add_argument('--duration', type=float, default=2.0, help="Duration in seconds to run the motors during wheel calibration (default: 2 seconds).")
+parser.add_argument('--calibrate-ks', action='store_true', help="Run the kS calibration routine to determine the static friction voltage for the motors.")
+parser.add_argument('--resolution', type=float, default=0.1, help="Time resolution in seconds for testing different PWM values during kS calibration (default: 0.1 seconds).")
 async def main():
     port = SerialManager.find_port()
     if not port:
@@ -39,7 +41,11 @@ if __name__ == "__main__":
         args = parser.parse_args()
         
         if args.calibrate_wheel:
-            calibrate_wheel(args.calibrate_wheel_speed, args.calibrate_wheel_duration)
+            calibrate_wheel(args.speed, args.duration)
+        elif args.calibrate_wheelbase:
+            calibrate_wheelbase(args.speed, args.duration)
+        elif args.calibrate_ks:
+            calibrate_ks(args.resolution, args.duration)
         else:
             asyncio.run(main())
     else:

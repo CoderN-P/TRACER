@@ -54,7 +54,6 @@ void mainLoop(void *pvParameters) {
         leftEncoderCount += deltaLeft;
         rightEncoderCount += deltaRight;
         
-        
         getMPUData(ax, ay, az, gx, gy, gz, tempC);
         bool newMagData = loopCounter % 2 == 0; // Magnetometer updates at 50 Hz, so new data is available every 2 loops of the main loop
        

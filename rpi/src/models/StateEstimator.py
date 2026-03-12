@@ -6,7 +6,7 @@ from . import ROBOT_CONFIG
 
 
 class StateEstimator:
-    def __init__(self):
+    def __init__(self, logger):
         self.state: RobotState = RobotState(
             x=0.0,
             y=0.0,
@@ -22,7 +22,7 @@ class StateEstimator:
         # Pre state estimations
         self.initial_mag_heading = None
         self.theta_encoders = 0.0 # Cumulative heading change from encoders, in radians
-        
+        self._logger = logger
         self.heading_filter = HeadingFilter()
     
     def initialize(self, sensor_data: SensorData):
@@ -80,6 +80,13 @@ class StateEstimator:
         # Previous sensor data is needed to determine dt
         self.prev_state = self.state.model_copy()
         dt = self.calculate_dt(sensor_data.timestamp, previous_sensor_data.timestamp)
+
+        MAX_MARGIN = 1.15  # 15% margin for acceleration transients
+        max_pulses = ROBOT_CONFIG.ENCODER_TICKS_PER_REV * ROBOT_CONFIG.MAX_RPM / 60.0 * dt * MAX_MARGIN
+        
+        if abs(sensor_data.left_encoder_ticks - previous_sensor_data.left_encoder_ticks) > max_pulses:
+            self._logger.error(f"Left encoder tick jump detected: {previous_sensor_data.left_encoder_ticks} -> {sensor_data.left_encoder_ticks} (max expected: {max_pulses:.2f})")
+            return
         
         delta_left_ticks = sensor_data.left_encoder_ticks - previous_sensor_data.left_encoder_ticks
         delta_right_ticks = sensor_data.right_encoder_ticks - previous_sensor_data.right_encoder_ticks

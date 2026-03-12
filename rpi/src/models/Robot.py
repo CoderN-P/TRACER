@@ -19,7 +19,6 @@ class Robot:
  
         self.socketio = socketio
         self.cliff_clear = asyncio.Event()
-        self.state_estimator = StateEstimator()
         self.running = False
         self.distance_history = deque(maxlen=10)  # Store last 10 distance readings for smoothing
         
@@ -27,6 +26,7 @@ class Robot:
 
         self._logger = logging.getLogger("RobotManager")
         self.motor_lock = asyncio.Lock()
+        self.state_estimator = StateEstimator(self._logger)
         
         self.state = Mode.MANUAL
         self.state_lock = asyncio.Lock()  # Lock to protect access to the robot's state (manual, autonomous, stopped)
@@ -126,7 +126,7 @@ class Robot:
         # f     - magnetometer z (float, microtesla)
         # i     - left encoder ticks (int32_t)
         # i     - right encoder ticks (int32_t)
-        # B     - flags (uint8_t) bit 0: front IR, bit 1: back IR, 0 = cliff detected, 1 = no cliff, bit 2: new mag data
+        # B     - flags (uint8_t) bit 0: front IR, bit 1: back IR, 0 = cliff detected, 1 = no cliff, bit 2: new mag data, bit 3: motors enabled
         # B     - battery percentage (uint8_t)
         # I     - timestamp (uint32_t, microseconds)
         # B     - checksum (uint8_t)
@@ -147,6 +147,7 @@ class Robot:
         ir_front = not bool(flags & 0b00000001)
         ir_back = not bool(flags & 0b00000010)
         new_mag_data = bool(flags & 0b00000100)
+        motors_enabled = bool(flags & 0b00001000)
         
         mag_heading = MagnetometerData.calculate_heading(mag_x, mag_y, mag_z)
         
@@ -176,7 +177,8 @@ class Robot:
             "ir_back": ir_back,
             "battery": battery,
             "timestamp": timestamp,
-            "packet_num": packet_num
+            "packet_num": packet_num,
+            "motors_enabled": motors_enabled
         }
         
         return SensorData.model_validate(data)
@@ -268,6 +270,9 @@ class Robot:
                 prev_data = self.previous_sensor_data
                 
             async with self.state_lock:
+                if self.state != Mode.STOPPED and sensor_data.motors_enabled == False:
+                    self._logger.warning("Motors manually disabled via ESTOP button, switching to STOPPED mode")
+                    self.state = Mode.STOPPED
                 cur_state = self.state
                 
             if not sensor_data:

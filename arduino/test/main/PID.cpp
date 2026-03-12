@@ -2,7 +2,6 @@
 #include <cmath>
 #include <algorithm>
 
-
 PIDController::PIDController(float kp, float ki, float kd) {
     this->kp = kp;
     this->ki = ki;

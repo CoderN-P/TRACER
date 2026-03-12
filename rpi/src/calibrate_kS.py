@@ -13,6 +13,7 @@ def calibrate_ks(resolution, duration_sec):
 
     left_encoder = 0
     right_encoder = 0
+    prev_sensor_data = None
 
     lock = threading.Lock()
 
@@ -22,10 +23,12 @@ def calibrate_ks(resolution, duration_sec):
 
         sensor_data = Robot.bytes_to_sensor_data(data)
 
-        nonlocal left_encoder, right_encoder
+        nonlocal left_encoder, right_encoder, prev_sensor_data
         with lock:
-            left_encoder = sensor_data.left_encoder
-            right_encoder = sensor_data.right_encoder
+            if prev_sensor_data is not None:
+                left_encoder += (sensor_data.left_encoder - prev_sensor_data.left_encoder)
+                right_encoder += (sensor_data.right_encoder - prev_sensor_data.right_encoder)
+            prev_sensor_data = sensor_data
             
 
     serial_manager = SerialManager(port, 115200)
@@ -42,7 +45,7 @@ def calibrate_ks(resolution, duration_sec):
     ks_left = 0
     ks_right = 0
     
-    while time.time() - cur_time < duration_sec:
+    while time.time() - cur_time < 60:  # Run for up to 60 seconds, or until we find the kS values
         serial_manager.send(
             Command(
                 command_type=CommandType.MOTOR,
@@ -63,10 +66,10 @@ def calibrate_ks(resolution, duration_sec):
             logging.info("If the robot moved at all, even a little bit, then the kS value is likely below this speed. If it didn't move, then the kS value is likely above this speed.")
             
             if left_encoder == 0:
-                ks_left = (speed_left + 0.05) / ROBOT_CONFIG.MAX_LINEAR_VEL_LEFT
+                ks_left = (speed_left + resolution) / ROBOT_CONFIG.MAX_LINEAR_VEL_LEFT
             
             if right_encoder == 0:
-                ks_right = (speed_right + 0.05) / ROBOT_CONFIG.MAX_LINEAR_VEL_RIGHT
+                ks_right = (speed_right + resolution) / ROBOT_CONFIG.MAX_LINEAR_VEL_RIGHT
                 
             if left_encoder == 0 and right_encoder == 0:
                 logging.info("Evaluated kS values:")

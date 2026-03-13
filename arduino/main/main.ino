@@ -10,6 +10,7 @@
 #include "types.h"
 #include "comms.h"
 #include "tasks.h"
+#include "OLED.h"
 
 
 // RTOS task handles
@@ -78,6 +79,7 @@ void setup()
     
     setup_magnetometer();
     setup_pwm();
+    setupOLED();
     
     if (initMPU6050())
     {

@@ -14,3 +14,4 @@ extern PIDController pidRight;
 extern QueueHandle_t commandQueue;
 extern pcnt_unit_t pcnt_unit_left;
 extern pcnt_unit_t pcnt_unit_right;
+extern uint8_t pageIndex;

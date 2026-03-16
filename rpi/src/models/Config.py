@@ -12,7 +12,7 @@ class RobotConfig:
     WHEEL_BASE_CORRECTION: float = 1.0 # Ratio between true distance and encoder distance, to be calibrated
     WHEEL_BASE: float = MEASURED_WHEEL_BASE * WHEEL_BASE_CORRECTION
     # Motor Limits
-    MAX_RPM: int = 178
+    MAX_RPM: int = 178 / 2 # With 2S LiPo the motors receive less voltage and thus have a lower max RPM, so we cut it in half to be safe. This can be adjusted after testing.
     # Max speed in m/s: (RPM * pi * D) / 60
     MAX_LINEAR_VEL: float = (MAX_RPM * math.pi * WHEEL_DIAMETER) / 60.0
     
@@ -48,7 +48,7 @@ class RobotConfig:
     
     # Encoders
     ENCODER_PPR: int = 11 # Pulses per revolution of the motor shaft
-    ENCODER_TICKS_PER_REV: int = ENCODER_PPR * REDUCTION_RATIO * 2 # Pulses per revolution of the wheel 
+    ENCODER_TICKS_PER_REV: int = ENCODER_PPR * REDUCTION_RATIO * 4 # Pulses per revolution of the wheel 
     METERS_PER_TICK: float = WHEEL_CIRCUMFERENCE / ENCODER_TICKS_PER_REV
     
     LEFT_CORRECTION = 1 # Ratio between true distance and left encoder dist

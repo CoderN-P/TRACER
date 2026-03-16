@@ -14,7 +14,7 @@ socket = SocketIO(app, cors_allowed_origins='*')
 sio_client = socketio.Client()  # Use WebSocket transport for better performance
 gesture_controller_route = "http://192.168.4.47/sensors" # esp32 running gesture controller code, serving sensor data at this endpoint
 AP = "http://10.42.0.1:8080"
-NORMAL = "http://192.168.4.119:8080"
+NORMAL = "http://192.168.4.27:8080"
 
 def setup_routes(controller: Controller):
     @socket.on('query')

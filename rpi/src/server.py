@@ -26,7 +26,7 @@ def setup_routes(robot):
         
     @sio.on('enable')
     async def on_enable(sid, data):
-        await robot.enable()
+        await robot.resume()
         
         
     # TODO: Implement the following events: "set_state" (if new state = PATH_FOLLOWING, a path must be provided, "

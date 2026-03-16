@@ -21,13 +21,13 @@ class Command(BaseModel):
         self.ID = str(uuid.uuid4())
     
     @classmethod
-    def apply_deadzone(cls, value: float) -> float:
+    def apply_deadzone_and_scale(cls, value: float) -> float:
         """
         Apply a deadzone to the joystick input to prevent drift.
         """
         if abs(value) < ROBOT_CONFIG.JOYSTICK_DEADZONE:
             return 0.0
-        return value
+        return value * ROBOT_CONFIG.MAX_LINEAR_VEL  # Scale to max velocity
     
     @classmethod
     def from_joystick(cls, left_y: float, right_x: float):

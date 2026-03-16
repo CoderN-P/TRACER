@@ -35,10 +35,19 @@ void drawHeaderStatic()
 void drawHeader(RobotState &state, bool blinkState)
 {
   // Blink dot (status indicator)
+    // Draw black rect to clear prev status
+    
     display.setTextSize(1);
     display.setTextColor(WHITE);
+    display.fillRect(0, 1, 40, 12, BLACK);
     display.setCursor(0, 4);
     display.print(motorsEnabled ? "[RUN]" : "[STOP]");
+    
+    bool motorsPhysical = digitalRead(STBY) == HIGH;
+    
+     if (motorsPhysical){
+        display.print("*"); // indicate mismatch between desired and actual motor state
+     }
     
   display.fillCircle(45, 7, 3, blinkState ? WHITE : BLACK);
 
@@ -50,8 +59,8 @@ void drawHeader(RobotState &state, bool blinkState)
   display.print("ms");
 
   // Battery icon + percentage
-  display.fillRect(90, 1, 38, 12, BLACK);
-  display.setCursor(90, 4);
+  display.fillRect(95, 1, 38, 12, BLACK);
+  display.setCursor(95, 4);
   display.print(state.batteryPercent);
   display.print("%");
   display.drawRect(112, 2, 13, 9, WHITE); // battery body
@@ -102,11 +111,11 @@ void drawPage1(RobotState &state)
 
   // Left bar (outline + fill)
   display.drawRect(0, BAR_Y, BAR_W, BAR_H, WHITE);
-  display.fillRect(0, BAR_Y, (int)(BAR_W * state.leftPWM), BAR_H, WHITE);
+  display.fillRect(0, BAR_Y, (int)(BAR_W * abs(state.leftPWM)), BAR_H, WHITE);
 
   // Right bar
   display.drawRect(65, BAR_Y, BAR_W, BAR_H, WHITE);
-  display.fillRect(65, BAR_Y, (int)(BAR_W * state.rightPWM), BAR_H, WHITE);
+  display.fillRect(65, BAR_Y, (int)(BAR_W * abs(state.rightPWM)), BAR_H, WHITE);
 
   // Velocity
   display.setCursor(0, VEL_Y);

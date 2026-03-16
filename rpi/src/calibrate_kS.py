@@ -5,10 +5,15 @@ from . import ROBOT_CONFIG
 from .models import SerialManager, Robot, Command, CommandType, MotorCommand
 
 
-def calibrate_ks(resolution, duration_sec):
-    port = SerialManager.find_port()
+def calibrate_ks(resolution, duration_sec, port=None):
+    port = port if port else SerialManager.find_port()
+
+    logging.basicConfig(level=logging.INFO, format='%(levelname)s:%(name)s:%(message)s')
+
+    logger = logging.getLogger(__name__)
+    
     if not port:
-        logging.error("No serial port found. Please connect the robot.")
+        logger.error("No serial port found. Please connect the robot.")
         return
 
     left_encoder = 0
@@ -36,8 +41,8 @@ def calibrate_ks(resolution, duration_sec):
 
     cur_time = time.time()
     
-    speed_left = ROBOT_CONFIG.MAX_LINEAR_VEL_LEFT / 2
-    speed_right = ROBOT_CONFIG.MAX_LINEAR_VEL_RIGHT / 2
+    speed_left = ROBOT_CONFIG.MAX_LINEAR_VEL / 2
+    speed_right = ROBOT_CONFIG.MAX_LINEAR_VEL / 2
     
     # kV = speed * MAX_PWM / max_speed
     # kS = min PWM (0-1) needed to overcome static friction and start moving the robot. We can estimate this by running the motors at a low speed and seeing which level actually gets movement.
@@ -48,33 +53,37 @@ def calibrate_ks(resolution, duration_sec):
     while time.time() - cur_time < 60:  # Run for up to 60 seconds, or until we find the kS values
         serial_manager.send(
             Command(
+                ID="",
                 command_type=CommandType.MOTOR,
                 command=MotorCommand(
                     left_motor=speed_left,
                     right_motor=speed_right,
                 ),
+                duration=0,
+                pause_duration=0,
             )
+            
         )
         time.sleep(duration_sec)
         serial_manager.send(Command.stop())
         
         with lock:
-            logging.info(f"Left wheel encoder ticks {left_encoder:.4f} meters")
-            logging.info(f"Right wheel encoder ticks: {right_encoder:.4f} meters")
-            logging.info(f"LEFT PWM value tested: {speed_left / ROBOT_CONFIG.MAX_LINEAR_VEL_LEFT:.2f}")
-            logging.info(f"RIGHT PWM value tested: {speed_right / ROBOT_CONFIG.MAX_LINEAR_VEL_RIGHT:.2f}")
-            logging.info("If the robot moved at all, even a little bit, then the kS value is likely below this speed. If it didn't move, then the kS value is likely above this speed.")
+            logger.info(f"Left wheel encoder ticks {left_encoder:.4f} meters")
+            logger.info(f"Right wheel encoder ticks: {right_encoder:.4f} meters")
+            logger.info(f"LEFT PWM value tested: {speed_left / ROBOT_CONFIG.MAX_LINEAR_VEL:.2f}")
+            logger.info(f"RIGHT PWM value tested: {speed_right / ROBOT_CONFIG.MAX_LINEAR_VEL:.2f}")
+            logger.info("If the robot moved at all, even a little bit, then the kS value is likely below this speed. If it didn't move, then the kS value is likely above this speed.")
             
             if left_encoder == 0:
-                ks_left = (speed_left + resolution) / ROBOT_CONFIG.MAX_LINEAR_VEL_LEFT
+                ks_left = (speed_left + resolution) / ROBOT_CONFIG.MAX_LINEAR_VEL
             
             if right_encoder == 0:
-                ks_right = (speed_right + resolution) / ROBOT_CONFIG.MAX_LINEAR_VEL_RIGHT
+                ks_right = (speed_right + resolution) / ROBOT_CONFIG.MAX_LINEAR_VEL
                 
             if left_encoder == 0 and right_encoder == 0:
-                logging.info("Evaluated kS values:")
-                logging.info(f"Estimated kS for left wheel: {ks_left:.2f}")
-                logging.info(f"Estimated kS for right wheel: {ks_right:.2f}")
+                logger.info("Evaluated kS values:")
+                logger.info(f"Estimated kS for left wheel: {ks_left:.2f}")
+                logger.info(f"Estimated kS for right wheel: {ks_right:.2f}")
                 return
                 
             left_encoder = 0
@@ -84,9 +93,9 @@ def calibrate_ks(resolution, duration_sec):
         speed_right -= resolution
         
         if speed_left < resolution and speed_right < resolution:
-            logging.info("Evaluated kS values:")
-            logging.info(f"Estimated kS for left wheel: {ks_left:.2f}")
-            logging.info(f"Estimated kS for right wheel: {ks_right:.2f}")
+            logger.info("Evaluated kS values:")
+            logger.info(f"Estimated kS for left wheel: {ks_left:.2f}")
+            logger.info(f"Estimated kS for right wheel: {ks_right:.2f}")
             return
         
         

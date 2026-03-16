@@ -5,10 +5,15 @@ from . import ROBOT_CONFIG
 from .models import SerialManager, Robot, Command, CommandType, MotorCommand
 
 
-def calibrate_wheelbase(speed, duration_sec):
-    port = SerialManager.find_port()
+def calibrate_wheelbase(speed, duration_sec, port=None):
+    port = port if port else SerialManager.find_port()
+
+    logging.basicConfig(level=logging.INFO, format='%(levelname)s:%(name)s:%(message)s')
+
+    logger = logging.getLogger(__name__)
+    
     if not port:
-        logging.error("No serial port found. Please connect the robot.")
+        logger.error("No serial port found. Please connect the robot.")
         return
 
     left_distance = 0
@@ -34,17 +39,20 @@ def calibrate_wheelbase(speed, duration_sec):
     serial_manager = SerialManager(port, 115200)
     serial_manager.start_read(callback=callback)
 
-    logging.info(f"Spinning motors at {speed} m/s for {duration_sec} seconds...")
+    logger.info(f"Spinning motors at {speed} m/s for {duration_sec} seconds...")
 
     cur_time = time.time()
 
     serial_manager.send(
         Command(
+            ID="",
             command_type=CommandType.MOTOR,
             command=MotorCommand(
                 left_motor=-speed,
                 right_motor=speed,
             ),
+            duration=0,
+            pause_duration=0,
         )
     )
 
@@ -54,8 +62,8 @@ def calibrate_wheelbase(speed, duration_sec):
     serial_manager.send(Command.stop())
 
     with lock:
-        logging.info(f"Left wheel distance traveled: {left_distance:.4f} meters")
-        logging.info(f"Right wheel distance traveled: {right_distance:.4f} meters")
-        logging.info(f"Estimated heading change: {(left_distance - right_distance) / ROBOT_CONFIG.WHEELBASE:.4f} radians")
-        logging.info(f"Measure the actual heading change using a protractor or by tracking the robot's path, and use the ratio of actual to estimated heading change to calculate the correction factor for the wheelbase.")
+        logger.info(f"Left wheel distance traveled: {left_distance:.4f} meters")
+        logger.info(f"Right wheel distance traveled: {right_distance:.4f} meters")
+        logger.info(f"Estimated heading change: {(left_distance - right_distance) / ROBOT_CONFIG.WHEEL_BASE:.4f} radians")
+        logger.info(f"Measure the actual heading change using a protractor or by tracking the robot's path, and use the ratio of actual to estimated heading change to calculate the correction factor for the wheelbase.")
     

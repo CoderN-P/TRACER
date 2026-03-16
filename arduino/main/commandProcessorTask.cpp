@@ -8,7 +8,9 @@ void commandProcessorTask(void *pvParameters) {
     static uint8_t latestCmds[NUM_TYPES][MAX_BUFFER_SIZE];
     bool typeReceived[NUM_TYPES];
     
+    
     while (true) {
+
         if (xQueueReceive(commandQueue, buffer, portMAX_DELAY) == pdPASS) {
             memset(typeReceived, 0, sizeof(typeReceived)); // Reset received flags for all command types
             

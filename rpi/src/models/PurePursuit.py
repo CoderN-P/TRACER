@@ -124,8 +124,8 @@ class PurePursuit:
     @staticmethod
     def scale_to_max(left, right) -> tuple:
         scale = min(
-            ROBOT_CONFIG.MAX_LINEAR_VEL_LEFT / abs(left),
-            ROBOT_CONFIG.MAX_LINEAR_VEL_RIGHT / abs(right),
+            ROBOT_CONFIG.MAX_LINEAR_VEL / abs(left),
+            ROBOT_CONFIG.MAX_LINEAR_VEL / abs(right),
             1
         )
 

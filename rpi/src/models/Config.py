@@ -48,7 +48,7 @@ class RobotConfig:
     
     # Encoders
     ENCODER_PPR: int = 11 # Pulses per revolution of the motor shaft
-    ENCODER_TICKS_PER_REV: int = ENCODER_PPR * REDUCTION_RATIO * 4 # Pulses per revolution of the wheel 
+    ENCODER_TICKS_PER_REV: int = ENCODER_PPR * REDUCTION_RATIO * 2 # Pulses per revolution of the wheel 
     METERS_PER_TICK: float = WHEEL_CIRCUMFERENCE / ENCODER_TICKS_PER_REV
     
     LEFT_CORRECTION = 1 # Ratio between true distance and left encoder dist
@@ -57,9 +57,7 @@ class RobotConfig:
     # TODO: Calibrate correction factors for each
     METERS_PER_TICK_LEFT: float = METERS_PER_TICK * LEFT_CORRECTION
     METERS_PER_TICK_RIGHT: float = METERS_PER_TICK * RIGHT_CORRECTION
-    
-    MAX_LINEAR_VEL_LEFT: float = MAX_LINEAR_VEL * LEFT_CORRECTION
-    MAX_LINEAR_VEL_RIGHT: float = MAX_LINEAR_VEL * RIGHT_CORRECTION
+
     
     
     # State Estimation

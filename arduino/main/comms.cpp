@@ -19,7 +19,7 @@ uint8_t computeChecksum(uint8_t* data, uint8_t len) {
     for (uint8_t i = 0; i < len; i++) {
         sum += data[i];
     }
-    return sum;
+    return sum & 0xFF; // Return only the least significant byte
 }
 
 int getTypeIndex(uint8_t cmd) {

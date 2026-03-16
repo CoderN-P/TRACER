@@ -3,10 +3,9 @@ import threading
 import struct
 from collections import deque
 import asyncio
-from . import SerialManager, SensorData, Command, CommandType, LCDCommand, StateEstimator, Mode, ROBOT_CONFIG
+from . import SerialManager, SensorData, Command, CommandType, LCDCommand, StateEstimator, Mode, ROBOT_CONFIG, MagnetometerData
 from .Path import Path
 from .PurePursuit import PurePursuit
-from .. import MagnetometerData
 from ..ai.get_commands import text_to_command
 
 

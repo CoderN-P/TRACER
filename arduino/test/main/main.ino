@@ -13,13 +13,12 @@ const int MAX_PWM = 1; // Max PWM Value (scaled 0-1)
 const int REDUCTION_RATIO = 56; 
 const int MAX_OUTPUT_RPM = 178;
 const int ENCODER_PPR = 11;
-const int ENCODER_TICKS_PER_REV = ENCODER_PPR * REDUCTION_RATIO * 4; // Total ticks per wheel revolution
+const int ENCODER_TICKS_PER_REV = ENCODER_PPR * REDUCTION_RATIO * 2; // Total ticks per wheel revolution
 const float MAX_OUTPUT_SPEED = (MAX_OUTPUT_RPM / 60.0) * (PI * WHEEL_DIAMETER); // in m/s
 const float METERS_PER_TICK = (PI * WHEEL_DIAMETER) / ENCODER_TICKS_PER_REV; // Distance traveled per encoder tick
 const float LEFT_CORRECTION = 1.0; // Correction factor for left motor speed (accounts for slight differences in motors/wheels)
 const float RIGHT_CORRECTION = 1.0; // Correction factor for right motor speed (accounts for slight differences in motors/wheels)
-const float MAX_OUTPUT_SPEED_LEFT = MAX_OUTPUT_SPEED * LEFT_CORRECTION;
-const float MAX_OUTPUT_SPEED_RIGHT = MAX_OUTPUT_SPEED * RIGHT_CORRECTION;
+
 const float METERS_PER_TICK_LEFT = METERS_PER_TICK * LEFT_CORRECTION;
 const float METERS_PER_TICK_RIGHT = METERS_PER_TICK * RIGHT_CORRECTION;
 
@@ -73,8 +72,8 @@ const int BAUD_RATE = 115200;
 // PID + Feedforward constants
 const float kS_LEFT = 0;
 const float kS_RIGHT = 0;
-const float kV_LEFT = (1.0 - kS_LEFT)/MAX_OUTPUT_SPEED_LEFT; // Velocity feedforward term for left motor (V = kS + kV * velocity)
-const float kV_RIGHT = (1.0 - kS_RIGHT)/MAX_OUTPUT_SPEED_RIGHT; // Velocity feedforward term for right motor (V = kS + kV * velocity)
+const float kV_LEFT = (1.0 - kS_LEFT)/MAX_OUTPUT_SPEED; // Velocity feedforward term for left motor (V = kS + kV * velocity)
+const float kV_RIGHT = (1.0 - kS_RIGHT)/MAX_OUTPUT_SPEED; // Velocity feedforward term for right motor (V = kS + kV * velocity)
 const float kA_LEFT = 0;
 const float kA_RIGHT = 0;
 
@@ -391,8 +390,8 @@ void pidLoop(int32_t left, int32_t lastLeft, int32_t right, int32_t lastRight){
     float rightSpeed = getRightMotorSpeed(right, lastRight);
     
     // Simple feedforward model 
-    float leftFeedforward = pidLeft.getSetpoint() * MAX_PWM / MAX_OUTPUT_SPEED_LEFT;
-    float rightFeedforward = pidRight.getSetpoint() * MAX_PWM / MAX_OUTPUT_SPEED_RIGHT;
+    float leftFeedforward = pidLeft.getSetpoint() * MAX_PWM / MAX_OUTPUT_SPEED;
+    float rightFeedforward = pidRight.getSetpoint() * MAX_PWM / MAX_OUTPUT_SPEED;
     
     int outputLeft = constrain(pidLeft.compute(leftSpeed, leftFeedforward), -MAX_PWM, MAX_PWM);
     int outputRight = constrain(pidRight.compute(rightSpeed, rightFeedforward), -MAX_PWM, MAX_PWM);

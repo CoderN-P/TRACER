@@ -4,3 +4,5 @@ from .server import sio as socketio, run_socket_server
 from .calibrate_wheel import calibrate_wheel
 from .calibrate_wheelbase import calibrate_wheelbase
 from .calibrate_kS import calibrate_ks
+from .serial_test import serial_test
+from .calibrate_kV import calibrate_kv

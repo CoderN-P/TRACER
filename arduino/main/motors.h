@@ -14,5 +14,6 @@ float getRightMotorSpeed(int32_t deltaRightTicks);
 void setup_pwm();
 void handleMovement(float leftPWM, float rightPWM);
 void IRAM_ATTR estopISR();
+float sign(float v);
 std::pair<float, float> pidLoop(float leftSpeed, float rightSpeed);
 #endif

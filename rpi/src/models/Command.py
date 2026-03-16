@@ -40,8 +40,8 @@ class Command(BaseModel):
         turn = cls.apply_deadzone_and_scale(right_x)
         
         # Calculate motor values (arcade drive)
-        left_motor = min(ROBOT_CONFIG.MAX_LINEAR_VEL_LEFT, max(-ROBOT_CONFIG.MAX_LINEAR_VEL_LEFT, forward - turn))
-        right_motor = min(ROBOT_CONFIG.MAX_LINEAR_RIGHT, max(-ROBOT_CONFIG.MAX_LINEAR_VEL_RIGHT, forward + turn))
+        left_motor = min(ROBOT_CONFIG.MAX_LINEAR_VEL, max(-ROBOT_CONFIG.MAX_LINEAR_VEL, forward - turn))
+        right_motor = min(ROBOT_CONFIG.MAX_LINEAR_VEL, max(-ROBOT_CONFIG.MAX_LINEAR_VEL, forward + turn))
         
 
         command = cls(

@@ -47,9 +47,10 @@ void mainLoop(void *pvParameters) {
         taskEXIT_CRITICAL(&spinlock);
 
         int16_t deltaLeft = pcntLeft - prevPcntLeft;
-        int16_t deltaRight = pcntRight - prevPcntRight;
+        int16_t pcntRightCorrected = (-1 * pcntRight); // Invert right encoder count to match physical direction
+        int16_t deltaRight = pcntRightCorrected - prevPcntRight;
         prevPcntLeft = pcntLeft;
-        prevPcntRight = pcntRight;
+        prevPcntRight = pcntRightCorrected;
         
         leftEncoderCount += deltaLeft;
         rightEncoderCount += deltaRight;

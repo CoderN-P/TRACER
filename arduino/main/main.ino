@@ -34,10 +34,8 @@ volatile bool motorsEnabled = true;
 
 void setup()
 {
-    pinMode(EN1, OUTPUT);
     pinMode(IN1, OUTPUT);
     pinMode(IN2, OUTPUT);
-    pinMode(EN2, OUTPUT);
     pinMode(IN3, OUTPUT);
     pinMode(IN4, OUTPUT);
     pinMode(IR_FRONT, INPUT);
@@ -58,11 +56,13 @@ void setup()
     
     WiFi.mode(WIFI_OFF); 
     
+    
     attachInterrupt(digitalPinToInterrupt(ECHO_1), echoISR1, CHANGE);
     attachInterrupt(digitalPinToInterrupt(ECHO_2), echoISR2, CHANGE);
     attachInterrupt(digitalPinToInterrupt(ESTOP_PIN), estopISR, FALLING);
     
     setupEncoderLeft();
+    
     setupEncoderRight();
 
     state_mutex = xSemaphoreCreateMutex();
@@ -84,7 +84,7 @@ void setup()
     if (initMPU6050())
     {
         if (xSemaphoreTake(state_mutex, 0) == pdTRUE) {
-            strncpy(robot_state.oledLine1, "System Initialized", 16);
+            strncpy(robot_state.oledLine1, "Initialized", 16);
             strncpy(robot_state.oledLine2, "MPU6050 OK", 16);
             xSemaphoreGive(state_mutex);
         }
@@ -93,7 +93,7 @@ void setup()
     {
         // TODO: Display error on OLED
         if (xSemaphoreTake(state_mutex, 0) == pdTRUE) {
-            strncpy(robot_state.oledLine1, "MPU6050 Init Failed", 16);
+            strncpy(robot_state.oledLine1, "MPU6050 Failed", 16);
             xSemaphoreGive(state_mutex);
         }
     }
@@ -114,7 +114,6 @@ void setup()
     // Low priority task for updating the OLED at 2 Hz
     xTaskCreate(oledUpdateTask, "OLED Update Task", 2048, NULL, 2, &oledUpdateHandle);
 }
-
 
 void loop() {
     // Empty loop

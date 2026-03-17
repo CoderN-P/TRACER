@@ -1,5 +1,6 @@
 #include "comms.h"
 #include "config.h"
+#include "motors.h"
 
 uint8_t expectedCommandLength(uint8_t cmd)
 {
@@ -11,6 +12,8 @@ uint8_t expectedCommandLength(uint8_t cmd)
         return 3;
     if (cmd == CMD_ENABLE)
         return 3;
+    if (cmd == CMD_PWM)
+        return 7;
     return 0; // invalid
 }
 
@@ -28,6 +31,7 @@ int getTypeIndex(uint8_t cmd) {
         case CMD_OLED_UPDATE: return 1;
         case CMD_ENABLE: return 2;
         case CMD_STOP: return 3;
+        case CMD_PWM: return 4;
         default: return -1; // Invalid command type
     }
 }
@@ -78,6 +82,16 @@ void handleCommand(byte *buffer, size_t length)
         motorsEnabled = false;
         digitalWrite(STBY, LOW);
         strncpy(line1, "Motors Stopped", 16);
+    } else if (cmd == CMD_PWM && length == 7){
+        // Command 0x05: Direct PWM control (for testing)
+        int16_t leftPWM_raw, rightPWM_raw; // 0 to 1000 for -1 to 1
+        
+        memcpy(&leftPWM_raw, &buffer[2], 2);
+        memcpy(&rightPWM_raw, &buffer[4], 2);
+        
+        pidLeft.setPWMSetpoint(leftPWM_raw / 1000.0f);
+        pidRight.setPWMSetpoint(rightPWM_raw / 1000.0f); // Convert to -1 to 1 range
+        strncpy(line1, "Direct PWM Set", 16);
     }
     else
     {

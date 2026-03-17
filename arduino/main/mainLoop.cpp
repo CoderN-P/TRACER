@@ -128,9 +128,21 @@ void mainLoop(void *pvParameters) {
         packet.checksum = computeChecksum((uint8_t*)&packet, sizeof(packet) - 1);
         
         Serial.write((uint8_t*)&packet, sizeof(packet));
+        
+        int leftPIDMode = pidLeft.getMode();
+        int rightPIDMode = pidRight.getMode();
+        
+        int mode;
+        
+        if (leftPIDMode == 1 && rightPIDMode == 1) {
+            mode = 1; // Open-loop PWM control mode
+        } else {
+            mode = 0; // PID control mode
+        }
       
         uint32_t loop_time = micros() - loop_start;
         float elapsed_ms = loop_time / 1000.0;
+        
         
         if (xSemaphoreTake(state_mutex, 0) == pdTRUE) {
             robot_state.leftEncoder = leftEncoderCount;
@@ -157,6 +169,7 @@ void mainLoop(void *pvParameters) {
             robot_state.rightPWM = rightPWM;
             robot_state.timestamp = packet.timestamp;
             robot_state.newMagData = newMagData;
+            robot_state.pidMode = mode;
             xSemaphoreGive(state_mutex);
         }
         

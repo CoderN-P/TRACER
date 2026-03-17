@@ -117,3 +117,15 @@ class SerialManager:
             full = bytes([0xAA]) + packet
             checksum = sum(full) & 0xFF
             self.serial.write(full + bytes([checksum]))
+        elif data.command_type == CommandType.PWM:
+            left = max(-1000, min(1000, int(1000*data.command.left_motor)))
+            right = max(-1000, min(1000, int(1000*data.command.right_motor)))
+            
+            packet = struct.pack("<Bhh", 0x05, left, right)
+            full = bytes([0xAA]) + packet
+            checksum = sum(full) & 0xFF
+            self.serial.write(full + bytes([checksum]))
+        else:
+            self._logger.warning(f"Unknown command type: {data.command_type}")
+                                     
+                                     

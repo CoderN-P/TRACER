@@ -3,6 +3,7 @@ import uuid
 from .LCDCommand import LCDCommand
 from .MotorCommand import MotorCommand
 from .CommandTypeEnum import CommandType
+from .MotorPWMCommand import MotorPWMCommand
 from . import ROBOT_CONFIG
 
 
@@ -12,7 +13,7 @@ class Command(BaseModel):
     """
     ID: str = Field(description="Unique identifier for the command")
     command_type: CommandType
-    command: LCDCommand | MotorCommand | None = Field(description="Command to be executed, can be LCDCommand or MotorCommand, or None for stop command")
+    command: LCDCommand | MotorCommand | MotorPWMCommand | None = Field(description="Command to be executed, can be LCDCommand or MotorCommand, or None for stop command")
     pause_duration: int = Field(description="Pause duration in seconds after executing the command (AI Command ONLY)")
     duration: int = Field(description="Duration in seconds for which the command should be executed (AI Command ONLY)")
 

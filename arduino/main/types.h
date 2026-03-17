@@ -10,6 +10,7 @@ struct RobotState {
     float rightPWM;
     float leftSpeed;
     float rightSpeed;
+    int pidMode; // 0 = PID control mode, 1 = open-loop PWM control mode
     
     int gx, gy, gz;
     int ax, ay, az;

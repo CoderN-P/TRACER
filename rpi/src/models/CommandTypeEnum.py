@@ -8,6 +8,7 @@ class CommandType(str, Enum):
     SENSOR = "SENSOR"
     STOP = "STOP"
     ENABLE = "ENABLE" 
+    PWM = "PWM"
     
 
     def __str__(self):

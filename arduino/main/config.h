@@ -70,10 +70,11 @@ const float LSB_uT = 0.0244; // ±8G full-scale for magnetometer
 
 // Command definitions
 const uint8_t CMD_MOVE = 0x01;
+const uint8_t CMD_PWM = 0x05;
 const uint8_t CMD_OLED_UPDATE = 0x02;
 const uint8_t CMD_ENABLE = 0x03;
 const uint8_t CMD_STOP = 0x04;
-const int NUM_TYPES = 4; // Number of command types (MOVE, OLED_UPDATE, ENABLE, STOP)
+const int NUM_TYPES = 5; // Number of command types (MOVE, OLED_UPDATE, ENABLE, STOP, PWM)
 
 // Timing intervals (in milliseconds)
 const int ULTRASONIC_INTERVAL = 50;   // Sample ultrasonic sensor every 50 ms (20 hz)

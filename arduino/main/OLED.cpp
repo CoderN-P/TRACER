@@ -45,8 +45,16 @@ void drawHeader(RobotState &state, bool blinkState)
     
     bool motorsPhysical = digitalRead(STBY) == HIGH;
     
-     if (motorsPhysical){
+     if (motorsPhysical != motorsEnabled){
         display.print("*"); // indicate mismatch between desired and actual motor state
+     }
+     
+     // Indicate PWM vs PID mode
+     if (state.pidMode == 1){
+        display.print("-");
+     }
+     else {
+        display.print("+");
      }
     
   display.fillCircle(45, 7, 3, blinkState ? WHITE : BLACK);

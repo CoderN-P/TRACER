@@ -4,6 +4,7 @@
 #include "config.h"
 #include "globals.h"
 #include <Arduino.h>
+#include "motors.h"
 
 uint8_t expectedCommandLength(uint8_t cmd);
 uint8_t computeChecksum(uint8_t* data, uint8_t len);

@@ -78,9 +78,10 @@ class StateEstimator:
         
     def update(self, sensor_data: SensorData, previous_sensor_data: SensorData):
         # Previous sensor data is needed to determine dt
+        if (not previous_sensor_data): return
         self.prev_state = self.state.model_copy()
         dt = self.calculate_dt(sensor_data.timestamp, previous_sensor_data.timestamp)
-
+        if (dt < 1e-6): return
         MAX_MARGIN = 1.15  # 15% margin for acceleration transients
         max_pulses = ROBOT_CONFIG.ENCODER_TICKS_PER_REV * ROBOT_CONFIG.MAX_RPM / 60.0 * dt * MAX_MARGIN
         

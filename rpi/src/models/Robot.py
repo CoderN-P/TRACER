@@ -341,6 +341,7 @@ class Robot:
                         
                         if not command:
                             exit_path = True
+                            
                         else:
                             await self.send_safe_command(command)
                     else:
@@ -348,6 +349,7 @@ class Robot:
                         exit_path = True
                         
                     if exit_path:
+                        self._logger.info("Completed path")
                         async with self.state_lock:
                             self.state = Mode.MANUAL
                         self.cur_path = None
@@ -378,7 +380,7 @@ class Robot:
         async with self.state_lock:
             cur_state = self.state
             next_state = Mode[data["state"]]
-            
+            self._logger.info(f"Switching to state: {next_state}")            
             if next_state == Mode.PATH_FOLLOWING:
                 if data["path_type"] == "spline":
                     try:
@@ -389,6 +391,7 @@ class Robot:
                         self.state = Mode.MANUAL
                 elif data["path_type"] == "freehand":
                     self.cur_path = PurePursuit.from_xy_points(data["path"])
+                    self.state = Mode.PATH_FOLLOWING
                 else:
                     self._logger.error(f"Unknown path type: {data['type']}")
                     self.state = Mode.MANUAL
@@ -396,7 +399,6 @@ class Robot:
             elif next_state == Mode.MANUAL:
                 if cur_state == Mode.STOPPED:
                     await self.resume()
-                self.state = Mode.MANUAL
             elif next_state == Mode.STOPPED:
                 await self.emergency_stop()
         

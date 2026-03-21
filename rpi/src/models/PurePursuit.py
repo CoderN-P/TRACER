@@ -161,6 +161,7 @@ class PurePursuit:
         motor_speeds = self.twist_to_wheel_speeds(linear_velocity, angular_velocity)
         
         return Command(
+            ID="",
             command_type=CommandType.MOTOR,
             command=MotorCommand(
                 left_motor=motor_speeds[0],

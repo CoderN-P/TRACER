@@ -271,7 +271,8 @@ class Robot:
                 prev_data = self.previous_sensor_data
                 
             async with self.state_lock:
-                if self.state != Mode.STOPPED and sensor_data.motors_enabled == False:
+                # Only check this if we have not recently reieved a resume command (since it might take a moment for the ESTOP command to be processed and for the state estimator to reset, we want to avoid immediately switching back to STOPPED mode if we receive sensor data with motors disabled right after a resume command)
+                if self.state != Mode.STOPPED and sensor_data.motors_enabled == False and prev_data and prev_data.motors_enabled == True:
                     self._logger.warning("Motors manually disabled via ESTOP button, switching to STOPPED mode")
                     self.state = Mode.STOPPED
                 cur_state = self.state

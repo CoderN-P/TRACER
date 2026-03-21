@@ -4,7 +4,7 @@ from dataclasses import dataclass
 @dataclass(frozen=True) # frozen=True makes it read-only for safety
 class RobotConfig:
     # Physical Dimensions (Meters)
-    MEASURED_WHEEL_BASE: float = 0.27
+    MEASURED_WHEEL_BASE: float = 0.278
     WHEEL_DIAMETER: float = 0.05411268
     WHEEL_RADIUS: float = WHEEL_DIAMETER / 2.0
     WHEEL_CIRCUMFERENCE: float = math.pi * WHEEL_DIAMETER

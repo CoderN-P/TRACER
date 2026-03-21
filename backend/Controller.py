@@ -310,12 +310,15 @@ class Controller:
                     self.socketio.emit('enable', {})
                     self.socketio_server.emit('enable', {})
                     self.stopped = False
+                    self.stop_motor = False  # Reset flag to allow stopping again if needed
                 else:
                     self.socketio.emit('stop', {})
                     self.socketio_server.emit('stop', {})
                     
                     self.stop_motor = False  # Reset flag to avoid sending stop command repeatedly
                     self.stopped = True
+                    
+                self.rumble(0.5, 0.5, 500)  # Rumble to indicate motor state change
         else:
             self.stop_motor = True
 

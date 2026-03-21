@@ -12,6 +12,7 @@ from .CommandTypeEnum import CommandType
 from .Command import Command
 from .UltrasonicSensor import UltrasonicSensor
 from .MotorPWMCommand import MotorPWMCommand
+from .PurePursuit import PurePursuit
 from .IMU import IMUData
 from .SensorData import SensorData
 from .CommandResponse import AICommand

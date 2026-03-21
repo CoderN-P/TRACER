@@ -56,13 +56,14 @@ def calibrate_max_speed(port=None):
     )
     
     
-    
     # Wait to reach steady state
     while time.time() - cur_time < 1:
         time.sleep(0.02)
         
     left_encoder = 0
     right_encoder = 0
+    
+    cur_time = time.time()
 
     # Run at full speed for 1 second to measure max speed
     while time.time() - cur_time < 1:
@@ -71,8 +72,10 @@ def calibrate_max_speed(port=None):
     serial_manager.send(Command.stop())
     
     with lock:
-        left_speed = (left_encoder * ROBOT_CONFIG.METERS_PER_TICK_LEFT)
-        right_speed = (right_encoder * ROBOT_CONFIG.METERS_PER_TICK_RIGHT)
+        logger.info(f"Total encoder ticks: Left = {left_encoder}, Right = {right_encoder}")
+        logger.info(f"Total time elapsed: {time.time() - cur_time:.2f} seconds")
+        left_speed = (left_encoder * ROBOT_CONFIG.METERS_PER_TICK_LEFT) / (time.time() - cur_time)
+        right_speed = (right_encoder * ROBOT_CONFIG.METERS_PER_TICK_RIGHT) / (time.time() - cur_time)
         
         logger.info(f"Max speed: Left = {left_speed:.2f} m/s, Right = {right_speed:.2f} m/s")
         logger.info(f"Global MAX_LINEAR_VEL: {min(left_speed, right_speed):.2f} m/s")

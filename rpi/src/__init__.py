@@ -6,3 +6,5 @@ from .calibrate_wheelbase import calibrate_wheelbase
 from .calibrate_kS import calibrate_ks
 from .serial_test import serial_test
 from .calibrate_kV import calibrate_kv
+from .calibrate_max_speed import calibrate_max_speed
+from .interactive_velocity_test import interactive_velocity_test

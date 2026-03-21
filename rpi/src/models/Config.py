@@ -4,7 +4,7 @@ from dataclasses import dataclass
 @dataclass(frozen=True) # frozen=True makes it read-only for safety
 class RobotConfig:
     # Physical Dimensions (Meters)
-    MEASURED_WHEEL_BASE: float = 0.21
+    MEASURED_WHEEL_BASE: float = 0.27
     WHEEL_DIAMETER: float = 0.05411268
     WHEEL_RADIUS: float = WHEEL_DIAMETER / 2.0
     WHEEL_CIRCUMFERENCE: float = math.pi * WHEEL_DIAMETER
@@ -12,9 +12,9 @@ class RobotConfig:
     WHEEL_BASE_CORRECTION: float = 1.0 # Ratio between true distance and encoder distance, to be calibrated
     WHEEL_BASE: float = MEASURED_WHEEL_BASE * WHEEL_BASE_CORRECTION
     # Motor Limits
-    MAX_RPM: int = 178 / 2 # With 2S LiPo the motors receive less voltage and thus have a lower max RPM, so we cut it in half to be safe. This can be adjusted after testing.
+    MAX_RPM: int = 178 # With 2S LiPo the motors receive less voltage and thus have a lower max RPM, so we cut it in half to be safe. This can be adjusted after testing.
     # Max speed in m/s: (RPM * pi * D) / 60
-    MAX_LINEAR_VEL: float = (MAX_RPM * math.pi * WHEEL_DIAMETER) / 60.0
+    MAX_LINEAR_VEL: float = 0.27 # (MAX_RPM * math.pi * WHEEL_DIAMETER) / 60.0
     
     REDUCTION_RATIO: float = 56.0 
     
@@ -51,8 +51,9 @@ class RobotConfig:
     ENCODER_TICKS_PER_REV: int = ENCODER_PPR * REDUCTION_RATIO * 4 # Pulses per revolution of the wheel 
     METERS_PER_TICK: float = WHEEL_CIRCUMFERENCE / ENCODER_TICKS_PER_REV
     
-    LEFT_CORRECTION = 1 # Ratio between true distance and left encoder dist
-    RIGHT_CORRECTION = 1 # Ratio between true distance and left encoder dist
+    # NOTE: Values calibrated for 2S LiPo (subject to change after testing)
+    LEFT_CORRECTION = 0.9646096844 # Ratio between true distance and left encoder dist
+    RIGHT_CORRECTION = 0.9873417722 # Ratio between true distance and left encoder dist
     
     # TODO: Calibrate correction factors for each
     METERS_PER_TICK_LEFT: float = METERS_PER_TICK * LEFT_CORRECTION

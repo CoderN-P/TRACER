@@ -43,9 +43,10 @@ float PIDController::compute(float input, float feedforward) {
     float error = this->setpoint - input;
     this->integral += error;
     
-    float maxIntegral = 1 - abs(feedforward + this->kp*error); // Max integral contribution to avoid windup
-    this->integral = std::clamp(this->integral, -maxIntegral, maxIntegral);
-    
+    if (this->ki > 0) {
+        float maxIntegral = (1 - abs(feedforward + this->kp*error)) / this->ki; // Max integral contribution to avoid windup
+        this->integral = std::clamp(this->integral, -maxIntegral, maxIntegral);
+    }
     float proportional_t = kp*error;
     float integral_t = ki*integral;
     float derivative_t = kd*(error - lastError)/PID_INTERVAL;

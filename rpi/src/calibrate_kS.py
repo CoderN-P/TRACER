@@ -41,8 +41,8 @@ def calibrate_ks(resolution, duration_sec, port=None):
 
     cur_time = time.time()
     
-    pwm_left = 0.5
-    pwm_right = 0.5
+    pwm_left = 0.3
+    pwm_right = 0.3
     
     ks_left = 0
     ks_right = 0
@@ -65,8 +65,8 @@ def calibrate_ks(resolution, duration_sec, port=None):
         serial_manager.send(Command.stop())
         
         with lock:
-            logger.info(f"Left wheel encoder ticks {left_encoder:.4f} meters")
-            logger.info(f"Right wheel encoder ticks: {right_encoder:.4f} meters")
+            logger.info(f"Left wheel encoder ticks {left_encoder:.4f} ticks")
+            logger.info(f"Right wheel encoder ticks: {right_encoder:.4f} ticks")
             logger.info(f"LEFT PWM value tested: {pwm_left:.2f}")
             logger.info(f"RIGHT PWM value tested: {pwm_right:.2f}")
             logger.info("If the robot moved at all, even a little bit, then the kS value is likely below this speed. If it didn't move, then the kS value is likely above this speed.")

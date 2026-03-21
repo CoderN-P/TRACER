@@ -7,7 +7,7 @@ load_dotenv()
 from src import text_to_command
 import os
 
-from src import Robot, SerialManager, run_socket_server, socketio, ROBOT_CONFIG, calibrate_wheel, calibrate_wheelbase, serial_test, calibrate_ks, calibrate_kv
+from src import Robot, SerialManager, run_socket_server, socketio, ROBOT_CONFIG, calibrate_wheel, calibrate_wheelbase, serial_test, calibrate_ks, calibrate_kv, calibrate_max_speed, interactive_velocity_test
 
 parser = argparse.ArgumentParser(
     prog="TRACER RPI",
@@ -23,6 +23,11 @@ parser.add_argument('--resolution', type=float, default=0.1, help="Time resoluti
 parser.add_argument('--serial-test', action='store_true', help="Run a test that continuously prints out sensor packets from the robot to verify serial communication and packet parsing.")
 parser.add_argument('--port', type=str, default=None, help="Serial port to use for communication with the robot (default: auto-detect).")
 parser.add_argument('--calibrate-kv', action='store_true', help="Run the kV calibration routine to determine the velocity constants for the motors.")
+parser.add_argument('--ks-left', type=float, default=0.2, help="Initial guess for left motor kS value during kV calibration (default: 0.2).")
+parser.add_argument('--ks-right', type=float, default=0.2, help="Initial guess for right motor kS value during kV calibration (default: 0.2).")
+parser.add_argument('--calibrate-max-speed', action='store_true', help="Run the max speed calibration routine to determine the maximum achievable speed of the robot at full motor power.")
+parser.add_argument('--interactive-test', action='store_true', help="Run interactive velocity test CLI (enter left/right m/s + duration repeatedly until exit).")
+
 async def main():
     port = SerialManager.find_port()
     if not port:
@@ -51,7 +56,11 @@ if __name__ == "__main__":
     elif args.serial_test:
         serial_test(args.port)
     elif args.calibrate_kv:
-        calibrate_kv(args.resolution, args.duration, args.port)
+        calibrate_kv(args.resolution, args.duration, args.ks_left, args.ks_right, args.port)
+    elif args.calibrate_max_speed:
+        calibrate_max_speed(args.port)
+    elif args.interactive_test:
+        interactive_velocity_test(args.port)
     else:
         if hostname == "tracer":
             asyncio.run(main())

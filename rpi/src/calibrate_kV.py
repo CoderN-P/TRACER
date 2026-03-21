@@ -61,8 +61,8 @@ def calibrate_kv(resolution, duration_sec, ks_left, ks_right, port=None):
     serial_manager = SerialManager(port, 115200)
     serial_manager.start_read(callback=callback)
 
-    pwm_left = ks_left + resolution
-    pwm_right = ks_right + resolution
+    pwm_left = 0.5
+    pwm_right = 0.5
 
     settle_sec = 1.0
     left_speeds = []
@@ -119,13 +119,23 @@ def calibrate_kv(resolution, duration_sec, ks_left, ks_right, port=None):
             logger.info(f"Left wheel kV: {left_kV:.2f}")
             logger.info(f"Right wheel kV: {right_kV:.2f}")
 
-            if left_actual_speed > 0:
-                left_speeds.append(left_actual_speed)
-                left_pwm_above_ks.append(pwm_left - ks_left)
+            MIN_VEL = 0.05
+            MIN_DELTA_PWM = 0.03
+            MAX_VEL = 0.25
 
-            if right_actual_speed > 0:
-                right_speeds.append(right_actual_speed)
-                right_pwm_above_ks.append(pwm_right - ks_right)
+        if (
+                MIN_VEL < left_actual_speed < MAX_VEL and
+                (pwm_left - ks_left) > MIN_DELTA_PWM
+        ):
+            left_speeds.append(left_actual_speed)
+            left_pwm_above_ks.append(pwm_left - ks_left)
+        
+        if (
+                MIN_VEL < right_actual_speed < MAX_VEL and
+                (pwm_right - ks_right) > MIN_DELTA_PWM
+        ):
+            right_speeds.append(right_actual_speed)
+            right_pwm_above_ks.append(pwm_right - ks_right)
 
         pwm_left += resolution
         pwm_right += resolution
@@ -152,7 +162,7 @@ def calibrate_kv(resolution, duration_sec, ks_left, ks_right, port=None):
                 logger.info(f"Right fit intercept (expected near 0): {right_intercept:.4f}")
                 logger.info(f"Right fit R^2: {right_r2:.4f}")
 
-            serial_manager.send(Command.pwm_stop())
+            serial_manager.send(Command.stop())
             serial_manager.stop()
             return
         

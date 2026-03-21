@@ -65,5 +65,6 @@ def calibrate_wheelbase(speed, duration_sec, port=None):
         logger.info(f"Left wheel distance traveled: {left_distance:.4f} meters")
         logger.info(f"Right wheel distance traveled: {right_distance:.4f} meters")
         logger.info(f"Estimated heading change: {(left_distance - right_distance) / ROBOT_CONFIG.WHEEL_BASE:.4f} radians")
+        logger.info(f"Estimated heading change: {(left_distance - right_distance) / ROBOT_CONFIG.WHEEL_BASE * (180 / 3.14159):.2f} degrees")
         logger.info(f"Measure the actual heading change using a protractor or by tracking the robot's path, and use the ratio of actual to estimated heading change to calculate the correction factor for the wheelbase.")
     

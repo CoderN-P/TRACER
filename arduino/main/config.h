@@ -12,8 +12,8 @@ const int ENCODER_PPR = 11;
 const int ENCODER_TICKS_PER_REV = ENCODER_PPR * REDUCTION_RATIO * 4;            // Total ticks per wheel revolution with 4x quadrature decoding
 const float MAX_OUTPUT_SPEED = (MAX_OUTPUT_RPM / 60.0) * (PI * WHEEL_DIAMETER); // in m/s
 const float METERS_PER_TICK = (PI * WHEEL_DIAMETER) / ENCODER_TICKS_PER_REV;    // Distance traveled per encoder tick
-const float LEFT_CORRECTION = 1.0;                                              // Correction factor for left motor speed (accounts for slight differences in motors/wheels)
-const float RIGHT_CORRECTION = 1.0;                                             // Correction factor for right motor speed (accounts for slight differences in motors/wheels)
+const float LEFT_CORRECTION = 0.9646096844;                                              // Correction factor for left motor speed (accounts for slight differences in motors/wheels)
+const float RIGHT_CORRECTION = 0.9873417722;                                             // Correction factor for right motor speed (accounts for slight differences in motors/wheels)
 const float METERS_PER_TICK_LEFT = METERS_PER_TICK * LEFT_CORRECTION;
 const float METERS_PER_TICK_RIGHT = METERS_PER_TICK * RIGHT_CORRECTION;
 
@@ -44,15 +44,15 @@ const int MAX_BUFFER_SIZE = 64;
 const int BAUD_RATE = 115200;
 
 // PID + Feedforward constants (for 2S lipo)
-const float kS_LEFT = 0.2;
-const float kS_RIGHT = 0.1;
-const float kV_LEFT = 3.20;  // Velocity feedforward term for left motor (V = kS + kV * velocity)
-const float kV_RIGHT = 3.42; // Velocity feedforward term for right motor (V = kS + kV * velocity)
+const float kS_LEFT = 0.18;
+const float kS_RIGHT = 0.18;
+const float kV_LEFT = 3.15;  // Velocity feedforward term for left motor (V = kS + kV * velocity)
+const float kV_RIGHT = 3.20; // Velocity feedforward term for right motor (V = kS + kV * velocity)
 const float kA_LEFT = 0;
 const float kA_RIGHT = 0;
 
-const float P_LEFT = 0.0;
-const float P_RIGHT = 0.0;
+const float P_LEFT = 0.3;
+const float P_RIGHT = 0.3;
 const float I_LEFT = 0.0;
 const float I_RIGHT = 0.0;
 const float D_LEFT = 0.0;

@@ -12,27 +12,30 @@ app = socketio.ASGIApp(sio, other_asgi_app=app)
 logger = logging.getLogger("SocketServer")
 
 def setup_routes(robot):
+    async def on_robot_loop(coro):
+        return await robot.run_on_robot_loop(coro)
+
     @sio.on('joystick_input')
     async def on_joystick(sid, data):
-        await robot.handle_joystick_input(data)
+        await on_robot_loop(robot.handle_joystick_input(data))
 
     @sio.on('query')
     async def on_query(sid, data):
-        await robot.handle_query(data["query"])
+        await on_robot_loop(robot.handle_query(data["query"]))
         
     @sio.on('stop')
     async def on_stop(sid, data):
-        await robot.emergency_stop()
+        await on_robot_loop(robot.emergency_stop())
         
     @sio.on('enable')
     async def on_enable(sid, data):
-        await robot.resume()
+        await on_robot_loop(robot.resume())
         
         
     # TODO: Implement the following events: "set_state" (if new state = PATH_FOLLOWING, a path must be provided, "
     @sio.on('set_state') # Manual, path following, LLM control
     async def on_set_state(sid, data):
-        await robot.set_state(data)
+        await on_robot_loop(robot.set_state(data))
         
     @sio.event
     async def connect(sid, environ):

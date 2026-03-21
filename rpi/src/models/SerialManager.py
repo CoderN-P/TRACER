@@ -40,7 +40,6 @@ class SerialManager:
         thread = threading.Thread(target=self.read_loop, daemon=True)
         thread.start()
         self._logger.info(f"SerialManager started on {self.serial.portstr} at {self.serial.baudrate} baud")
-        asyncio.run_coroutine_threadsafe(robot.start(), loop)
         
     def start_read(self, callback=None):
         self.running = True

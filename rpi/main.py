@@ -44,10 +44,14 @@ async def main():
     logging.getLogger('socketio').setLevel(logging.ERROR)
     logging.getLogger('engineio').setLevel(logging.ERROR)
     robot._logger.setLevel(logging.INFO)        
-    loop = asyncio.get_running_loop()
-    serial_manager.start(robot, loop)  # Start background serial read thread
+    robot.start()
+    serial_manager.start(robot, robot.loop)  # Start background serial read thread; dispatch sensor packets on robot loop
 
-    await run_socket_server(robot)
+    try:
+        await run_socket_server(robot)
+    finally:
+        serial_manager.stop()
+        robot.stop()
 
 if __name__ == "__main__":
     hostname = os.uname().nodename

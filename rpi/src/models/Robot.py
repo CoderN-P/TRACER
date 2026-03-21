@@ -33,7 +33,10 @@ class Robot:
         self.sensor_lock = threading.Lock()          # shared between serial thread and asyncio
         self.previous_sensor_data = None             # for any processing that needs to compare current and previous sensor data, only accessed within main loop
         self.latest_sensor_data = None               # written by serial thread, read by pose loop
-        self.main_loop_task = None 
+        self.main_loop_task = None
+        self.main_loop_thread = None
+        self.loop = None
+        self._loop_ready = threading.Event()
         self.backup_time = 2        
         self.cur_path = None
         
@@ -46,22 +49,48 @@ class Robot:
             if wait_after > 0:
                 await asyncio.sleep(wait_after)
 
-    async def start(self):
-        """Start the robot's background tasks"""
+    def _run_loop_thread(self):
+        asyncio.set_event_loop(asyncio.new_event_loop())
+        self.loop = asyncio.get_event_loop()
+        self.main_loop_task = self.loop.create_task(self.main_loop())
+        self._loop_ready.set()
+        try:
+            self.loop.run_until_complete(self.main_loop_task)
+        except asyncio.CancelledError:
+            pass
+        finally:
+            pending = asyncio.all_tasks(self.loop)
+            for task in pending:
+                task.cancel()
+            if pending:
+                self.loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
+            self.loop.close()
+
+    def start(self):
+        """Start the robot main loop on its own thread/asyncio loop."""
+        if self.running:
+            return
         self.running = True
-        self.main_loop_task = asyncio.create_task(self.main_loop())
+        self.main_loop_thread = threading.Thread(target=self._run_loop_thread, name="RobotMainLoop", daemon=True)
+        self.main_loop_thread.start()
+        self._loop_ready.wait(timeout=2.0)
         self._logger.info("Robot main loop started")
 
-    async def stop(self):
-        """Stop the robot's background tasks"""
+    def stop(self):
+        """Stop the robot main loop thread."""
         self.running = False
-        if self.main_loop_task:
-            self.main_loop_task.cancel()
-            try:
-                await self.main_loop_task
-            except asyncio.CancelledError:
-                pass
+        if self.loop and self.main_loop_task:
+            self.loop.call_soon_threadsafe(self.main_loop_task.cancel)
+        if self.main_loop_thread and self.main_loop_thread.is_alive():
+            self.main_loop_thread.join(timeout=2.0)
         self._logger.info("Robot main loop stopped")
+
+    async def run_on_robot_loop(self, coro):
+        """Execute a robot coroutine on the robot's dedicated loop from another loop/thread."""
+        if self.loop is None:
+            raise RuntimeError("Robot loop is not running")
+        future = asyncio.run_coroutine_threadsafe(coro, self.loop)
+        return await asyncio.wrap_future(future)
 
     async def _reset_cliff_detected(self):
         """Reset the cliff clear flag after a short duration."""
@@ -273,18 +302,19 @@ class Robot:
             else:
                 self._logger.warning("Sensor lock timeout")
                 continue
+
+            if not sensor_data:
+                elapsed = asyncio.get_event_loop().time() - start
+                self._logger.warning("Skipping loop as no sensor data was recieve")
+                await asyncio.sleep(max(0.0001, dt - elapsed)) # 100Hz loop
+                continue
+
             async with self.state_lock:
                 # Only check this if we have not recently reieved a resume command (since it might take a moment for the ESTOP command to be processed and for the state estimator to reset, we want to avoid immediately switching back to STOPPED mode if we receive sensor data with motors disabled right after a resume command)
                 if self.state != Mode.STOPPED and sensor_data.motors_enabled == False and prev_data and prev_data.motors_enabled == True:
                     self._logger.warning("Motors manually disabled via ESTOP button, switching to STOPPED mode")
                     self.state = Mode.STOPPED
                 cur_state = self.state
-            
-            if not sensor_data:
-                elapsed = asyncio.get_event_loop().time() - start
-                self._logger.warning("Skipping loop as no sensor data was recieve")
-                await asyncio.sleep(max(0.0001, dt - elapsed)) # 100Hz loop
-                continue
             
            # if cur_state != Mode.STOPPED: # Only update state estimator if not stopped
             #    self.state_estimator.update(sensor_data, prev_data)

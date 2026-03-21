@@ -1,3 +1,4 @@
+import sys
 import argparse
 import asyncio
 import logging
@@ -33,9 +34,16 @@ async def main():
     if not port:
         logging.error("No serial port found. Please connect the robot.")
         return
+    logging.basicConfig(
+        level=logging.DEBUG,
+        format='%(asctime)s | %(threadName)s | %(name)s | %(levelname)s | %(message)s',
+        handlers=[logging.StreamHandler(sys.stdout)] # Explicitly add StreamHandler
+    )
     serial_manager = SerialManager(port, 115200)
     robot = Robot(serial_manager, socketio)
-    
+    logging.getLogger('socketio').setLevel(logging.ERROR)
+    logging.getLogger('engineio').setLevel(logging.ERROR)
+    robot._logger.setLevel(logging.INFO)        
     loop = asyncio.get_running_loop()
     serial_manager.start(robot, loop)  # Start background serial read thread
 

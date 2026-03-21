@@ -75,7 +75,7 @@ class Robot:
     async def emergency_stop(self):
         """Immediately stop the robot and clear any pending commands."""
         await self.send_safe_command(Command.estop())
-        
+        self._logger.info("Stopping robot")
         async with self.state_lock:
             self.state = Mode.STOPPED
             
@@ -84,6 +84,7 @@ class Robot:
         
     async def resume(self):
         """Resume normal operation after an emergency stop."""
+        self._logger.info("Re-enabling robot")
         async with self.state_lock:
             self.state = Mode.MANUAL
         await self.send_safe_command(Command.stop())   # clear any stale setpoint
@@ -140,10 +141,10 @@ class Robot:
         if not valid:
             logger = logging.getLogger("RobotManager")
             logger.error(f"Invalid checksum: calculated={calculated_checksum}, received={received_checksum}")
-            raise ValueError("Invalid checksum")
+           
         
         # Extract IR flags
-        ir_front = not bool(flags & 0b00000001)
+        ir_front = not bool(flags & 0b00000001) # True means ground detected
         ir_back = not bool(flags & 0b00000010)
         new_mag_data = bool(flags & 0b00000100)
         motors_enabled = bool(flags & 0b00001000)
@@ -243,6 +244,7 @@ class Robot:
     async def send_sensor_update(self, current_time, sensor_data: SensorData):
         dt = 1 / ROBOT_CONFIG.EMIT_SENSOR_FREQ
         if current_time - self.last_emit_time >= dt:
+            self._logger.info("Sending sensor update")
             self.last_emit_time = current_time
             
             async with self.state_lock:
@@ -260,10 +262,10 @@ class Robot:
     async def main_loop(self):
         """Main loop to continuously read sensor data and update state estimator."""
         dt = 1/ROBOT_CONFIG.MAIN_LOOP_FREQ
-        
+        self._logger.info("Running main loop: " + str(self.running))        
         while self.running:
             start = asyncio.get_event_loop().time()
-                    
+            
             with self.sensor_lock:
                 sensor_data = self.latest_sensor_data
                 prev_data = self.previous_sensor_data
@@ -273,17 +275,16 @@ class Robot:
                     self._logger.warning("Motors manually disabled via ESTOP button, switching to STOPPED mode")
                     self.state = Mode.STOPPED
                 cur_state = self.state
-                
+            
             if not sensor_data:
                 elapsed = asyncio.get_event_loop().time() - start
-                await asyncio.sleep(max(0, dt - elapsed)) # 100Hz loop
+                self._logger.warning("Skipping loop as no sensor data was recieve")
+                await asyncio.sleep(max(0.0001, dt - elapsed)) # 100Hz loop
                 continue
-                
             
-            if cur_state != Mode.STOPPED: # Only update state estimator if not stopped
-                self.state_estimator.update(sensor_data, prev_data)
+           # if cur_state != Mode.STOPPED: # Only update state estimator if not stopped
+            #    self.state_estimator.update(sensor_data, prev_data)
 
-            
             if cur_state == Mode.PATH_FOLLOWING:
                 if self.cur_path is None:
                     async with self.state_lock:
@@ -321,12 +322,11 @@ class Robot:
             
             obstacle_dt = 1 / ROBOT_CONFIG.CHECK_OBSTACLE_FREQ
             cliff_dt = 1 / ROBOT_CONFIG.CHECK_CLIFF_FREQ
-            
             if (start - self.last_obstacle_detect_time) >= obstacle_dt:
                 self.last_obstacle_detect_time = start
                 # Will not backup if in STOPPED mode
-                sensor_data.ultrasonic.distance = await self.handle_obstacle(sensor_data) ## Run simple smoothing via moving average and handle obstacle detection/backup
-                self.distance_history.append(sensor_data.ultrasonic.distance)  # Store the ultrasonic distance for history for smoothing
+               #  sensor_data.ultrasonic.distance = await self.handle_obstacle(sensor_data) ## Run simple smoothing via moving average and handle obstacle detection/backup
+               # self.distance_history.append(sensor_data.ultrasonic.distance)  # Store the ultrasonic distance for history for smoothing
                 
             if (start - self.last_cliff_detect_time) >= cliff_dt:
                 self.last_cliff_detect_time = start
@@ -335,8 +335,10 @@ class Robot:
             
             await self.send_sensor_update(start, sensor_data)
             elapsed = asyncio.get_event_loop().time() - start
-            await asyncio.sleep(max(0, dt - elapsed)) # 100Hz loop
-    
+           
+            await asyncio.sleep(max(0.0001, dt - elapsed)) # 100Hz loop
+        self._logger.info("Exited main loop")
+
     async def set_state(self, data):
         """Set the robot's state (manual, path following, stopped)"""
         async with self.state_lock:

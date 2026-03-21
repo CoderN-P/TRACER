@@ -48,7 +48,8 @@ def interactive_velocity_test_twist(port=None):
     if not serial_port:
         logger.error("No serial port found. Please connect the robot.")
         return
-
+    else:
+        logger.info("Port: " + serial_port)
     left_encoder = 0
     right_encoder = 0
     prev_sensor_data = None
@@ -158,6 +159,8 @@ def interactive_velocity_test(port=None):
     if not serial_port:
         logger.error("No serial port found. Please connect the robot.")
         return
+    else:
+        logger.info("Port: " + serial_port)
 
     left_encoder = 0
     right_encoder = 0

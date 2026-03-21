@@ -34,7 +34,7 @@ class Robot:
         self.previous_sensor_data = None             # for any processing that needs to compare current and previous sensor data, only accessed within main loop
         self.latest_sensor_data = None               # written by serial thread, read by pose loop
         self.main_loop_task = None 
-        
+        self.backup_time = 2        
         self.cur_path = None
         
         self.obstacle_clear.set()
@@ -244,9 +244,8 @@ class Robot:
     async def send_sensor_update(self, current_time, sensor_data: SensorData):
         dt = 1 / ROBOT_CONFIG.EMIT_SENSOR_FREQ
         if current_time - self.last_emit_time >= dt:
-            self._logger.info("Sending sensor update")
             self.last_emit_time = current_time
-            
+            self._logger.info("Sending sensor data")            
             async with self.state_lock:
                 current_mode = self.state
                 
@@ -265,11 +264,15 @@ class Robot:
         self._logger.info("Running main loop: " + str(self.running))        
         while self.running:
             start = asyncio.get_event_loop().time()
-            
-            with self.sensor_lock:
-                sensor_data = self.latest_sensor_data
-                prev_data = self.previous_sensor_data
-                
+            if self.sensor_lock.acquire(timeout=0.001):
+                try:
+                    sensor_data = self.latest_sensor_data
+                    prev_data = self.previous_sensor_data
+                finally:
+                    self.sensor_lock.release()
+            else:
+                self._logger.warning("Sensor lock timeout")
+                continue
             async with self.state_lock:
                 # Only check this if we have not recently reieved a resume command (since it might take a moment for the ESTOP command to be processed and for the state estimator to reset, we want to avoid immediately switching back to STOPPED mode if we receive sensor data with motors disabled right after a resume command)
                 if self.state != Mode.STOPPED and sensor_data.motors_enabled == False and prev_data and prev_data.motors_enabled == True:

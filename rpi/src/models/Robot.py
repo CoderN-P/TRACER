@@ -316,8 +316,8 @@ class Robot:
                     self.state = Mode.STOPPED
                 cur_state = self.state
             
-           # if cur_state != Mode.STOPPED: # Only update state estimator if not stopped
-            #    self.state_estimator.update(sensor_data, prev_data)
+            if cur_state != Mode.STOPPED: # Only update state estimator if not stopped
+                self.state_estimator.update(sensor_data, prev_data)
 
             if cur_state == Mode.PATH_FOLLOWING:
                 if self.cur_path is None:

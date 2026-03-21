@@ -84,12 +84,12 @@ class StateEstimator:
         MAX_MARGIN = 1.15  # 15% margin for acceleration transients
         max_pulses = ROBOT_CONFIG.ENCODER_TICKS_PER_REV * ROBOT_CONFIG.MAX_RPM / 60.0 * dt * MAX_MARGIN
         
-        if abs(sensor_data.left_encoder_ticks - previous_sensor_data.left_encoder_ticks) > max_pulses:
-            self._logger.error(f"Left encoder tick jump detected: {previous_sensor_data.left_encoder_ticks} -> {sensor_data.left_encoder_ticks} (max expected: {max_pulses:.2f})")
+        if abs(sensor_data.left_encoder - previous_sensor_data.left_encoder) > max_pulses:
+            self._logger.error(f"Left encoder tick jump detected: {previous_sensor_data.left_encoder} -> {sensor_data.left_encoder} (max expected: {max_pulses:.2f})")
             return
         
-        delta_left_ticks = sensor_data.left_encoder_ticks - previous_sensor_data.left_encoder_ticks
-        delta_right_ticks = sensor_data.right_encoder_ticks - previous_sensor_data.right_encoder_ticks
+        delta_left_ticks = sensor_data.left_encoder - previous_sensor_data.left_encoder
+        delta_right_ticks = sensor_data.right_encoder - previous_sensor_data.right_encoder
         
         self.theta_encoders += self.heading_delta_from_encoders(delta_left_ticks, delta_right_ticks)
         
@@ -104,7 +104,7 @@ class StateEstimator:
         else:
             mag_heading_rad = None
             
-        self.state.yaw = self.heading_filter.step(self.theta_encoders, sensor_data.gyro_z, dt, mag_heading_rad)
+        self.state.yaw = self.heading_filter.step(self.theta_encoders, sensor_data.imu.gyroscope_z, dt, mag_heading_rad)
     
         
         self.state.linear_velocity = self.estimate_linear_velocity(delta_left_ticks, delta_right_ticks, dt)

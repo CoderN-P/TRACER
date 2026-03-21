@@ -113,9 +113,9 @@ def setup_routes(controller: Controller):
         controller.manage_state(data['mode'])
         
     @socket.on('stop')
-    def stop():
-        controller.rumble(0.5, 0.5, 1)
-        sio_client.emit("stop")
+    def stop(data):
+        controller.rumble(0.5, 0.5, 500)
+        sio_client.emit("stop", {})
         
     @sio_client.event
     def connect():

@@ -28,6 +28,7 @@
     freehandPath: freehandPathProp = $bindable([]),
     pathComplete = false,
     onRunPath = (_payload: RunPathPayload) => {},
+    onStopRun = () => {},
   }: {
     robotPos?: { x: number; y: number; theta: number } | null;
     freehandPath?: { x: number; y: number }[];
@@ -35,6 +36,8 @@
     pathComplete?: boolean;
     /** Called with the typed path payload when the run button is pressed. */
     onRunPath?: (payload: RunPathPayload) => void;
+    /** Called when the user presses Stop while a run is active. */
+    onStopRun?: () => void;
   } = $props();
 
   let path = new SplinePathSvelte();
@@ -389,15 +392,16 @@
     onRunPath(payload);
   }
 
-  function stopRun() {
+  function stopRun(notifyParent = true) {
     running = false;
     runOffsetX = 0;
     runOffsetY = 0;
+    if (notifyParent) onStopRun();
   }
 
   // Exit run mode automatically when parent signals completion.
   $effect(() => {
-    if (pathComplete && running) stopRun();
+    if (pathComplete && running) stopRun(false);
   });
 
   /** Freehand render points shifted by the run offset (world pixels). */
@@ -542,7 +546,7 @@
           </button>
         {:else}
           <button
-            onclick={stopRun}
+            onclick={() => stopRun()}
             class="flex items-center gap-1.5 px-3 py-2 text-xs rounded-md bg-red-600 hover:bg-red-700 text-white transition-colors"
           >
             <StopCircle class="w-3.5 h-3.5" /> Stop

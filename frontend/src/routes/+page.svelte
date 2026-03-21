@@ -203,6 +203,16 @@
     });
   }
 
+  function stopPathRun() {
+    socket.emit("stop", {});
+    socket.emit("set_state", { state: "MANUAL" });
+    logs.push({
+      timestamp: new Date().toISOString(),
+      message: "Stopped path run and returned to MANUAL mode",
+      icon: "warning",
+    });
+  }
+
   $effect(() => {
     socket.emit("joystick_input", uiJoystick);
   });
@@ -330,6 +340,7 @@
       {pathComplete}
       bind:freehandPath
       onRunPath={runPath}
+      onStopRun={stopPathRun}
     />
   </div>
 

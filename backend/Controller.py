@@ -82,11 +82,8 @@ class Controller:
             left_y = -self.controller.get_axis(1)
             right_x = -self.controller.get_axis(0)
         else:  # TANK
-            left = -self.controller.get_axis(1)
-            right = -self.controller.get_axis(3)
-
-            left_y = (left + right) / 2
-            right_x = (right - left) / 2
+            left_y = -self.controller.get_axis(1)
+            right_x = -self.controller.get_axis(3)
 
         return left_y, right_x
 
@@ -413,8 +410,10 @@ class Controller:
 
             data = {
                 "left_y": left_y,
-                "right_x": right_x
+                "right_x": right_x,
+                "type": "tank" if self.state == ControllerState.TANK else "arcade"
             }
+            
 
             if self.recording:
                 self.joystick_history[-1]["commands"].append(data)

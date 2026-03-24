@@ -418,7 +418,7 @@
 {#if !browser}
   <p>Loading...</p>
 {:else}
-  <div class="rounded-lg border border-gray-200 p-4 flex flex-col select-none">
+  <div class="rounded-lg border border-gray-200 p-4 bg-white flex flex-col select-none">
     <!-- Toolbar -->
     <div class="flex flex-row items-center gap-2 mb-4 flex-wrap">
       <!-- Mode toggle -->

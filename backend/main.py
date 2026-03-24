@@ -133,11 +133,11 @@ if __name__ == "__main__":
 
     # Start the gesture controller sensor loop
 
-    gesture_controller = GestureController(gesture_controller_route, socket)
-    gesture_controller.start_sensor_loop()
+    # gesture_controller = GestureController(gesture_controller_route, socket)
+    # gesture_controller.start_sensor_loop()
     
-    controller = Controller.initialize(sio_client, socket, gesture_controller)
-    # controller = Controller.initialize(sio_client, socket)
+    # controller = Controller.initialize(sio_client, socket, gesture_controller)
+    controller = Controller.initialize(sio_client, socket)
     setup_routes(controller)
     # # Connect to RPi backend
     sio_client.connect(NORMAL, transports=['polling'])

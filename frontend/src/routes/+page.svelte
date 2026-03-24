@@ -34,6 +34,8 @@
   import Recordings from "$lib/components/Recordings.svelte";
   import GestureController from "$lib/components/GestureController.svelte";
   import RobotControls from "$lib/components/RobotControls.svelte";
+  import GyroMagDebug from "$lib/components/GyroMagDebug.svelte";
+  import VelocityDebug from "$lib/components/VelocityDebug.svelte";
 
   let sensorData = $state<SensorData | null>(null);
   let robotState = $state<RobotState | null>(null);
@@ -282,11 +284,13 @@
     class="w-full flex flex-col md:flex-row items-center gap-2 justify-between"
   >
     <Status {lastSensorUpdate} {mode} bind:logs />
-    <BatteryPercentage
-      percent={sensorData?.battery ?? 0}
-      lastSensorUpdateTime={lastSensorUpdate}
-    />
-    <RobotControls lastSensorUpdateTime={lastSensorUpdate} />
+    <div class="flex flex-row gap-2 w-full justify-between md:justify-end">
+      <RobotControls lastSensorUpdateTime={lastSensorUpdate} />
+      <BatteryPercentage
+        percent={sensorData?.battery ?? 0}
+        lastSensorUpdateTime={lastSensorUpdate}
+      />
+    </div>
     <div class="flex flex-row gap-2 w-full justify-between md:justify-end">
       <Uptime {lastSensorUpdate} />
       <SensorRate rate={sensorRate} />
@@ -332,6 +336,11 @@
     <Logs {logs} class="w-full h-full" />
   </div>
 
+  <!-- Velocity Debug Widget -->
+  <div class="w-full">
+    <VelocityDebug {robotState} lastSensorUpdateTime={lastSensorUpdate} />
+  </div>
+
   <div class="w-full">
     <PathDrawer
       robotPos={robotState
@@ -347,6 +356,10 @@
   <!-- Board Orientation Visualization -->
   <div class="w-full">
     <GestureController {gestureData} />
+  </div>
+
+  <div class="w-full">
+    <GyroMagDebug {sensorData} lastSensorUpdateTime={lastSensorUpdate} />
   </div>
 
   <!-- Recordings and Command List Section - Side by side on large screens -->

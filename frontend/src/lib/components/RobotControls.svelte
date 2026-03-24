@@ -18,7 +18,7 @@
 </script>
 
 <div
-  class="rounded-lg border border-gray-100 px-4 py-1.5 flex flex-row shrink-0 bg-white items-center gap-3 flex-wrap"
+  class="rounded-lg border border-gray-100 px-4 py-1.5 flex flex-row shrink-0 grow w-full sm:w-min bg-white items-center gap-3 "
 >
   <!-- Emergency Stop -->
   <button

@@ -23,7 +23,7 @@ class RobotConfig:
     
     # Environment
     MAX_LATERAL_ACCEL: float = 0.5 # m/s^2, for path following constraints
-    
+    MAX_LONG_ACCEL: float = 0.5
     # Magnetometer
     # TODO: Calibrate these values for the actual robot
     MAGNETOMETER_HARD_IRON_OFFSETS: tuple = (0.0, 0.0, 0.0) # microteslas (x, y, z)
@@ -52,8 +52,8 @@ class RobotConfig:
     METERS_PER_TICK: float = WHEEL_CIRCUMFERENCE / ENCODER_TICKS_PER_REV
     
     # NOTE: Values calibrated for 2S LiPo (subject to change after testing)
-    LEFT_CORRECTION = 0.9646096844 # Ratio between true distance and left encoder dist
-    RIGHT_CORRECTION = 0.9873417722 # Ratio between true distance and left encoder dist
+    LEFT_CORRECTION = 1 # 0.9646096844 # Ratio between true distance and left encoder dist
+    RIGHT_CORRECTION = 1 # 0.9873417722 # Ratio between true distance and left encoder dist
     
     # TODO: Calibrate correction factors for each
     METERS_PER_TICK_LEFT: float = METERS_PER_TICK * LEFT_CORRECTION
@@ -80,13 +80,13 @@ class RobotConfig:
     
     # Pure Pursuit
     LOOKAHEAD_DISTANCE: float = 0.3 # Meters
-    COMPLETION_THRESHOLD: float = 0.1 # Meters
+    COMPLETION_THRESHOLD: float = 0.01 # Meters
     MAX_SEARCH_POINTS: int = 50 # Only search 50 points ahead in pure pursuit. 
     END_LOOKAHEAD_MULTIPLIER: float = 1.5 # Increase lookahead distance near the end of the path
     
     # RAMSETE
-    RAMSETE_B: float = 2.0
-    RAMSETE_ZETA: float = 0.7
+    BETA: float = 2.0
+    ZETA: float = 0.7
     
     # Splines
     SPLINE_SAMPLES = 1000

@@ -1,4 +1,5 @@
 from pydantic import BaseModel, Field
+import logging
 import uuid
 from .LCDCommand import LCDCommand
 from .MotorCommand import MotorCommand
@@ -31,20 +32,24 @@ class Command(BaseModel):
         return value * ROBOT_CONFIG.MAX_LINEAR_VEL  # Scale to max velocity
     
     @classmethod
-    def from_joystick(cls, left_y: float, right_x: float):
+    def from_joystick(cls, left_y: float, right_x: float, mode: str = "arcade"):
         """
         Calculate the differential drive values based on the controller input.
         """
-        
+        logger = logging.getLogger("RobotManager")
+        logger.info(f"Running manual command [{mode}]")
         # Scale joystick input to max left velocity and apply deadzone
-        forward = cls.apply_deadzone_and_scale(left_y)  
-        turn = cls.apply_deadzone_and_scale(right_x)
+        if mode == "arcade":
+            forward = cls.apply_deadzone_and_scale(left_y)  
+            turn = cls.apply_deadzone_and_scale(right_x)
+            
+            # Calculate motor values (arcade drive)
+            left_motor = min(ROBOT_CONFIG.MAX_LINEAR_VEL, max(-ROBOT_CONFIG.MAX_LINEAR_VEL, forward - turn))
+            right_motor = min(ROBOT_CONFIG.MAX_LINEAR_VEL, max(-ROBOT_CONFIG.MAX_LINEAR_VEL, forward + turn))
+        else:
+            left_motor = min(ROBOT_CONFIG.MAX_LINEAR_VEL, max(-ROBOT_CONFIG.MAX_LINEAR_VEL, cls.apply_deadzone_and_scale(left_y)))
+            right_motor = min(ROBOT_CONFIG.MAX_LINEAR_VEL, max(-ROBOT_CONFIG.MAX_LINEAR_VEL, cls.apply_deadzone_and_scale(right_x)))
         
-        # Calculate motor values (arcade drive)
-        left_motor = min(ROBOT_CONFIG.MAX_LINEAR_VEL, max(-ROBOT_CONFIG.MAX_LINEAR_VEL, forward - turn))
-        right_motor = min(ROBOT_CONFIG.MAX_LINEAR_VEL, max(-ROBOT_CONFIG.MAX_LINEAR_VEL, forward + turn))
-        
-
         command = cls(
             ID="",
             command_type=CommandType.MOTOR,

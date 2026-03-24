@@ -164,7 +164,7 @@ class QuinticHermiteSpline:
         self.build_time_lut()
         
         total_time = self.time_lut[-1]
-        num_points = np.ceil(total_time / ROBOT_CONFIG.TRAJECTORY_DT)
+        num_points = int(np.ceil(total_time / ROBOT_CONFIG.TRAJECTORY_DT))
         
         
         i = 0

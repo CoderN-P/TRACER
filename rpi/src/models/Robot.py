@@ -1,5 +1,6 @@
 import logging
 import threading
+import math
 import struct
 from collections import deque
 import asyncio
@@ -188,9 +189,9 @@ class Robot:
                 "acceleration_x": ax/16384,  # Convert to g's
                 "acceleration_y": ay/16384,  # Convert to g's
                 "acceleration_z": az/16384,  # Convert to g's
-                "gyroscope_x": gx/131,  # Convert to degrees per second
-                "gyroscope_y": gy/131,  # Convert to degrees per second
-                "gyroscope_z": gz/131,  # Convert to degrees per second
+                "gyroscope_x": math.radians(gx/131),  # Convert to rad per second (131 = LSB (deg/sec))
+                "gyroscope_y": math.radians(gy/131),  # Convert to degrees per second
+                "gyroscope_z": math.radians(gz/131),  # Convert to degrees per second
                 "temperature": temp
             },
             "magnetometer": {
@@ -377,6 +378,7 @@ class Robot:
 
     async def set_state(self, data):
         """Set the robot's state (manual, path following, stopped)"""
+        resume = False
         async with self.state_lock:
             cur_state = self.state
             next_state = Mode[data["state"]]
@@ -398,9 +400,12 @@ class Robot:
                 
             elif next_state == Mode.MANUAL:
                 if cur_state == Mode.STOPPED:
-                    await self.resume()
+                    resume = True
             elif next_state == Mode.STOPPED:
                 await self.emergency_stop()
+                
+        if resume:
+            await self.resume()
         
                 
     async def handle_joystick_input(self, data):
@@ -418,7 +423,10 @@ class Robot:
         right_x = data.get('right_x', 0)
 
         if self.cliff_clear.is_set() and self.obstacle_clear.is_set():
-            await self.send_safe_command(Command.from_joystick(left_y, right_x))
+            if data.get("type"):
+                await self.send_safe_command(Command.from_joystick(left_y, right_x, data["type"]))
+            else:
+                await self.send_safe_command(Command.from_joystick(left_y, right_x))
             
 
     async def _run_command_sequence(self, commands):

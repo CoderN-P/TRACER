@@ -23,7 +23,7 @@ class Path:
         
         process = mp.Process(
             target=self._build_trajectory_worker,
-            args=(splines, self._meta_queue, self._ready),
+            args=(),
             daemon=True
         )
         
@@ -61,14 +61,12 @@ class Path:
         return True
     
     def _build_trajectory_worker(self):
-        shm = shared_memory.SharedMemory(create=True)
-        
         trajectory = []
         for i, spline in enumerate(self.splines):
-            start_velocity = 0.0 if i == 0 else self.trajectory[-1].v
+            start_velocity = 0.0 if i == 0 else trajectory[-1].v
             end_velocity = 0.0 if i == len(self.splines) - 1 else None
             
-            spline_trajectory = spline.build_trajectory(start_velocity, end_velocity, self.trajectory[-1].t if self.trajectory else 0.0)
+            spline_trajectory = spline.build_trajectory(start_velocity, end_velocity, trajectory[-1].t if trajectory else 0.0)
             
             if i > 0:
                 spline_trajectory.pop(0) # Remove the first point to avoid duplicates
@@ -78,6 +76,7 @@ class Path:
         # Serialize into numpy array
         
         arr = np.array([[p.x, p.y, p.theta, p.v, p.omega, p.t] for p in trajectory])
+        shm = shared_memory.SharedMemory(create=True, size=arr.nbytes)
         shared_arr = np.ndarray(arr.shape, dtype=arr.dtype, buffer=shm.buf)
         shared_arr[:] = arr
         self._meta_queue.put((shm.name, len(trajectory)))

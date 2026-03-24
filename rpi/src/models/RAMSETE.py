@@ -71,6 +71,7 @@ class RAMSETE:
         self.running_time += dt
 
         return Command(
+            ID="",
             command_type=CommandType.MOTOR,
             command=MotorCommand(
                 left_motor=v_left,

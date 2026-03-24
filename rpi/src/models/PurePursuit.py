@@ -1,5 +1,6 @@
 import math
 from typing import List
+import logging
 
 from .RobotState import RobotState
 from .Command import Command
@@ -138,16 +139,15 @@ class PurePursuit:
         
         current_pos = (robot_state.x, robot_state.y,)
 
-        if math.dist(current_pos, self.path[-1]) <= ROBOT_CONFIG.COMPLETION_THRESHOLD:
+        if math.dist(current_pos, self.path[-1]) <= ROBOT_CONFIG.COMPLETION_THRESHOLD and self.last_found_index >= len(self.path) * 0.9:
             return Command.stop()
         
         goal_point = self.find_goal_point(current_pos)
         
         if not goal_point:
-            if math.dist(current_pos, self.path[-1]) < ROBOT_CONFIG.LOOKAHEAD_DISTANCE * ROBOT_CONFIG.END_LOOKAHEAD_MULTIPLIER:
-                goal_point = self.path[-1]
-            else:
-                return None # The main loop will fall back to manual control
+            logger = logging.getLogger("RobotManager")
+            logger.warning("PurePursuit lost the path")
+            return None # The main loop will fall back to manual control
         
         local_target = self.get_local_target(robot_state, goal_point)
         

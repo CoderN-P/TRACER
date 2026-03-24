@@ -109,7 +109,7 @@ class StateEstimator:
     
         
         self.state.linear_velocity = self.estimate_linear_velocity(delta_left_ticks, delta_right_ticks, dt)
-        self.state.angular_velocity = ((self.state.yaw - self.prev_state.yaw) % (2 * math.pi) - math.pi) / dt
+        self.state.angular_velocity = sensor_data.imu.gyroscope_z - self.heading_filter.state[1]
         
         position_delta_x, position_delta_y = self.get_position_delta(delta_left_ticks, delta_right_ticks, self.state.yaw)
         self.state.x += position_delta_x

@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from . import UltrasonicSensor, IMUData, MagnetometerData
+from . import UltrasonicSensor, IMUData, MagnetometerData, TOFData
 
 
 class SensorData(BaseModel):
@@ -8,6 +8,7 @@ class SensorData(BaseModel):
     """
     ultrasonic: UltrasonicSensor = Field(..., description="Data from the ultrasonic sensor")
     imu: IMUData = Field(..., description="Data from the IMU (Inertial Measurement Unit)")
+    tof: TOFData = Field(..., description="Data from the Time-of-Flight sensor")
     magnetometer: MagnetometerData = Field(..., description="Data from the magnetometer")
     left_encoder: int = Field(..., description="Left wheel encoder ticks")
     right_encoder: int = Field(..., description="Right wheel encoder ticks")

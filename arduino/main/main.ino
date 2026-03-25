@@ -18,6 +18,7 @@ TaskHandle_t ultrasonicTaskHandle;
 TaskHandle_t mainLoopHandle;
 TaskHandle_t serialTaskHandle;
 TaskHandle_t commandProcessorHandle;
+TaskHandle_t tofTaskHandle;
 TaskHandle_t oledUpdateHandle;
 
 static_assert(PID_INTERVAL == MAIN_INTERVAL, "PID and main loop intervals must match");
@@ -80,6 +81,7 @@ void setup()
     setup_magnetometer();
     setup_pwm();
     setupOLED();
+    setup_tof();
     
     if (initMPU6050())
     {
@@ -110,6 +112,10 @@ void setup()
     xTaskCreate(vSerialTask, "Serial Task", 2048, NULL, 4, &serialTaskHandle);
     // Medium priority task for processing commands from the command queue
     xTaskCreate(commandProcessorTask, "Command Processor Task", 4096, NULL, 3, &commandProcessorHandle);
+    
+    // Medium priority task for reading time-of-flight sensor at 20 Hz
+    
+    xTaskCreate(tofTask, "ToF Task", 2048, NULL, 3, &tofTaskHandle);
     
     // Low priority task for updating the OLED at 2 Hz
     xTaskCreate(oledUpdateTask, "OLED Update Task", 2048, NULL, 2, &oledUpdateHandle);

@@ -109,7 +109,9 @@ void mainLoop(void *pvParameters) {
         
         packet.startByte = 0xAA;
         packet.packetSeq = packetSeq++;
-        packet.distance = lastDistance1;
+        packet.distance_left = lastDistance1;
+        packet.distance_right = lastDistance2;
+        packet.distance_front = distanceFront;
         packet.ax = ax;
         packet.ay = ay;
         packet.az = az;
@@ -170,6 +172,8 @@ void mainLoop(void *pvParameters) {
             robot_state.timestamp = packet.timestamp;
             robot_state.newMagData = newMagData;
             robot_state.pidMode = mode;
+            robot_state.distanceFront = distanceFront;
+            
             xSemaphoreGive(state_mutex);
         }
         

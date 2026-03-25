@@ -13,7 +13,7 @@ class MagnetometerData(BaseModel):
     @staticmethod
     def calculate_heading(x, y, z) -> float:
         cal_x, cal_y, cal_z = MagnetometerData.calibrate(x, y, z)
-        heading_rad = math.atan2(cal_y, cal_x)
+        heading_rad = math.atan2(cal_x, cal_y)
         return math.degrees(heading_rad)
     
     @staticmethod

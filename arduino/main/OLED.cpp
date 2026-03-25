@@ -153,7 +153,7 @@ void drawPage3(RobotState &state, bool blinkState)
   display.setTextSize(1);
 
   // ── ToF sensor ───────────────────────────────────────────
-  const float tofDist = 30; // for now no ToF data, just simulate with a static value
+  const float tofDist = state.distanceFront;
   bool warn = (tofDist < TOF_WARN_CM);
 
   display.setCursor(0, Y0);

@@ -3,11 +3,14 @@
 #include <Arduino.h>
 #include <Wire.h>
 #include "soc/gpio_struct.h"
+#include "Adafruit_VL53L0X.h"
 
 volatile uint32_t echoStart1    = 0;
 volatile int32_t  echoDuration1 = 0;
 volatile uint32_t echoStart2    = 0;
 volatile int32_t  echoDuration2 = 0;
+
+Adafruit_VL53L0X lox = Adafruit_VL53L0X();
 
 bool initMPU6050()
 {
@@ -19,14 +22,32 @@ bool initMPU6050()
 }
 
 void setup_magnetometer(){
-  uint8_t MODE_CONTINUOUS = 0b00000001;
-  uint8_t ODR_50Hz = 0b00000100;
-  uint8_t LSB_8G = 0b00010000;
-  uint8_t OSR_512 = 0x00;
-  Wire.beginTransmission(MAG_ADDRESS);
-  Wire.write(MAG_CTRL_REG);
-  Wire.write(MODE_CONTINUOUS | ODR_50Hz | LSB_8G | OSR_512);
-  Wire.endTransmission();
+    /*
+      uint8_t MODE_CONTINUOUS = 0b00000001;
+      uint8_t ODR_50Hz = 0b00000100;
+      uint8_t LSB_2G = 0b00000000;
+      uint8_t OSR_512 = 0x00;
+      Wire.beginTransmission(MAG_ADDRESS);
+      Wire.write(MAG_CTRL_REG);
+      Wire.write(MODE_CONTINUOUS | ODR_50Hz | LSB_2G | OSR_512);
+      Wire.endTransmission();
+    */
+  
+    Wire.beginTransmission(MAG_ADDRESS);
+    // Control Register 1 (0x09)
+    // 0x1D = 0b00011101 
+    // (OSR: 512 | Range: 2G | ODR: 200Hz* | Mode: Continuous)
+    // *Note: Using 200Hz ODR internally ensures your 50Hz reads are always fresh.
+    Wire.write(0x09); 
+    Wire.write(0x1D); 
+    Wire.endTransmission();
+    
+    // CRITICAL: Set/Reset Period Register (0x0B)
+    // The sensor will NOT update correctly without this!
+    Wire.beginTransmission(MAG_ADDRESS);
+    Wire.write(0x0B);
+    Wire.write(0x01); // Standard recommended value
+    Wire.endTransmission();
 }
 
 uint8_t getBatteryPercent()
@@ -147,5 +168,27 @@ void IRAM_ATTR echoISR2() {
         } else {
             echoDuration2 = (int32_t) duration;
         }
+    }
+}
+
+bool setup_tof(){
+    bool on = lox.begin();
+    
+    if (!on) {
+        return false;
+    }
+    
+    lox.setMeasurementTimingBudgetMicroSeconds(33000); // 33 ms timing budget 
+    lox.startRangeContinuous(TOF_TIMING_BUDGET);
+}
+
+void getToFDistance(float &distanceFront){
+    VL53L0X_RangingMeasurementData_t measure;
+    lox.rangingTest(&measure, false);
+    
+    if (measure.RangeStatus != 4) { // 4 = out of range
+        distanceFront = measure.RangeMilliMeter / 10.0f; // Convert to cm
+    } else {
+        distanceFront = -1.0f; // Indicate out of range
     }
 }

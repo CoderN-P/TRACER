@@ -13,6 +13,7 @@ from .Command import Command
 from .UltrasonicSensor import UltrasonicSensor
 from .MotorPWMCommand import MotorPWMCommand
 from .PurePursuit import PurePursuit
+from .TOF import TOFData
 from .IMU import IMUData
 from .SensorData import SensorData
 from .CommandResponse import AICommand

@@ -20,7 +20,8 @@ class Robot:
         self.socketio = socketio
         self.cliff_clear = asyncio.Event()
         self.running = False
-        self.distance_history = deque(maxlen=10)  # Store last 10 distance readings for smoothing
+        self.left_distance_history = deque(maxlen=10)  # Store last 10 distance readings for smoothing
+        self.right_distance_history = deque(maxlen=10)
         
         self.obstacle_clear = asyncio.Event()
 
@@ -143,7 +144,9 @@ class Robot:
         # Unpack the data according to the Arduino's sendSensorData format
         # <B    - start byte (0xAA)
         # B     - packet number (uint8_t) 
-        # f     - distance (float)
+        # f     - distance_left (float)
+        # f     - distance_right (float)
+        # f     - distance_front (float)
         # h     - ax (int16_t)
         # h     - ay (int16_t)
         # h     - az (int16_t)
@@ -161,8 +164,8 @@ class Robot:
         # I     - timestamp (uint32_t, microseconds)
         # B     - checksum (uint8_t)
         
-        fields = struct.unpack('<BBfhhhhhhffffiiBBIB', data)
-        start, packet_num, distance, ax, ay, az, gx, gy, gz, temp, mag_x, mag_y, mag_z, left_encoder_ticks, right_encoder_ticks, flags, battery, timestamp, received_checksum = fields
+        fields = struct.unpack('<BBfffhhhhhhffffiiBBIB', data)
+        start, packet_num, distance_left, distance_right, distance_front, ax, ay, az, gx, gy, gz, temp, mag_x, mag_y, mag_z, left_encoder_ticks, right_encoder_ticks, flags, battery, timestamp, received_checksum = fields
 
         # Calculate checksum (sum of all bytes except checksum byte)
         calculated_checksum = sum(data[:-1]) & 0xFF
@@ -183,7 +186,11 @@ class Robot:
         
         data = {
             "ultrasonic": {
-                "distance": distance
+                "distance_left": distance_left,
+                "distance_right": distance_right
+            },
+            "tof": {
+                "distance_front": distance_front
             },
             "imu": {
                 "acceleration_x": ax/16384,  # Convert to g's
@@ -212,34 +219,43 @@ class Robot:
         }
         
         return SensorData.model_validate(data)
-
-    async def handle_obstacle(self, sensor_data: SensorData) -> float:
-        """Detect obstacles and trigger backup if needed. Returns processed distance."""
-        distance = sensor_data.ultrasonic.distance
-
+    
+    def filter_distance(self, distance, left=True) -> float:
+        distance_history = self.left_distance_history if left else self.right_distance_history
         if distance == -1:  # too far
-            avg_distance = sum(self.distance_history) / len(self.distance_history) if self.distance_history else 300
+            avg_distance = sum(distance_history) / len(distance_history) if distance_history else 300
             return avg_distance
         elif distance == -2:  # too close
-            avg_distance = sum(self.distance_history) / len(self.distance_history) if self.distance_history else 0
+            avg_distance = sum(distance_history) / len(distance_history) if distance_history else 0
         else:
             avg_distance = distance
+            
+        return avg_distance
+        
+    async def handle_obstacle(self, sensor_data: SensorData) -> tuple[float, float]:
+        """Detect obstacles and trigger backup if needed. Returns processed distance."""
+        distance_left = self.filter_distance(sensor_data.ultrasonic.distance_left)
+        distance_right = self.filter_distance(sensor_data.ultrasonic.distance_right, left=False)
+
             
         async with self.state_lock:
             cur_state = self.state
             
-        if not sensor_data.is_obstacle_detected(ROBOT_CONFIG.OBSTACLE_DETECTED_THRESHOLD) or not self.obstacle_clear.is_set() or cur_state == Mode.STOPPED:
-            return avg_distance
+        obstacle_detected = sensor_data.ultrasonic.obstacle_detected(ROBOT_CONFIG.OBSTACLE_DETECTED_THRESHOLD)
+            
+        if obstacle_detected == 0 or not self.obstacle_clear.is_set() or cur_state == Mode.STOPPED:
+            return distance_left, distance_right
     
-        await self.socketio.emit('obstacle_detected', {"distance": distance})
+        await self.socketio.emit('obstacle_detected', {"distance_left": distance_left, "distance_right": distance_right})
     
         # If the distance is below the obstacle avoidance threshold, trigger backup and set obstacle clear flag
-        if distance <= ROBOT_CONFIG.OBSTACLE_AVOID_THRESHOLD:
+        obstacle_avoid = sensor_data.ultrasonic.obstacle_detected(ROBOT_CONFIG.OBSTACLE_AVOID_THRESHOLD)
+        if obstacle_avoid > 0 and self.obstacle_clear.is_set():
             asyncio.create_task(self.backup())
             self.obstacle_clear.clear()
             asyncio.create_task(self._reset_obstacle_clear())
     
-        return avg_distance
+        return distance_left, distance_right
     
     
     async def handle_cliff(self, sensor_data: SensorData):
@@ -266,6 +282,7 @@ class Robot:
             with self.sensor_lock: # Ensure thread-safe access to latest_sensor_data
                 self.previous_sensor_data = self.latest_sensor_data
                 self.latest_sensor_data = new_data
+                    
         except Exception as e:
             self._logger.error(f"Error processing sensor data: {e}")
             return
@@ -362,8 +379,11 @@ class Robot:
             if (start - self.last_obstacle_detect_time) >= obstacle_dt:
                 self.last_obstacle_detect_time = start
                 # Will not backup if in STOPPED mode
-               #  sensor_data.ultrasonic.distance = await self.handle_obstacle(sensor_data) ## Run simple smoothing via moving average and handle obstacle detection/backup
-               # self.distance_history.append(sensor_data.ultrasonic.distance)  # Store the ultrasonic distance for history for smoothing
+                # filtered_left, filtered_right = await self.handle_obstacle(sensor_data) ## Run simple smoothing via moving average and handle obstacle detection/backup
+                # self.ultrasonic.distance_left = filtered_left
+                # self.ultrasonic.distance_right = filtered_right
+                # self.left_distance_history.append(sensor_data.ultrasonic.distance) # Store the ultrasonic distance for history for smoothing
+                # self.right_distance_history.append(sensor_data.ultrasonic.left)
                 
             if (start - self.last_cliff_detect_time) >= cliff_dt:
                 self.last_cliff_detect_time = start

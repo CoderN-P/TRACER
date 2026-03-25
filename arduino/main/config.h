@@ -66,7 +66,8 @@ const int MAG_DATA_REG = 0x00; // Starting register for magnetometer data
 const int MAG_CTRL_REG = 0x09; // Control register for magnetometer
 
 // Sensor constants
-const float LSB_uT = 0.0244; // ±8G full-scale for magnetometer
+const float LSB_uT = 1.0 / 120.0; // ±2G full-scale for magnetometer
+const int TOF_TIMING_BUDGET = 70000; // Timing budget for VL53L0X in microseconds (longer timing budget increases accuracy and max range but reduces update rate)
 
 // Command definitions
 const uint8_t CMD_MOVE = 0x01;
@@ -78,8 +79,11 @@ const int NUM_TYPES = 5; // Number of command types (MOVE, OLED_UPDATE, ENABLE, 
 
 // Timing intervals (in milliseconds)
 const int ULTRASONIC_INTERVAL = 50;   // Sample ultrasonic sensor every 50 ms (20 hz)
+const int TOF_INTERVAL = 100;          // Sample time-of-flight sensor every 100 ms (10 Hz)
 const int OLED_UPDATE_INTERVAL = 500; // Update OLED every 500ms
 const int MAIN_INTERVAL = 10;         // Run main loop every 10 ms (100 Hz)
+
+
 
 // OLED
 const int OLED_WIDTH = 128;

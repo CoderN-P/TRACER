@@ -17,7 +17,7 @@ struct RobotState {
     float magX, magY, magZ;
     float tempC;
     
-    float distance1, distance2;
+    float distance1, distance2, distanceFront;
     
     uint8_t irFront;
     uint8_t irBack;
@@ -35,7 +35,9 @@ struct RobotState {
 struct SensorPacket {
     uint8_t startByte; // 0xAA
     uint8_t packetSeq; // Incrementing sequence number
-    float distance; // Ultrasonic distance in meters
+    float distance_left; // Ultrasonic distance in cm
+    float distance_right; // Ultrasonic distance in cm  
+    float distance_front; // Time-of-flight distance in cm
     int16_t ax, ay, az; // Accelerometer data
     int16_t gx, gy, gz; // Gyroscope data
     float tempC; // Temperature in Celsius

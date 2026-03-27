@@ -2,10 +2,12 @@ import { z } from 'zod';
 import { UltrasonicSensorSchema } from "./UltrasonicSensor";
 import { IMUSchema } from "./IMU";
 import { MagnetometerSchema } from "./Magnetometer";
+import { TOFSchema } from "./TOF";
 
 export const SensorDataSchema = z.object({
     ultrasonic: UltrasonicSensorSchema,
     imu: IMUSchema,
+    tof: TOFSchema,
     magnetometer: MagnetometerSchema,
     ir_front: z.boolean(),
     ir_back: z.boolean(),

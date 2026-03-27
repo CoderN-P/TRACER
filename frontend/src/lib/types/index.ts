@@ -4,6 +4,7 @@ export { type MotorCommand, MotorCommandSchema } from './MotorCommand';
 export { type LCDCommand, LCDCommandSchema } from './LCDCommand';
 export { type Command, CommandSchema } from './Command';
 export { type IMU, IMUSchema } from './IMU';
+export { type TOF, TOFSchema } from './TOF';
 export { type SensorData, SensorDataSchema } from './SensorData';
 export { type UltrasonicSensor, UltrasonicSensorSchema } from './UltrasonicSensor';
 export { type DistanceEntry, DistanceEntrySchema } from './DistanceEntry';

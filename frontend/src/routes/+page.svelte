@@ -168,6 +168,9 @@
       distanceHistory.push(
         DistanceEntrySchema.parse({
           timestamp: new Date().toISOString(),
+          distance_left: sensorData.ultrasonic.distance_left,
+          distance_right: sensorData.ultrasonic.distance_right,
+          distance_front: sensorData.tof.distance_front,
           distance: sensorData.ultrasonic.distance,
         }),
       );

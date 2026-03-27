@@ -35,11 +35,10 @@ void setup_magnetometer(){
   
     Wire.beginTransmission(MAG_ADDRESS);
     // Control Register 1 (0x09)
-    // 0x1D = 0b00011101 
-    // (OSR: 512 | Range: 2G | ODR: 200Hz* | Mode: Continuous)
-    // *Note: Using 200Hz ODR internally ensures your 50Hz reads are always fresh.
+    // 0x05 = 0b00000101 
+    // (OSR: 512 | Range: 2G | ODR: 50Hz* | Mode: Continuous)
     Wire.write(0x09); 
-    Wire.write(0x1D); 
+    Wire.write(0x05); 
     Wire.endTransmission();
     
     // CRITICAL: Set/Reset Period Register (0x0B)

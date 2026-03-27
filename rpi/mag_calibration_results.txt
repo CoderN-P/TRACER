@@ -1,0 +1,12 @@
+# Magnetometer Calibration Results
+# Generated on 2026-03-26 17:24:14
+
+# Hard Iron Offset (μT)
+hard_iron_offset = [29.388542, 40.285078, -9.347339]
+
+# Soft Iron Matrix
+soft_iron_matrix = [
+    [2.285983, 0.291302, 0.198188],
+    [0.291302, 1.321735, 0.207721],
+    [0.198188, 0.207721, 1.072847],
+]

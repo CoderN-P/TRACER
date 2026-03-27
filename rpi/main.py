@@ -8,7 +8,7 @@ load_dotenv()
 from src import text_to_command
 import os
 
-from src import Robot, SerialManager, run_socket_server, socketio, ROBOT_CONFIG, calibrate_wheel, calibrate_wheelbase, serial_test, calibrate_ks, calibrate_kv, calibrate_max_speed, interactive_velocity_test
+from src import Robot, SerialManager, run_socket_server, socketio, ROBOT_CONFIG, calibrate_wheel, calibrate_wheelbase, serial_test, calibrate_ks, calibrate_kv, calibrate_max_speed, interactive_velocity_test, calibrate_mag
 
 parser = argparse.ArgumentParser(
     prog="TRACER RPI",
@@ -27,7 +27,9 @@ parser.add_argument('--calibrate-kv', action='store_true', help="Run the kV cali
 parser.add_argument('--ks-left', type=float, default=0.2, help="Initial guess for left motor kS value during kV calibration (default: 0.2).")
 parser.add_argument('--ks-right', type=float, default=0.2, help="Initial guess for right motor kS value during kV calibration (default: 0.2).")
 parser.add_argument('--calibrate-max-speed', action='store_true', help="Run the max speed calibration routine to determine the maximum achievable speed of the robot at full motor power.")
+parser.add_argument('--calibrate-mag', action='store_true', help="Calibrate the magnetometer using hard and soft iron calibration.")
 parser.add_argument('--interactive-test', action='store_true', help="Run interactive velocity test CLI (enter left/right m/s + duration repeatedly until exit).")
+parser.add_argument("--timeout", type=float, default=1.0, help="No-data timeout before mag calibration (seconds)")
 
 async def main():
     port = SerialManager.find_port()
@@ -73,6 +75,8 @@ if __name__ == "__main__":
         calibrate_max_speed(args.port)
     elif args.interactive_test:
         interactive_velocity_test(args.port)
+    elif args.calibrate_mag:
+        calibrate_mag(args.port, args.timeout)
     else:
         if hostname == "tracer":
             asyncio.run(main())

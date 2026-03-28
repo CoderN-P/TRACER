@@ -1,6 +1,6 @@
 #include <WiFi.h>
-#include <FreeRTOS/task.h>
-#include <FreeRTOS/queue.h>
+#include "freertos/task.h"
+#include "freertos/queue.h"
 #include <Wire.h>
 #include "PID.h"
 #include "config.h"

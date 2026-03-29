@@ -14,14 +14,9 @@ Adafruit_SSD1306 display(OLED_WIDTH, OLED_HEIGHT, &Wire, -1);
 
 bool setupOLED()
 {
-  if (i2c_mutex == NULL || xSemaphoreTake(i2c_mutex, pdMS_TO_TICKS(20)) != pdTRUE)
-  {
-    return false;
-  }
-
+  // No mutex needed—runs in setup() before FreeRTOS tasks start
   if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C))
   { // Address 0x3C for 128x64
-    xSemaphoreGive(i2c_mutex);
     return false;
   }
 
@@ -31,8 +26,6 @@ bool setupOLED()
 
   lastPageSwitch = millis();
 
-  display.clearDisplay();
-  xSemaphoreGive(i2c_mutex);
   return true;
 }
 
@@ -231,6 +224,12 @@ void drawPage3(RobotState &state, bool blinkState)
 
 void updateOLED(RobotState &state)
 {
+  // Hold mutex for entire draw+display cycle to prevent I2C buffer corruption
+  if (i2c_mutex == NULL || xSemaphoreTake(i2c_mutex, pdMS_TO_TICKS(50)) != pdTRUE)
+  {
+    return; // Skip this frame if we can't get the lock
+  }
+
   uint32_t now = millis();
   if (now - lastPageSwitch >= PAGE_CYCLE_MS)
   {
@@ -259,9 +258,6 @@ void updateOLED(RobotState &state)
   drawPageDots();
   drawHeader(state, blinkState);
 
-  if (i2c_mutex != NULL && xSemaphoreTake(i2c_mutex, pdMS_TO_TICKS(10)) == pdTRUE)
-  {
-    display.display();
-    xSemaphoreGive(i2c_mutex);
-  }
+  display.display();
+  xSemaphoreGive(i2c_mutex);
 }

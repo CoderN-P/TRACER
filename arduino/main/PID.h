@@ -13,15 +13,12 @@ private:
     float setpoint;
     std::atomic<float> pendingSetpoint; // For thread-safe setpoint updates from the command processor task
     float lastError;
-    int mode; // 0 = PID control mode, 1 = open-loop PWM control mode
     float integral;
 
 public:
     PIDController(float kp, float ki, float kd);
     void reset();
     float getSetpoint();                            // Get the current setpoint of the PID controller
-    int getMode();                                  // Get the current mode (PID control or open-loop PWM control)
-    void setPWMSetpoint(float pwmSetpoint);         // Set the desired PWM setpoint and switch to open-loop PWM control mode
     void setPendingSetpoint(float pendingSetpoint); // Set the desired setpoint for the PID controller
     float getPendingSetpoint();                     // Get the current PWM setpoint (returns 0 if in PID control mode)
     void setSetpoint(float setpoint);               // Set the desired setpoint for the PID controller

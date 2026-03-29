@@ -11,7 +11,6 @@ PIDController::PIDController(float kp, float ki, float kd)
     this->pendingSetpoint = 0;
     this->lastError = 0;
     this->integral = 0;
-    this->mode = 0; // 0 = PID control mode, 1 = open-loop PWM control mode
 }
 
 void PIDController::setSetpoint(float setpoint)
@@ -19,20 +18,9 @@ void PIDController::setSetpoint(float setpoint)
     this->setpoint = setpoint;
 }
 
-void PIDController::setPWMSetpoint(float pwmSetpoint)
-{
-    this->mode = 1;               // Switch to open-loop PWM control mode
-    this->setpoint = pwmSetpoint; // In PWM mode, the "setpoint" variable holds the desired PWM value for feedforward calculation
-}
-
 void PIDController::setPendingSetpoint(float pendingSetpoint)
 {
     this->pendingSetpoint = pendingSetpoint;
-}
-
-int PIDController::getMode()
-{
-    return this->mode;
 }
 
 float PIDController::getSetpoint()
@@ -63,10 +51,10 @@ float PIDController::compute(float input, float feedforward)
 
     return feedforward + proportional_t + integral_t + derivative_t;
 }
+
 void PIDController::reset()
 {
     this->lastError = 0;
     this->integral = 0;
     this->setpoint = 0;
-    this->mode = 0;
 }

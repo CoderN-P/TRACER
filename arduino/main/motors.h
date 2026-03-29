@@ -15,5 +15,5 @@ void setup_pwm();
 void handleMovement(float leftPWM, float rightPWM);
 void IRAM_ATTR estopISR();
 float sign(float v);
-std::pair<float, float> pidLoop(float leftSpeed, float rightSpeed);
+std::pair<float, float> pidLoop(float leftSpeed, float rightSpeed, uint8_t mode);
 #endif

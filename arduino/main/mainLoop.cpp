@@ -74,20 +74,10 @@ void mainLoop(void *pvParameters)
 
         if (pendingMode != lastPIDMode)
         {
-            if (pendingMode == 0) // PID mode
-            {
-                pidLeft.reset();
-                pidRight.reset();
-
-                pidLeft.setSetpoint(pidLeft.getPendingSetpoint());
-                pidRight.setSetpoint(pidRight.getPendingSetpoint());
-            }
-            else if (pendingMode == 1) // PWM mode
-            {
-                pidLeft.setPWMSetpoint(pidLeft.getPendingSetpoint());
-                pidRight.setPWMSetpoint(pidRight.getPendingSetpoint());
-            }
-
+            pidLeft.reset();
+            pidRight.reset();
+            pidLeft.setSetpoint(pidLeft.getPendingSetpoint());
+            pidRight.setSetpoint(pidRight.getPendingSetpoint());
             lastPIDMode = pendingMode;
         }
 
@@ -100,7 +90,7 @@ void mainLoop(void *pvParameters)
 
             if (motorCmdFresh)
             {
-                auto [leftPWM_CPY, rightPWM_CPY] = pidLoop(leftSpeed, rightSpeed);
+                auto [leftPWM_CPY, rightPWM_CPY] = pidLoop(leftSpeed, rightSpeed, lastPIDMode);
                 leftPWM = leftPWM_CPY;
                 rightPWM = rightPWM_CPY;
             }
@@ -185,20 +175,6 @@ void mainLoop(void *pvParameters)
 
         Serial.write((uint8_t *)&packet, sizeof(packet));
 
-        int leftPIDMode = pidLeft.getMode();
-        int rightPIDMode = pidRight.getMode();
-
-        uint8_t mode;
-
-        if (leftPIDMode == 1 && rightPIDMode == 1)
-        {
-            mode = 1; // Open-loop PWM control mode
-        }
-        else
-        {
-            mode = 0; // PID control mode
-        }
-
         uint32_t loop_time = micros() - loop_start;
         float elapsed_ms = loop_time / 1000.0;
 
@@ -228,7 +204,7 @@ void mainLoop(void *pvParameters)
             robot_state.rightPWM = rightPWM;
             robot_state.timestamp = packet.timestamp;
             robot_state.newMagData = newMagData;
-            robot_state.pidMode = mode;
+            robot_state.pidMode = lastPIDMode;
             robot_state.distanceFront = distanceFront;
 
             xSemaphoreGive(state_mutex);

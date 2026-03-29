@@ -124,12 +124,12 @@ float sign(float v)
     return 0.0;
 }
 
-std::pair<float, float> pidLoop(float leftSpeed, float rightSpeed)
+std::pair<float, float> pidLoop(float leftSpeed, float rightSpeed, uint8_t mode)
 {
     // Simple feedforward model
 
     // Only run direct PWM control if the PWM values are set and in range. As soon as a motor command is recieved, the PWM setpoint will be set to 2 (out of range) to indicate that we should be in PID control mode, so this allows us to switch between open-loop PWM control and closed-loop PID control based on whether we've received a valid motor command or not.
-    if (pidLeft.getMode() == 1 && pidRight.getMode() == 1)
+    if (mode == 1)
     {
         // If we're in open-loop PWM control mode, just return the PWM setpoint as the output without PID correction
         handleMovement(pidLeft.getSetpoint(), pidRight.getSetpoint());

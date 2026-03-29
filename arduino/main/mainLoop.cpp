@@ -67,12 +67,11 @@ void mainLoop(void *pvParameters)
 
         uint8_t pendingMode = pendingPIDMode.load();
 
+        // If the control mode has changed since the last loop, reset the PID controllers to prevent integral windup and other issues when switching between open-loop and closed-loop control
         if (pendingMode != lastPIDMode)
         {
             pidLeft.reset();
             pidRight.reset();
-            pidLeft.setSetpoint(pidLeft.getPendingSetpoint());
-            pidRight.setSetpoint(pidRight.getPendingSetpoint());
             lastPIDMode = pendingMode;
         }
         
@@ -88,6 +87,8 @@ void mainLoop(void *pvParameters)
 
             if (motorCmdFresh)
             {
+                pidLeft.setSetpoint(pidLeft.getPendingSetpoint());
+                pidRight.setSetpoint(pidRight.getPendingSetpoint());
                 auto [leftPWM_CPY, rightPWM_CPY] = pidLoop(leftSpeed, rightSpeed, lastPIDMode);
                 leftPWM = leftPWM_CPY;
                 rightPWM = rightPWM_CPY;

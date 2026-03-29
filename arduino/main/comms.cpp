@@ -93,9 +93,9 @@ void handleCommand(byte *buffer, size_t length)
     {
         // Command 0x03: ENABLE
         lastMotorCommandMs.store(millis());
-        
+
         digitalWrite(STBY, HIGH);
-        
+
         motorsEnabled.store(true);
         pidLeft.reset();
         pidRight.reset();
@@ -120,8 +120,8 @@ void handleCommand(byte *buffer, size_t length)
         lastMotorCommandMs.store(millis());
         pendingPIDMode.store(1); // Switch to open-loop PWM control mode
 
-        pidLeft.setSetpoint(leftPWM_raw / 1000.0f);
-        pidRight.setSetpoint(rightPWM_raw / 1000.0f); // Convert to -1 to 1 range
+        pidLeft.setPendingSetpoint(leftPWM_raw / 1000.0f);
+        pidRight.setPendingSetpoint(rightPWM_raw / 1000.0f); // Convert to -1 to 1 range
         strncpy(line1, "Direct PWM Set", 16);
     }
     else

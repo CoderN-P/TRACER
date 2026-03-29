@@ -11,6 +11,7 @@
 #include "comms.h"
 #include "tasks.h"
 #include "OLED.h"
+#include <atomic>
 
 // RTOS task handles
 TaskHandle_t ultrasonicTaskHandle;
@@ -31,8 +32,8 @@ RobotState robot_state;
 SemaphoreHandle_t state_mutex;
 SemaphoreHandle_t i2c_mutex;
 QueueHandle_t commandQueue;
-volatile bool motorsEnabled = true;
-volatile uint32_t lastMotorCommandMs = 0;
+std::atomic<bool> motorsEnabled = true;
+std::atomic<uint32_t> lastMotorCommandMs = 0;
 
 void setup()
 {

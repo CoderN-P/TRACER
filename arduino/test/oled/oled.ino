@@ -1,6 +1,7 @@
 #include <Adafruit_SSD1306.h>
 #include <Adafruit_GFX.h>
 #include <Wire.h>
+#include <atomic>
 
 #define WIDTH 128
 #define HEIGHT 64
@@ -36,7 +37,7 @@ bool irBack = false;
 // ── State ─────────────────────────────────────────────────────
 Adafruit_SSD1306 display(WIDTH, HEIGHT, &Wire, -1);
 
-static uint8_t pageIndex = 0;
+std::atomic<uint8_t> pageIndex = 0;
 static uint32_t lastPageSwitch = 0;
 static uint32_t lastOledUpdate = 0;
 static uint32_t lastBlink = 0;

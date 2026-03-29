@@ -8,6 +8,7 @@
 #include "globals.h"
 #include "config.h"
 #include <Arduino.h>
+#include <atomic>
 
 #define WIDTH 128
 #define HEIGHT 64

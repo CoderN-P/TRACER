@@ -71,6 +71,8 @@
   >([]);
   let freehandPath = $state<{ x: number; y: number }[]>([]);
   let pathComplete = $state(false);
+  let joystickSendInterval: ReturnType<typeof setInterval> | null = null;
+  let wasJoystickActive = false;
 
   function onSubmit(e) {
     if (input.trim() === "") return;
@@ -186,7 +188,25 @@
       pathComplete = true;
     });
 
+    joystickSendInterval = setInterval(() => {
+      const snapshot = $state.snapshot(uiJoystick);
+      const isActive = snapshot.left_y !== 0 || snapshot.right_x !== 0;
+
+      if (isActive) {
+        socket.emit("joystick_input", snapshot);
+      } else if (wasJoystickActive) {
+        // Send exactly one neutral command when returning to center.
+        socket.emit("joystick_input", snapshot);
+      }
+
+      wasJoystickActive = isActive;
+    }, 100);
+
     return () => {
+      if (joystickSendInterval) {
+        clearInterval(joystickSendInterval);
+        joystickSendInterval = null;
+      }
       socket.disconnect();
     };
   });
@@ -217,10 +237,6 @@
       icon: "warning",
     });
   }
-
-  $effect(() => {
-    socket.emit("joystick_input", uiJoystick);
-  });
 
   function cliffDetected(data: SensorData): boolean {
     return !data.ir_back || !data.ir_front;
@@ -274,10 +290,6 @@
       logs.push(newLog);
     }
   }
-
-  $effect(() => {
-    socket.emit("joystick_input", $state.snapshot(uiJoystick));
-  });
 </script>
 
 <KeyboardHandler bind:joystick={uiJoystick} {inputFocus} />

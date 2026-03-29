@@ -1,8 +1,9 @@
 #include "sensors.h"
 #include "config.h"
 #include "globals.h"
+#include <atomic>
 
-float distanceFront = 300.0; // Initialize with max range (300 cm for VL53L0X)
+std::atomic<float> distanceFront = 300.0; // Initialize with max range (300 cm for VL53L0X)
 
 void tofTask(void *pvParameters) {
     const TickType_t xFrequency = pdMS_TO_TICKS(TOF_INTERVAL);
@@ -10,6 +11,8 @@ void tofTask(void *pvParameters) {
     
     while (true) {
         vTaskDelayUntil(&xLastWakeTime, xFrequency);
-        getToFDistance(distanceFront);
+        float dist;
+        getToFDistance(dist);
+        distanceFront.store(dist);
     }
 }

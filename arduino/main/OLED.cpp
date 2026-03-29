@@ -6,9 +6,10 @@
 #include "globals.h"
 #include "config.h"
 #include <Arduino.h>
+#include <atomic>
 
 uint32_t lastPageSwitch = 0;
-uint8_t pageIndex = 0;
+std::atomic<uint8_t> pageIndex = 0;
 bool blinkState = false;
 Adafruit_SSD1306 display(OLED_WIDTH, OLED_HEIGHT, &Wire, -1);
 

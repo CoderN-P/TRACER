@@ -18,6 +18,7 @@ void mainLoop(void *pvParameters)
     int16_t prevPcntRight = 0;
     int32_t leftEncoderCount = 0;
     int32_t rightEncoderCount = 0;
+    uint8_t lastPIDMode = 0; // 0 = PID control mode, 1 = open-loop PWM control mode
     static portMUX_TYPE spinlock = portMUX_INITIALIZER_UNLOCKED;
 
     while (true)
@@ -69,6 +70,27 @@ void mainLoop(void *pvParameters)
         float leftSpeed, rightSpeed;
         float leftPWM, rightPWM;
 
+        uint8_t pendingMode = pendingPIDMode.load();
+
+        if (pendingMode != lastPIDMode)
+        {
+            if (pendingMode == 0) // PID mode
+            {
+                pidLeft.reset();
+                pidRight.reset();
+
+                pidLeft.setSetpoint(pidLeft.getPendingSetpoint());
+                pidRight.setSetpoint(pidRight.getPendingSetpoint());
+            }
+            else if (pendingMode == 1) // PWM mode
+            {
+                pidLeft.setPWMSetpoint(pidLeft.getPendingSetpoint());
+                pidRight.setPWMSetpoint(pidRight.getPendingSetpoint());
+            }
+
+            lastPIDMode = pendingMode;
+        }
+
         if (motorsEnabled)
         {
             const bool motorCmdFresh = (uint32_t)(millis() - lastMotorCommandMs) <= MOTOR_COMMAND_TIMEOUT_MS;
@@ -86,6 +108,8 @@ void mainLoop(void *pvParameters)
             {
                 // Motor command stream timed out: bypass PID and force zero output.
                 handleMovement(0.0, 0.0);
+                pidLeft.reset();
+                pidRight.reset();
                 leftPWM = 0.0f;
                 rightPWM = 0.0f;
             }
@@ -164,7 +188,7 @@ void mainLoop(void *pvParameters)
         int leftPIDMode = pidLeft.getMode();
         int rightPIDMode = pidRight.getMode();
 
-        int mode;
+        uint8_t mode;
 
         if (leftPIDMode == 1 && rightPIDMode == 1)
         {

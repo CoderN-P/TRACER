@@ -77,8 +77,10 @@ void handleCommand(byte *buffer, size_t length)
 
         lastMotorCommandMs = millis();
 
-        pidLeft.setSetpoint(leftVel / 1000.0f); // Convert mm/s to m/s for PID setpoint
-        pidRight.setSetpoint(rightVel / 1000.0f);
+        pendingPIDMode = 0; // Switch to PID control mode
+
+        pidLeft.setPendingSetpoint(leftVel / 1000.0f); // Convert mm/s to m/s for PID setpoint
+        pidRight.setPendingSetpoint(rightVel / 1000.0f);
     }
     else if (cmd == CMD_OLED_UPDATE && length == 35)
     {
@@ -116,8 +118,10 @@ void handleCommand(byte *buffer, size_t length)
 
         lastMotorCommandMs = millis();
 
-        pidLeft.setPWMSetpoint(leftPWM_raw / 1000.0f);
-        pidRight.setPWMSetpoint(rightPWM_raw / 1000.0f); // Convert to -1 to 1 range
+        pendingPIDMode = 1; // Switch to open-loop PWM control mode
+
+        pidLeft.setSetpoint(leftPWM_raw / 1000.0f);
+        pidRight.setSetpoint(rightPWM_raw / 1000.0f); // Convert to -1 to 1 range
         strncpy(line1, "Direct PWM Set", 16);
     }
     else

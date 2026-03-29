@@ -12,19 +12,28 @@ uint8_t pageIndex = 0;
 bool blinkState = false;
 Adafruit_SSD1306 display(OLED_WIDTH, OLED_HEIGHT, &Wire, -1);
 
-bool setupOLED() {
-    if(!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) { // Address 0x3C for 128x64
-        return false;
-    }
-    
-    display.clearDisplay();
-    drawHeaderStatic();
-    display.display();
-    
-    lastPageSwitch = millis();
-      
-    display.clearDisplay();
-    return true; 
+bool setupOLED()
+{
+  if (i2c_mutex == NULL || xSemaphoreTake(i2c_mutex, pdMS_TO_TICKS(20)) != pdTRUE)
+  {
+    return false;
+  }
+
+  if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C))
+  { // Address 0x3C for 128x64
+    xSemaphoreGive(i2c_mutex);
+    return false;
+  }
+
+  display.clearDisplay();
+  drawHeaderStatic();
+  display.display();
+
+  lastPageSwitch = millis();
+
+  display.clearDisplay();
+  xSemaphoreGive(i2c_mutex);
+  return true;
 }
 
 void drawHeaderStatic()
@@ -35,28 +44,31 @@ void drawHeaderStatic()
 void drawHeader(RobotState &state, bool blinkState)
 {
   // Blink dot (status indicator)
-    // Draw black rect to clear prev status
-    
-    display.setTextSize(1);
-    display.setTextColor(WHITE);
-    display.fillRect(0, 1, 40, 12, BLACK);
-    display.setCursor(0, 4);
-    display.print(motorsEnabled ? "[RUN]" : "[STOP]");
-    
-    bool motorsPhysical = digitalRead(STBY) == HIGH;
-    
-     if (motorsPhysical != motorsEnabled){
-        display.print("*"); // indicate mismatch between desired and actual motor state
-     }
-     
-     // Indicate PWM vs PID mode
-     if (state.pidMode == 1){
-        display.print("-");
-     }
-     else {
-        display.print("+");
-     }
-    
+  // Draw black rect to clear prev status
+
+  display.setTextSize(1);
+  display.setTextColor(WHITE);
+  display.fillRect(0, 1, 40, 12, BLACK);
+  display.setCursor(0, 4);
+  display.print(motorsEnabled ? "[RUN]" : "[STOP]");
+
+  bool motorsPhysical = digitalRead(STBY) == HIGH;
+
+  if (motorsPhysical != motorsEnabled)
+  {
+    display.print("*"); // indicate mismatch between desired and actual motor state
+  }
+
+  // Indicate PWM vs PID mode
+  if (state.pidMode == 1)
+  {
+    display.print("-");
+  }
+  else
+  {
+    display.print("+");
+  }
+
   display.fillCircle(45, 7, 3, blinkState ? WHITE : BLACK);
 
   // Loop time
@@ -139,7 +151,7 @@ void drawPage2(RobotState &state)
 {
   display.setTextSize(1);
   display.setCursor(0, CONTENT_Y + 2);
-  
+
   display.println(state.oledLine1);
   display.setCursor(0, CONTENT_Y + 22);
   display.println(state.oledLine2);
@@ -217,33 +229,39 @@ void drawPage3(RobotState &state, bool blinkState)
   display.print(state.irBack ? "T" : "F");
 }
 
-void updateOLED(RobotState &state){
-    uint32_t now = millis();
-    if (now - lastPageSwitch >= PAGE_CYCLE_MS)
-    {
-        pageIndex = (pageIndex + 1) % NUM_PAGES;
-        lastPageSwitch = now;
-    }
-    
-    // 500 ms blink tick (same as oled update interval)
-    blinkState = !blinkState;
-    
-    clearContent();
-    
-    switch (pageIndex)
-    {
-        case 0:
-          drawPage1(state);
-          break;
-        case 1:
-          drawPage2(state);
-          break;
-        case 2:
-          drawPage3(state, blinkState);
-          break;
-    }
-    
-    drawPageDots();
-    drawHeader(state, blinkState);
+void updateOLED(RobotState &state)
+{
+  uint32_t now = millis();
+  if (now - lastPageSwitch >= PAGE_CYCLE_MS)
+  {
+    pageIndex = (pageIndex + 1) % NUM_PAGES;
+    lastPageSwitch = now;
+  }
+
+  // 500 ms blink tick (same as oled update interval)
+  blinkState = !blinkState;
+
+  clearContent();
+
+  switch (pageIndex)
+  {
+  case 0:
+    drawPage1(state);
+    break;
+  case 1:
+    drawPage2(state);
+    break;
+  case 2:
+    drawPage3(state, blinkState);
+    break;
+  }
+
+  drawPageDots();
+  drawHeader(state, blinkState);
+
+  if (i2c_mutex != NULL && xSemaphoreTake(i2c_mutex, pdMS_TO_TICKS(10)) == pdTRUE)
+  {
     display.display();
+    xSemaphoreGive(i2c_mutex);
+  }
 }

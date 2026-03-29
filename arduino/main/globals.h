@@ -8,6 +8,7 @@
 
 extern RobotState robot_state;
 extern SemaphoreHandle_t state_mutex;
+extern SemaphoreHandle_t i2c_mutex;
 extern volatile bool motorsEnabled;
 extern PIDController pidLeft;
 extern PIDController pidRight;

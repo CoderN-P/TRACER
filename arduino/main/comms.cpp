@@ -51,9 +51,12 @@ void handleCommand(byte *buffer, size_t length)
     if (checksum != buffer[length - 1])
     {
         strncpy(line1, "Checksum Error", 16);
-        return;
+    } 
+    else if (length != expectedCommandLength(cmd))
+    {
+        strncpy(line1, "Length Error", 16);
     }
-    if (cmd == CMD_MOVE && length == 7)
+    else if (cmd == CMD_MOVE && length == 7)
     {
         // Command 0x01: Handle movement
         int16_t leftVel, rightVel; // mm/s
@@ -69,6 +72,8 @@ void handleCommand(byte *buffer, size_t length)
         // Command 0x02: Update OLED with two lines of text
         memcpy(line1, &buffer[2], 16);
         memcpy(line2, &buffer[18], 16);
+        line1[16] = '\0';
+        line2[16] = '\0';
     } else if (cmd == CMD_ENABLE && length == 3){
         // Command 0x03: ENABLE
         motorsEnabled = true;

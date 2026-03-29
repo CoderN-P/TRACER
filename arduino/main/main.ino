@@ -12,7 +12,6 @@
 #include "tasks.h"
 #include "OLED.h"
 
-
 // RTOS task handles
 TaskHandle_t ultrasonicTaskHandle;
 TaskHandle_t mainLoopHandle;
@@ -30,6 +29,7 @@ PIDController pidRight(P_RIGHT, I_RIGHT, D_RIGHT);
 
 RobotState robot_state;
 SemaphoreHandle_t state_mutex;
+SemaphoreHandle_t i2c_mutex;
 QueueHandle_t commandQueue;
 volatile bool motorsEnabled = true;
 
@@ -48,44 +48,55 @@ void setup()
     pinMode(STBY, OUTPUT);
     pinMode(BATTERY, INPUT);
     pinMode(ENCODER_LEFT_A, INPUT_PULLUP);
-    pinMode(ENCODER_LEFT_B, INPUT_PULLUP);  
+    pinMode(ENCODER_LEFT_B, INPUT_PULLUP);
     pinMode(ENCODER_RIGHT_A, INPUT_PULLUP);
     pinMode(ENCODER_RIGHT_B, INPUT_PULLUP);
     pinMode(ESTOP_PIN, INPUT_PULLUP);
-    
+
     digitalWrite(STBY, HIGH);
-    
-    WiFi.mode(WIFI_OFF); 
-    
-    
+
+    WiFi.mode(WIFI_OFF);
+
     attachInterrupt(digitalPinToInterrupt(ECHO_1), echoISR1, CHANGE);
     attachInterrupt(digitalPinToInterrupt(ECHO_2), echoISR2, CHANGE);
     attachInterrupt(digitalPinToInterrupt(ESTOP_PIN), estopISR, FALLING);
-    
+
     setupEncoderLeft();
-    
+
     setupEncoderRight();
 
     state_mutex = xSemaphoreCreateMutex();
+    i2c_mutex = xSemaphoreCreateMutex();
+
+    if (state_mutex == NULL || i2c_mutex == NULL)
+    {
+        while (true)
+        {
+            delay(1000);
+        }
+    }
+
     Wire.begin();
     Wire.setClock(400000); // Set I2C to 400kHz (Fast Mode)
+    Wire.setTimeOut(20);   // Prevent indefinite stalls on a stuck I2C bus
     Serial.begin(BAUD_RATE);
     Serial.setTimeout(50);
 
     delay(1000); // Allow time for sensors to stabilize
     digitalWrite(STBY, HIGH);
-    
+
     // Create the command queue (10 commands deep, each command can be up to MAX_BUFFER_SIZE bytes)
     commandQueue = xQueueCreate(10, sizeof(byte) * MAX_BUFFER_SIZE);
-    
+
     setup_magnetometer();
     setup_pwm();
     setupOLED();
     setup_tof();
-    
+
     if (initMPU6050())
     {
-        if (xSemaphoreTake(state_mutex, 0) == pdTRUE) {
+        if (xSemaphoreTake(state_mutex, 0) == pdTRUE)
+        {
             strncpy(robot_state.oledLine1, "Initialized", 16);
             strncpy(robot_state.oledLine2, "MPU6050 OK", 16);
             xSemaphoreGive(state_mutex);
@@ -94,33 +105,35 @@ void setup()
     else
     {
         // TODO: Display error on OLED
-        if (xSemaphoreTake(state_mutex, 0) == pdTRUE) {
+        if (xSemaphoreTake(state_mutex, 0) == pdTRUE)
+        {
             strncpy(robot_state.oledLine1, "MPU6050 Failed", 16);
             xSemaphoreGive(state_mutex);
         }
     }
-    
+
     // Create RTOS tasks
-    
+
     // Medium priority task for triggering ultrasonic sensors at 20 Hz
     xTaskCreate(ultrasonicTask, "Ultrasonic Task", 2048, NULL, 3, &ultrasonicTaskHandle);
-    
-    // High priority task for main loop (PID, sensor reading, sending data) at 100 Hz, 
-    xTaskCreate(mainLoop, "Main Loop", 4096, NULL, 4, &mainLoopHandle); 
-    
+
+    // High priority task for main loop (PID, sensor reading, sending data) at 100 Hz,
+    xTaskCreate(mainLoop, "Main Loop", 4096, NULL, 4, &mainLoopHandle);
+
     // High priority task for serial listening
     xTaskCreate(vSerialTask, "Serial Task", 2048, NULL, 4, &serialTaskHandle);
     // Medium priority task for processing commands from the command queue
     xTaskCreate(commandProcessorTask, "Command Processor Task", 4096, NULL, 3, &commandProcessorHandle);
-    
+
     // Medium priority task for reading time-of-flight sensor at 20 Hz
-    
+
     xTaskCreate(tofTask, "ToF Task", 2048, NULL, 3, &tofTaskHandle);
-    
+
     // Low priority task for updating the OLED at 2 Hz
     xTaskCreate(oledUpdateTask, "OLED Update Task", 2048, NULL, 2, &oledUpdateHandle);
 }
 
-void loop() {
+void loop()
+{
     // Empty loop
 }

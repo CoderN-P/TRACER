@@ -8,7 +8,7 @@
 #include <Arduino.h>
 #include <atomic>
 
-std::atomic<uint8_t> pendingPIDMode(0); // 0 = PID control mode, 1 = open-loop PWM control mode
+std::atomic<uint8_t> pendingPIDMode{0}; // 0 = PID control mode, 1 = open-loop PWM control mode
 
 float getLeftMotorSpeed(int32_t deltaLeftTicks)
 {
@@ -47,14 +47,16 @@ void handleMovement(float left, float right)
 
     float leftSpeed = constrain(left, -MAX_PWM, MAX_PWM);
     float rightSpeed = constrain(right, -MAX_PWM, MAX_PWM);
+    
+    bool enabled = motorsEnabled.load();
 
-    if (leftSpeed > 0 && motorsEnabled)
+    if (leftSpeed > 0 && enabled)
     {
         digitalWrite(IN3, HIGH);
         digitalWrite(IN4, LOW);
         mcpwm_set_duty(MCPWM_UNIT_0, MCPWM_TIMER_0, MCPWM_OPR_B, leftSpeed * 100.0);
     }
-    else if (leftSpeed < 0 && motorsEnabled)
+    else if (leftSpeed < 0 && enabled)
     {
         digitalWrite(IN3, LOW);
         digitalWrite(IN4, HIGH);
@@ -62,7 +64,7 @@ void handleMovement(float left, float right)
     }
     else
     {
-        if (motorsEnabled)
+        if (enabled)
         {
             // Allow motors to coast by setting both IN pins low but keeping PWM enabled at 0 duty cycle}
             digitalWrite(IN3, LOW);
@@ -77,14 +79,14 @@ void handleMovement(float left, float right)
         mcpwm_set_duty(MCPWM_UNIT_0, MCPWM_TIMER_0, MCPWM_OPR_B, 0.0);
     }
 
-    if (rightSpeed > 0 && motorsEnabled)
+    if (rightSpeed > 0 && enabled)
     {
         // Swapped high and low for wiring
         digitalWrite(IN1, LOW);
         digitalWrite(IN2, HIGH);
         mcpwm_set_duty(MCPWM_UNIT_0, MCPWM_TIMER_0, MCPWM_OPR_A, rightSpeed * 100.0);
     }
-    else if (rightSpeed < 0 && motorsEnabled)
+    else if (rightSpeed < 0 && enabled)
     {
         digitalWrite(IN1, HIGH);
         digitalWrite(IN2, LOW);
@@ -92,7 +94,7 @@ void handleMovement(float left, float right)
     }
     else
     {
-        if (motorsEnabled)
+        if (enabled)
         {
             // Allow motors to coast by setting both IN pins low but keeping PWM enabled at 0 duty cycle
             digitalWrite(IN1, LOW);

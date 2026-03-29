@@ -75,9 +75,8 @@ void handleCommand(byte *buffer, size_t length)
         memcpy(&leftVel, &buffer[2], 2);
         memcpy(&rightVel, &buffer[4], 2);
 
-        lastMotorCommandMs = millis();
-
-        pendingPIDMode = 0; // Switch to PID control mode
+        lastMotorCommandMs.store(millis());
+        pendingPIDMode.store(0); // Switch to PID control mode
 
         pidLeft.setPendingSetpoint(leftVel / 1000.0f); // Convert mm/s to m/s for PID setpoint
         pidRight.setPendingSetpoint(rightVel / 1000.0f);
@@ -93,9 +92,11 @@ void handleCommand(byte *buffer, size_t length)
     else if (cmd == CMD_ENABLE && length == 3)
     {
         // Command 0x03: ENABLE
-        lastMotorCommandMs = millis();
-        motorsEnabled = true;
+        lastMotorCommandMs.store(millis());
+        
         digitalWrite(STBY, HIGH);
+        
+        motorsEnabled.store(true);
         pidLeft.reset();
         pidRight.reset();
         strncpy(line1, "Motors Enabled", 16);
@@ -103,8 +104,8 @@ void handleCommand(byte *buffer, size_t length)
     else if (cmd == CMD_STOP && length == 3)
     {
         // Command 0x04: STOP
-        lastMotorCommandMs = millis();
-        motorsEnabled = false;
+        lastMotorCommandMs.store(millis());
+        motorsEnabled.store(false);
         digitalWrite(STBY, LOW);
         strncpy(line1, "Motors Stopped", 16);
     }
@@ -116,9 +117,8 @@ void handleCommand(byte *buffer, size_t length)
         memcpy(&leftPWM_raw, &buffer[2], 2);
         memcpy(&rightPWM_raw, &buffer[4], 2);
 
-        lastMotorCommandMs = millis();
-
-        pendingPIDMode = 1; // Switch to open-loop PWM control mode
+        lastMotorCommandMs.store(millis());
+        pendingPIDMode.store(1); // Switch to open-loop PWM control mode
 
         pidLeft.setSetpoint(leftPWM_raw / 1000.0f);
         pidRight.setSetpoint(rightPWM_raw / 1000.0f); // Convert to -1 to 1 range

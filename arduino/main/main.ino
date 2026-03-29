@@ -32,8 +32,8 @@ RobotState robot_state;
 SemaphoreHandle_t state_mutex;
 SemaphoreHandle_t i2c_mutex;
 QueueHandle_t commandQueue;
-std::atomic<bool> motorsEnabled = true;
-std::atomic<uint32_t> lastMotorCommandMs = 0;
+std::atomic<bool> motorsEnabled{true};
+std::atomic<uint32_t> lastMotorCommandMs{0};
 
 void setup()
 {
@@ -84,7 +84,7 @@ void setup()
     Serial.begin(BAUD_RATE);
     Serial.setTimeout(50);
 
-    lastMotorCommandMs = millis();
+    lastMotorCommandMs.store(millis());
 
     delay(1000); // Allow time for sensors to stabilize
     digitalWrite(STBY, HIGH);

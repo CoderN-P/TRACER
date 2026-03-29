@@ -9,7 +9,7 @@
 #include <atomic>
 
 uint32_t lastPageSwitch = 0;
-std::atomic<uint8_t> pageIndex = 0;
+std::atomic<uint8_t> pageIndex{0};
 bool blinkState = false;
 Adafruit_SSD1306 display(OLED_WIDTH, OLED_HEIGHT, &Wire, -1);
 
@@ -44,11 +44,14 @@ void drawHeader(RobotState &state, bool blinkState)
   display.setTextColor(WHITE);
   display.fillRect(0, 1, 40, 12, BLACK);
   display.setCursor(0, 4);
-  display.print(motorsEnabled ? "[RUN]" : "[STOP]");
+  
+  bool enabled = motorsEnabled.load();
+  
+  display.print(enabled ? "[RUN]" : "[STOP]");
 
   bool motorsPhysical = digitalRead(STBY) == HIGH;
 
-  if (motorsPhysical != motorsEnabled)
+  if (motorsPhysical != enabled)
   {
     display.print("*"); // indicate mismatch between desired and actual motor state
   }
@@ -92,10 +95,11 @@ void clearContent()
 
 void drawPageDots()
 {
+  uint8_t idx = pageIndex.load();
   for (uint8_t i = 0; i < NUM_PAGES; i++)
   {
     uint8_t dx = WIDTH - NUM_PAGES * 8 + i * 8;
-    if (i == pageIndex)
+    if (i == idx)
       display.fillCircle(dx, HEIGHT - 3, 2, WHITE);
     else
       display.drawCircle(dx, HEIGHT - 3, 2, WHITE);
@@ -105,39 +109,49 @@ void drawPageDots()
 // Page 1 ─ Motor PWM bars + velocity
 void drawPage1(RobotState &state)
 {
-  const uint8_t BAR_W = 57;
-  const uint8_t BAR_H = 9;
-  const uint8_t ROW1_Y = CONTENT_Y + 1;
-  const uint8_t BAR_Y = ROW1_Y + 10;
-  const uint8_t VEL_Y = BAR_Y + BAR_H + 4;
-
-  display.setTextSize(1);
-
-  // Labels
-  display.setCursor(0, ROW1_Y);
-  display.print("L:");
-  display.print((int)(state.leftPWM * 100));
-  display.print("%");
-  display.setCursor(65, ROW1_Y);
-  display.print("R:");
-  display.print((int)(state.rightPWM * 100));
-  display.print("%");
-
-  // Left bar (outline + fill)
-  display.drawRect(0, BAR_Y, BAR_W, BAR_H, WHITE);
-  display.fillRect(0, BAR_Y, (int)(BAR_W * abs(state.leftPWM)), BAR_H, WHITE);
-
-  // Right bar
-  display.drawRect(65, BAR_Y, BAR_W, BAR_H, WHITE);
-  display.fillRect(65, BAR_Y, (int)(BAR_W * abs(state.rightPWM)), BAR_H, WHITE);
-
-  // Velocity
-  display.setCursor(0, VEL_Y);
-  display.print(state.leftSpeed, 3);
-  display.print(" m/s");
-  display.setCursor(65, VEL_Y);
-  display.print(state.rightSpeed, 3);
-  display.print(" m/s");
+    const uint8_t BAR_W = 57;
+    const uint8_t BAR_H = 9;
+    const uint8_t ROW1_Y = CONTENT_Y + 1;
+    const uint8_t BAR_Y = ROW1_Y + 10;
+    const uint8_t VEL_Y = BAR_Y + BAR_H + 4;
+    const uint8_t SETPOINT_Y = VEL_Y + 10;
+    
+    
+    display.setTextSize(1);
+    
+    // Labels
+    display.setCursor(0, ROW1_Y);
+    display.print("L:");
+    display.print((int)(state.leftPWM * 100));
+    display.print("%");
+    display.setCursor(65, ROW1_Y);
+    display.print("R:");
+    display.print((int)(state.rightPWM * 100));
+    display.print("%");
+    
+    // Left bar (outline + fill)
+    display.drawRect(0, BAR_Y, BAR_W, BAR_H, WHITE);
+    display.fillRect(0, BAR_Y, (int)(BAR_W * abs(state.leftPWM)), BAR_H, WHITE);
+    
+    // Right bar
+    display.drawRect(65, BAR_Y, BAR_W, BAR_H, WHITE);
+    display.fillRect(65, BAR_Y, (int)(BAR_W * abs(state.rightPWM)), BAR_H, WHITE);
+    
+    // Velocity
+    display.setCursor(0, VEL_Y);
+    display.print(state.leftSpeed, 3);
+    display.print(" m/s");
+    display.setCursor(65, VEL_Y);
+    display.print(state.rightSpeed, 3);
+    display.print(" m/s");
+    
+    // Setpoints
+    display.setCursor(0, SETPOINT_Y);
+    display.print(state.leftSetpoint, 3);
+    display.print(state.pidMode == 0 ? " m/s" : " PWM");
+    display.setCursor(65, SETPOINT_Y);
+    display.print(state.rightSetpoint, 3);
+    display.print(state.pidMode == 0 ? " m/s" : " PWM");
 }
 
 // Page 2 ─ Two lines of text (messages / errors)
@@ -232,9 +246,12 @@ void updateOLED(RobotState &state)
   }
 
   uint32_t now = millis();
+  
+  uint8_t idx = pageIndex.load();
+  
   if (now - lastPageSwitch >= PAGE_CYCLE_MS)
   {
-    pageIndex = (pageIndex + 1) % NUM_PAGES;
+    pageIndex.store((idx + 1) % NUM_PAGES);
     lastPageSwitch = now;
   }
 
@@ -243,7 +260,7 @@ void updateOLED(RobotState &state)
 
   clearContent();
 
-  switch (pageIndex)
+  switch (idx)
   {
   case 0:
     drawPage1(state);

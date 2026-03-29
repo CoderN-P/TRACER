@@ -8,7 +8,7 @@ PIDController::PIDController(float kp, float ki, float kd)
     this->ki = ki;
     this->kd = kd;
     this->setpoint = 0;
-    this->pendingSetpoint = 0;
+    this->pendingSetpoint.store(0);
     this->lastError = 0;
     this->integral = 0;
 }
@@ -20,7 +20,7 @@ void PIDController::setSetpoint(float setpoint)
 
 void PIDController::setPendingSetpoint(float pendingSetpoint)
 {
-    this->pendingSetpoint = pendingSetpoint;
+    this->pendingSetpoint.store(pendingSetpoint);
 }
 
 float PIDController::getSetpoint()
@@ -30,7 +30,7 @@ float PIDController::getSetpoint()
 
 float PIDController::getPendingSetpoint()
 {
-    return this->pendingSetpoint;
+    return this->pendingSetpoint.load();
 }
 
 float PIDController::compute(float input, float feedforward)

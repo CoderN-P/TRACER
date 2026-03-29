@@ -27,11 +27,6 @@ void mainLoop(void *pvParameters)
 
         uint32_t loop_start = micros();
 
-        if (!motorsEnabled)
-        {
-            handleMovement(0.0, 0.0); // Ensure motors are stopped if disabled
-        }
-
         int16_t pcntLeft;
         int16_t pcntRight;
         int32_t echoDurationCopy1;
@@ -80,10 +75,13 @@ void mainLoop(void *pvParameters)
             pidRight.setSetpoint(pidRight.getPendingSetpoint());
             lastPIDMode = pendingMode;
         }
+        
+        bool enabled = motorsEnabled.load();
 
-        if (motorsEnabled)
+        if (enabled)
         {
-            const bool motorCmdFresh = (uint32_t)(millis() - lastMotorCommandMs) <= MOTOR_COMMAND_TIMEOUT_MS;
+            uint32_t lastMotorCommandMsCopy = lastMotorCommandMs.load();
+            const bool motorCmdFresh = (uint32_t)(millis() - lastMotorCommandMsCopy) <= MOTOR_COMMAND_TIMEOUT_MS;
 
             leftSpeed = getLeftMotorSpeed(deltaLeft);
             rightSpeed = getRightMotorSpeed(deltaRight);
@@ -168,7 +166,7 @@ void mainLoop(void *pvParameters)
         packet.magZ = magZ;
         packet.leftEncoder = leftEncoderCount;
         packet.rightEncoder = rightEncoderCount;
-        packet.flags = (irFront << 0) | (irBack << 1) | (newMagData << 2) | (motorsEnabled << 3); // Pack IR sensor states and new magnetometer data flag into flags byte
+        packet.flags = (irFront << 0) | (irBack << 1) | (newMagData << 2) | (enabled << 3); // Pack IR sensor states and new magnetometer data flag into flags byte
         packet.batteryPercent = curBatteryPercent;
         packet.timestamp = micros();
         packet.checksum = computeChecksum((uint8_t *)&packet, sizeof(packet) - 1);
@@ -184,6 +182,8 @@ void mainLoop(void *pvParameters)
             robot_state.rightEncoder = rightEncoderCount;
             robot_state.leftSpeed = leftSpeed;
             robot_state.rightSpeed = rightSpeed;
+            robot_state.leftSetpoint = pidLeft.getSetpoint();
+            robot_state.rightSetpoint = pidRight.getSetpoint();
             robot_state.ax = ax;
             robot_state.ay = ay;
             robot_state.az = az;

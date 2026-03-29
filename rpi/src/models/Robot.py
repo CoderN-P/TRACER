@@ -41,12 +41,21 @@ class Robot:
         self._loop_ready = threading.Event()
         self.backup_time = 2        
         self.cur_path = None
+        self.last_sensor_receive_time = 0
+        self.last_command_sent_at = 0.0
+        self.last_command_type = None
+        self.last_command_id = ""
+        self.freeze_after_cmd_window_s = 0.5
         
         self.obstacle_clear.set()
         self.cliff_clear.set()
 
     async def send_safe_command(self, command: Command, wait_after: float = 0):
         async with self.motor_lock:
+            now = asyncio.get_event_loop().time()
+            self.last_command_sent_at = now
+            self.last_command_type = command.command_type.name if hasattr(command.command_type, "name") else str(command.command_type)
+            self.last_command_id = command.ID
             self.serial.send(command)
             if wait_after > 0:
                 await asyncio.sleep(wait_after)
@@ -279,6 +288,8 @@ class Robot:
     async def process_sensor_data(self, data: bytes):
         try:
             new_data = self.bytes_to_sensor_data(data)
+            
+            self.last_sensor_receive_time = asyncio.get_event_loop().time()
             with self.sensor_lock: # Ensure thread-safe access to latest_sensor_data
                 self.previous_sensor_data = self.latest_sensor_data
                 self.latest_sensor_data = new_data
@@ -292,6 +303,7 @@ class Robot:
         dt = 1 / ROBOT_CONFIG.EMIT_SENSOR_FREQ
         if current_time - self.last_emit_time >= dt:
             self.last_emit_time = current_time
+            
             self._logger.info("Sending sensor data")            
             async with self.state_lock:
                 current_mode = self.state
@@ -311,6 +323,23 @@ class Robot:
         self._logger.info("Running main loop: " + str(self.running))        
         while self.running:
             start = asyncio.get_event_loop().time()
+            
+            if (start - self.last_sensor_receive_time) > ROBOT_CONFIG.SENSOR_TIMEOUT:
+                no_data_for = start - self.last_sensor_receive_time
+                freeze_log = f"No sensor data received for {no_data_for:.2f} seconds"
+
+                since_last_cmd = start - self.last_command_sent_at if self.last_command_sent_at > 0 else None
+                if since_last_cmd is not None and since_last_cmd <= self.freeze_after_cmd_window_s:
+                    freeze_log += (
+                        f" | freeze_after_cmd={self.last_command_type}"
+                        f" | cmd_id={self.last_command_id}"
+                        f" | cmd_age_ms={since_last_cmd * 1000:.0f}"
+                    )
+
+                self._logger.warning(freeze_log)
+                await self.emergency_stop()
+                return
+            
             if self.sensor_lock.acquire(timeout=0.001):
                 try:
                     sensor_data = self.latest_sensor_data

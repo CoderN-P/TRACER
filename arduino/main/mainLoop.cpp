@@ -71,11 +71,24 @@ void mainLoop(void *pvParameters)
 
         if (motorsEnabled)
         {
+            const bool motorCmdFresh = (uint32_t)(millis() - lastMotorCommandMs) <= MOTOR_COMMAND_TIMEOUT_MS;
+
             leftSpeed = getLeftMotorSpeed(deltaLeft);
             rightSpeed = getRightMotorSpeed(deltaRight);
-            auto [leftPWM_CPY, rightPWM_CPY] = pidLoop(leftSpeed, rightSpeed);
-            leftPWM = leftPWM_CPY;
-            rightPWM = rightPWM_CPY;
+
+            if (motorCmdFresh)
+            {
+                auto [leftPWM_CPY, rightPWM_CPY] = pidLoop(leftSpeed, rightSpeed);
+                leftPWM = leftPWM_CPY;
+                rightPWM = rightPWM_CPY;
+            }
+            else
+            {
+                // Motor command stream timed out: bypass PID and force zero output.
+                handleMovement(0.0, 0.0);
+                leftPWM = 0.0f;
+                rightPWM = 0.0f;
+            }
         }
         else
         {

@@ -32,6 +32,7 @@ SemaphoreHandle_t state_mutex;
 SemaphoreHandle_t i2c_mutex;
 QueueHandle_t commandQueue;
 volatile bool motorsEnabled = true;
+volatile uint32_t lastMotorCommandMs = 0;
 
 void setup()
 {
@@ -81,6 +82,8 @@ void setup()
     Wire.setTimeOut(20);   // Prevent indefinite stalls on a stuck I2C bus
     Serial.begin(BAUD_RATE);
     Serial.setTimeout(50);
+
+    lastMotorCommandMs = millis();
 
     delay(1000); // Allow time for sensors to stabilize
     digitalWrite(STBY, HIGH);

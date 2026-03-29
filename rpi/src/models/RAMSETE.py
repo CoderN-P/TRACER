@@ -17,7 +17,7 @@ class RAMSETE:
     @staticmethod
     def get_error(current_state: RobotState, target_state: TrajectoryState) -> tuple:
         error_x, error_y = PurePursuit.get_local_target(current_state, (target_state.x, target_state.y,))
-        error_theta = (target_state.theta - current_state.yaw + 180) % 360 - 180
+        error_theta = (target_state.theta - current_state.yaw + math.pi) % (2*math.pi) - math.pi
         return error_x, error_y, error_theta,
     
     def get_target_state(self) -> TrajectoryState:
@@ -35,7 +35,7 @@ class RAMSETE:
         
         interp_x = prev_state.x + t_ratio * (next_state.x - prev_state.x)
         interp_y = prev_state.y + t_ratio * (next_state.y - prev_state.y)
-        interp_theta = (prev_state.theta + t_ratio * ((next_state.theta - prev_state.theta + 180) % 360 - 180)) % 360
+        interp_theta = (prev_state.theta + t_ratio * ((next_state.theta - prev_state.theta + math.pi) % (math.pi*2) - math.pi)) % (2*math.pi)
         interp_v = prev_state.v + t_ratio * (next_state.v - prev_state.v)
         interp_omega = prev_state.omega + t_ratio * (next_state.omega - prev_state.omega)
         
@@ -56,15 +56,13 @@ class RAMSETE:
         target_state = self.get_target_state()
         error_x, error_y, error_theta = self.get_error(current_state, target_state)
         
-        theta_rad = np.radians(error_theta)
-        
         k = 2 * ROBOT_CONFIG.ZETA * np.sqrt(target_state.omega**2 + ROBOT_CONFIG.BETA * target_state.v**2)
         
-        v_command = target_state.v * np.cos(theta_rad) + k * error_x
+        v_command = target_state.v * np.cos(error_theta) + k * error_x
         
-        sinc = np.sin(theta_rad) / theta_rad if theta_rad > 1e-6 else 1
+        sinc = np.sin(error_theta) / error_theta if error_theta > 1e-6 else 1
         
-        omega_command = target_state.omega + k * theta_rad + ROBOT_CONFIG.BETA * target_state.v * sinc * error_y
+        omega_command = target_state.omega + k * error_theta + ROBOT_CONFIG.BETA * target_state.v * sinc * error_y
         
         v_left, v_right = PurePursuit.twist_to_wheel_speeds(v_command, omega_command)
         

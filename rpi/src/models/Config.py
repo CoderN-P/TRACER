@@ -80,7 +80,7 @@ class RobotConfig:
     R_THETA_MAGNETOMETER: float = 0.1
     
     # Pure Pursuit
-    LOOKAHEAD_DISTANCE: float = 0.3 # Meters
+    LOOKAHEAD_DISTANCE: float = 0.05 # Meters
     COMPLETION_THRESHOLD: float = 0.01 # Meters
     MAX_SEARCH_POINTS: int = 50 # Only search 50 points ahead in pure pursuit. 
     END_LOOKAHEAD_MULTIPLIER: float = 1.5 # Increase lookahead distance near the end of the path

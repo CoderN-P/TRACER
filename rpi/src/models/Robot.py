@@ -1,6 +1,7 @@
 import logging
 import threading
 import math
+import time
 import struct
 from collections import deque
 import asyncio
@@ -285,11 +286,12 @@ class Robot:
         })
                 
             
-    async def process_sensor_data(self, data: bytes):
+    def process_sensor_data(self, data: bytes):
         try:
             new_data = self.bytes_to_sensor_data(data)
             
-            self.last_sensor_receive_time = asyncio.get_event_loop().time()
+            self.last_sensor_receive_time = time.monotonic()
+    
             with self.sensor_lock: # Ensure thread-safe access to latest_sensor_data
                 self.previous_sensor_data = self.latest_sensor_data
                 self.latest_sensor_data = new_data
@@ -304,7 +306,8 @@ class Robot:
         if current_time - self.last_emit_time >= dt:
             self.last_emit_time = current_time
             
-            self._logger.info("Sending sensor data")            
+            self._logger.info("Sending sensor data")   
+                     
             async with self.state_lock:
                 current_mode = self.state
                 
@@ -324,7 +327,7 @@ class Robot:
         while self.running:
             start = asyncio.get_event_loop().time()
             
-            if (start - self.last_sensor_receive_time) > ROBOT_CONFIG.SENSOR_TIMEOUT:
+            if (start - self.last_sensor_receive_time) > ROBOT_CONFIG.SENSOR_TIMEOUT and self.state != Mode.STOPPED:
                 no_data_for = start - self.last_sensor_receive_time
                 freeze_log = f"No sensor data received for {no_data_for:.2f} seconds"
 
@@ -338,7 +341,10 @@ class Robot:
 
                 self._logger.warning(freeze_log)
                 await self.emergency_stop()
-                return
+                elapsed = asyncio.get_event_loop().time() - start
+                await asyncio.sleep(max(0.0001, dt - elapsed))
+                continue
+                    
             
             if self.sensor_lock.acquire(timeout=0.001):
                 try:

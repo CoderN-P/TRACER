@@ -17,6 +17,9 @@ class HeadingFilter:
         
         self.state = np.array([0, 0])
         
+    def reset(self):
+        self.state = np.array([0, 0])
+        
     @staticmethod 
     def get_process_jacobian(dt):
         return np.array(

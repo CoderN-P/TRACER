@@ -75,7 +75,7 @@ class SerialManager:
                         del self._buffer[:self._PACKET_LENGTH]
                         
                         if not callback:
-                            asyncio.run_coroutine_threadsafe(self.robot.process_sensor_data(bytes(packet)), self.loop)
+                            self.robot.process_sensor_data(bytes(packet))
                         else:
                             callback(bytes(packet))
                 else:

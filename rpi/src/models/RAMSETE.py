@@ -17,7 +17,7 @@ class RAMSETE:
     @staticmethod
     def get_error(current_state: RobotState, target_state: TrajectoryState) -> tuple:
         error_x, error_y = PurePursuit.get_local_target(current_state, (target_state.x, target_state.y,))
-        error_theta = (target_state.theta - current_state.yaw + math.pi) % (2*math.pi) - math.pi
+        error_theta = (target_state.theta - current_state.yaw + np.pi) % (2*np.pi) - np.pi
         return error_x, error_y, error_theta,
     
     def get_target_state(self) -> TrajectoryState:
@@ -35,7 +35,7 @@ class RAMSETE:
         
         interp_x = prev_state.x + t_ratio * (next_state.x - prev_state.x)
         interp_y = prev_state.y + t_ratio * (next_state.y - prev_state.y)
-        interp_theta = (prev_state.theta + t_ratio * ((next_state.theta - prev_state.theta + math.pi) % (math.pi*2) - math.pi)) % (2*math.pi)
+        interp_theta = (prev_state.theta + t_ratio * ((next_state.theta - prev_state.theta + np.pi) % (np.pi*2) - np.pi)) % (2*np.pi)
         interp_v = prev_state.v + t_ratio * (next_state.v - prev_state.v)
         interp_omega = prev_state.omega + t_ratio * (next_state.omega - prev_state.omega)
         

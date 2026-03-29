@@ -46,8 +46,8 @@ async def main():
     logging.getLogger('socketio').setLevel(logging.ERROR)
     logging.getLogger('engineio').setLevel(logging.ERROR)
     robot._logger.setLevel(logging.INFO)        
-    robot.start()
     serial_manager.start(robot, robot.loop)  # Start background serial read thread; dispatch sensor packets on robot loop
+    robot.start()
 
     try:
         await run_socket_server(robot)

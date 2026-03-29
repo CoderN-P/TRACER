@@ -39,6 +39,9 @@ class StateEstimator:
             linear_velocity=0.0,
             angular_velocity=0.0 
         )
+        self.theta_encoders = 0.0
+        self.initial_mag_heading = None
+        self.heading_filter.reset()
 
     # Python logic to find how many packets were missed
     @staticmethod
@@ -107,7 +110,6 @@ class StateEstimator:
             
         self.state.yaw = (self.heading_filter.step(self.theta_encoders, sensor_data.imu.gyroscope_z, dt, mag_heading_rad)) % (2 * math.pi)
     
-        
         self.state.linear_velocity = self.estimate_linear_velocity(delta_left_ticks, delta_right_ticks, dt)
         self.state.angular_velocity = sensor_data.imu.gyroscope_z - self.heading_filter.state[1]
         

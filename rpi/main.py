@@ -41,7 +41,7 @@ async def main():
         format='%(asctime)s | %(threadName)s | %(name)s | %(levelname)s | %(message)s',
         handlers=[logging.StreamHandler(sys.stdout)] # Explicitly add StreamHandler
     )
-    serial_manager = SerialManager(port, 115200)
+    serial_manager = SerialManager(port, 921600)
     robot = Robot(serial_manager, socketio)
     logging.getLogger('socketio').setLevel(logging.ERROR)
     logging.getLogger('engineio').setLevel(logging.ERROR)

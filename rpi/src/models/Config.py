@@ -42,7 +42,7 @@ class RobotConfig:
     
     # IO
     EMIT_SENSOR_FREQ: float = 10.0 # Hz
-    SENSOR_TIMEOUT: float = 0.5 # Seconds without new sensor data before considering it a timeout
+    SENSOR_TIMEOUT: float = 0.02 # Seconds without new sensor data before considering it a timeout
     
     # Loop
     MAIN_LOOP_FREQ: float = 100.0 # Hz

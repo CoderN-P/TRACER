@@ -124,8 +124,8 @@ void setup()
     // High priority task for main loop (PID, sensor reading, sending data) at 100 Hz,
     xTaskCreate(mainLoop, "Main Loop", 4096, NULL, 4, &mainLoopHandle);
 
-    // High priority task for serial listening
-    xTaskCreate(vSerialTask, "Serial Task", 2048, NULL, 4, &serialTaskHandle);
+    // Medium priority task for serial listening (below main loop to reduce control-loop jitter)
+    xTaskCreate(vSerialTask, "Serial Task", 2048, NULL, 3, &serialTaskHandle);
     // Medium priority task for processing commands from the command queue
     xTaskCreate(commandProcessorTask, "Command Processor Task", 4096, NULL, 3, &commandProcessorHandle);
 

@@ -306,7 +306,6 @@ class Robot:
         if current_time - self.last_emit_time >= dt:
             self.last_emit_time = current_time
             
-            self._logger.info("Sending sensor data")   
                      
             async with self.state_lock:
                 current_mode = self.state

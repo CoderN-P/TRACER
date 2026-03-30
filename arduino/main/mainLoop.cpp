@@ -18,7 +18,10 @@ void mainLoop(void *pvParameters)
     int16_t prevPcntRight = 0;
     int32_t leftEncoderCount = 0;
     int32_t rightEncoderCount = 0;
-    uint8_t lastPIDMode = 0; // 0 = PID control mode, 1 = open-loop PWM control mode
+    uint8_t lastPIDMode = 0;      // 0 = PID control mode, 1 = open-loop PWM control mode
+    uint32_t windowStartTime = 0; // Start time of the rolling window for max loop time calculation
+
+    float maxLoopTimeMs = 0.0f; // Max loop time in the rolling window
     static portMUX_TYPE spinlock = portMUX_INITIALIZER_UNLOCKED;
 
     while (true)
@@ -74,7 +77,7 @@ void mainLoop(void *pvParameters)
             pidRight.reset();
             lastPIDMode = pendingMode;
         }
-        
+
         bool enabled = motorsEnabled.load();
 
         if (enabled)
@@ -172,10 +175,19 @@ void mainLoop(void *pvParameters)
         packet.timestamp = micros();
         packet.checksum = computeChecksum((uint8_t *)&packet, sizeof(packet) - 1);
 
-        Serial.write((uint8_t *)&packet, sizeof(packet));
+        // Avoid blocking the 100 Hz control loop when command bursts contend for UART resources.
+        if (Serial.availableForWrite() >= (int)sizeof(packet))
+        {
+            Serial.write((uint8_t *)&packet, sizeof(packet));
+        }
 
         uint32_t loop_time = micros() - loop_start;
         float elapsed_ms = loop_time / 1000.0;
+
+        if (elapsed_ms > maxLoopTimeMs)
+        {
+            maxLoopTimeMs = elapsed_ms;
+        }
 
         if (xSemaphoreTake(state_mutex, 0) == pdTRUE)
         {
@@ -200,7 +212,7 @@ void mainLoop(void *pvParameters)
             robot_state.irFront = irFront;
             robot_state.irBack = irBack;
             robot_state.batteryPercent = curBatteryPercent;
-            robot_state.mainLoopElapsedMs = elapsed_ms;
+            robot_state.mainLoopElapsedMs = maxLoopTimeMs;
             robot_state.leftPWM = leftPWM;
             robot_state.rightPWM = rightPWM;
             robot_state.timestamp = packet.timestamp;
@@ -209,6 +221,14 @@ void mainLoop(void *pvParameters)
             robot_state.distanceFront = distanceFront;
 
             xSemaphoreGive(state_mutex);
+        }
+
+        uint32_t now = millis();
+
+        if (now - windowStartTime >= MAIN_WINDOW_SIZE_MS)
+        {
+            windowStartTime = now;
+            maxLoopTimeMs = 0.0f;
         }
 
         loopCounter++;

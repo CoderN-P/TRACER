@@ -5,8 +5,7 @@ import time
 import logging
 import struct
 import serial.tools.list_ports
-from .Command import Command
-from .CommandTypeEnum import CommandType
+from . import Command, CommandType
 
 class SerialManager:
     def __init__(self, port='/dev/ttyUSB0', baudrate=115200):
@@ -36,9 +35,14 @@ class SerialManager:
     def start(self, robot, loop):
         self.robot = robot
         self.loop = loop
-        self.running = True
+        
+        if not self.serial.is_open or not self.serial.writable() or not self.serial.readable():
+            self._logger.error(f"Serial port {self.serial.portstr} is not open/writable/readable")
+            return 
+            
         thread = threading.Thread(target=self.read_loop, daemon=True)
         thread.start()
+        self.running = True
         self._logger.info(f"SerialManager started on {self.serial.portstr} at {self.serial.baudrate} baud")
         
     def start_read(self, callback=None):
@@ -85,6 +89,9 @@ class SerialManager:
             self.running = False
 
     def send(self, data: Command):
+        if not self.running:
+            self._logger.warning("SerialManager is not running, cannot send command")
+            return
         # Check if data is a string or pydantic model
         if data.command_type == CommandType.MOTOR:
             left = max(-32767, min(32767, int(data.command.left_motor * 1000))) # Convert from m/s to mm/s to fit in int16

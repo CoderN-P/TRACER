@@ -1,6 +1,5 @@
 import numpy as np
-
-from . import ROBOT_CONFIG
+from .. import ROBOT_CONFIG
 
 class PoseFilter:
     def __init__(self):
@@ -31,5 +30,5 @@ class PoseFilter:
     
     
     def update(self):
-        # TODO: Implement this when we get a way to measure x and y
+        # TODO: Implement this with LIDAR data for measurement.
         pass 

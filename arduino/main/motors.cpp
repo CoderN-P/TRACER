@@ -36,8 +36,6 @@ void setup_pwm()
     mcpwm_gpio_init(MCPWM_UNIT_0, MCPWM0B, EN2); // EN2 controls the left motor, which is on operator B
 
     mcpwm_init(MCPWM_UNIT_0, MCPWM_TIMER_0, &pwm_config);
-    // mcpwm_set_duty_type(MCPWM_UNIT_0, MCPWM_TIMER_0, MCPWM_OPR_A, MCPWM_DUTY_MODE_0);
-    // mcpwm_set_duty_type(MCPWM_UNIT_0, MCPWM_TIMER_0, MCPWM_OPR_B, MCPWM_DUTY_MODE_0);
 }
 
 void handleMovement(float left, float right)

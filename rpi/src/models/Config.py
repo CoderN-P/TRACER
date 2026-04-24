@@ -37,8 +37,11 @@ class RobotConfig:
     CHECK_OBSTACLE_FREQ: float = 20.0 # Hz
     CHECK_CLIFF_FREQ: float = 20.0 # Hz
     BACKUP_TIME: float = 2.0 # s
-    OBSTACLE_DETECTED_THRESHOLD: float = 20.0 # cm
+    OBSTACLE_DETECTED_THRESHOLD: float = 30.0 # cm
     OBSTACLE_AVOID_THRESHOLD: float = 10.0 # cm
+    K_REPULSIVE_SOFT: int = 40
+    K_REPULSIVE_HARD: int = 100
+    K_ATTRACTIVE: int = 15
     
     # IO
     EMIT_SENSOR_FREQ: float = 10.0 # Hz
@@ -51,6 +54,7 @@ class RobotConfig:
     ENCODER_PPR: int = 11 # Pulses per revolution of the motor shaft
     ENCODER_TICKS_PER_REV: int = ENCODER_PPR * REDUCTION_RATIO * 4 # Pulses per revolution of the wheel 
     METERS_PER_TICK: float = WHEEL_CIRCUMFERENCE / ENCODER_TICKS_PER_REV
+    MAX_ENCODER_MARGIN = 1.15  # 15% margin for acceleration transients when validating encoder readings
     
     # NOTE: Values calibrated for 2S LiPo (subject to change after testing)
     LEFT_CORRECTION = 1 # 0.9646096844 # Ratio between true distance and left encoder dist

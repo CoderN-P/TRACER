@@ -288,7 +288,16 @@ class Controller:
                     self.state = ControllerState.CAR
                 self.rumble(0.5, 0.5, 500)
                 self.socketio_server.emit("joystick_mode", {"mode": self.state.name})
-
+    
+    def update_state(self, data):
+        """
+        Update the controller state based on incoming data (e.g., from sensors).
+        """
+        if data.get("mode") == "STOPPED":
+            self.stopped = True
+        else:
+            self.stopped = False
+            
     def send_update(self):
         """
         Send the current joystick data to the specified URL.

@@ -1,8 +1,7 @@
 import math
-from .RobotState import RobotState
-from .SensorData import SensorData
-from .HeadingFilter import HeadingFilter
-from . import ROBOT_CONFIG
+from . import RobotState, HeadingFilter
+from .. import SensorData, LidarData, ROBOT_CONFIG
+
 
 
 class StateEstimator:
@@ -79,14 +78,16 @@ class StateEstimator:
         # Heading must be in radians
         return delta_s * math.cos(heading), delta_s * math.sin(heading),
         
-    def update(self, sensor_data: SensorData, previous_sensor_data: SensorData):
+    def update(self, sensor_data: SensorData, previous_sensor_data: SensorData, lidar_data: LidarData | None):
         # Previous sensor data is needed to determine dt
-        if (not previous_sensor_data): return
+        if not previous_sensor_data: return
+        
         self.prev_state = self.state.model_copy()
         dt = self.calculate_dt(sensor_data.timestamp, previous_sensor_data.timestamp)
-        if (dt < 1e-6): return
-        MAX_MARGIN = 1.15  # 15% margin for acceleration transients
-        max_pulses = ROBOT_CONFIG.ENCODER_TICKS_PER_REV * ROBOT_CONFIG.MAX_RPM / 60.0 * dt * MAX_MARGIN
+        
+        if dt < 1e-6: return
+        
+        max_pulses = ROBOT_CONFIG.ENCODER_TICKS_PER_REV * ROBOT_CONFIG.MAX_RPM / 60.0 * dt * ROBOT_CONFIG.MAX_ENCODER_MARGIN
         
         if abs(sensor_data.left_encoder - previous_sensor_data.left_encoder) > max_pulses:
             self._logger.error(f"Left encoder tick jump detected: {previous_sensor_data.left_encoder} -> {sensor_data.left_encoder} (max expected: {max_pulses:.2f})")

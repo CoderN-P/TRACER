@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from . import ROBOT_CONFIG
+from .. import ROBOT_CONFIG
 
 class MotorPWMCommand(BaseModel):
     """

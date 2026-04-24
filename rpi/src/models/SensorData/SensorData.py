@@ -12,8 +12,6 @@ class SensorData(BaseModel):
     magnetometer: MagnetometerData = Field(..., description="Data from the magnetometer")
     left_encoder: int = Field(..., description="Left wheel encoder ticks")
     right_encoder: int = Field(..., description="Right wheel encoder ticks")
-    ir_front: bool = Field(..., description="Front IR sensor status (True if floor is detected)")
-    ir_back: bool = Field(..., description="Back IR sensor status (True if floor is detected)")
     battery: int = Field(..., description="Battery level in percentage (0-100)")
     timestamp: int = Field(..., description="Timestamp of the sensor data in microseconds since epoch") 
     packet_num: int = Field(..., description="Packet number for tracking sensor data updates")

@@ -1,8 +1,7 @@
 import os
 
 from openai import AsyncOpenAI
-
-from ..models.CommandResponse import AICommand
+from ..models import AICommand
 
 
 client = AsyncOpenAI(api_key=os.environ["OPENAI_API_KEY"])

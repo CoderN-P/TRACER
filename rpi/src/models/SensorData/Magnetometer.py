@@ -1,6 +1,6 @@
 from pydantic import BaseModel, Field
 import math
-from . import ROBOT_CONFIG
+from .. import ROBOT_CONFIG
 
 
 class MagnetometerData(BaseModel):

@@ -31,6 +31,10 @@ def setup_routes(robot):
     async def on_enable(sid, data):
         await on_robot_loop(robot.resume())
         
+    @sio.on('lidar')
+    async def on_lidar(sid, data):
+        await on_robot_loop(robot.process_lidar_data(data))
+        
         
     # TODO: Implement the following events: "set_state" (if new state = PATH_FOLLOWING, a path must be provided, "
     @sio.on('set_state') # Manual, path following, LLM control

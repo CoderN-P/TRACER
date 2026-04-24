@@ -35,7 +35,7 @@ async def main():
     port = SerialManager.find_port()
     if not port:
         logging.error("No serial port found. Please connect the robot.")
-        return
+        
     logging.basicConfig(
         level=logging.DEBUG,
         format='%(asctime)s | %(threadName)s | %(name)s | %(levelname)s | %(message)s',
@@ -78,7 +78,4 @@ if __name__ == "__main__":
     elif args.calibrate_mag:
         calibrate_mag(args.port, args.timeout)
     else:
-        if hostname == "tracer":
-            asyncio.run(main())
-        else:
-            print("Not running on TRACER robot. To run the main control program, please run this script on the Raspberry Pi connected to the robot.")
+        asyncio.run(main())

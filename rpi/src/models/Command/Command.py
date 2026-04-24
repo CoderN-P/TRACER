@@ -5,7 +5,7 @@ from .LCDCommand import LCDCommand
 from .MotorCommand import MotorCommand
 from .CommandTypeEnum import CommandType
 from .MotorPWMCommand import MotorPWMCommand
-from . import ROBOT_CONFIG
+from .. import ROBOT_CONFIG
 
 
 class Command(BaseModel):

@@ -1,6 +1,6 @@
 import numpy as np
 import math
-from . import ROBOT_CONFIG
+from .. import ROBOT_CONFIG
 
 
 class HeadingFilter:

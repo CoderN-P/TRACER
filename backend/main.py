@@ -63,6 +63,7 @@ def setup_routes(controller: Controller):
         
     @sio_client.on('sensor_data')
     def handle_sensor_update(data):
+        controller.update_state(data)
         socket.emit('sensor_data', data)
         
     @sio_client.on('active_command')
@@ -152,7 +153,7 @@ if __name__ == "__main__":
     try:
         while True:
             controller.send_update()
-            time.sleep(0.05)  # 20 Hz
+            time.sleep(0.1)  # 20 Hz
     except KeyboardInterrupt:
         print("Shutting down.")
     

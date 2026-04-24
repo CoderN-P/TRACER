@@ -2,11 +2,10 @@ import math
 from typing import List
 import logging
 
-from .RobotState import RobotState
-from .Command import Command
-from .CommandTypeEnum import CommandType
-from .MotorCommand import MotorCommand
-from . import ROBOT_CONFIG
+from .. import ROBOT_CONFIG
+from ..Command import Command, CommandType, MotorCommand
+from ..StateEstimation import RobotState
+
 
 
 """
@@ -132,7 +131,7 @@ class PurePursuit:
 
         return left * scale, right * scale,
     
-    def calculate_control_command(self, robot_state: RobotState) -> Command | None:
+    def calculate_control_command(self, robot_state: RobotState, repulsive_vector: tuple[float, float]) -> Command | None:
         """
         Calculate the control command (linear and angular velocity) based on the current robot state and the path.
         """
@@ -150,6 +149,9 @@ class PurePursuit:
             return None # The main loop will fall back to manual control
         
         local_target = self.get_local_target(robot_state, goal_point)
+        # Repulsive vector is already in the robot's local frame
+        local_target[0] += repulsive_vector[0] * ROBOT_CONFIG.REPULSIVE_WEIGHT
+        local_target[1] += repulsive_vector[1] * ROBOT_CONFIG.REPULSIVE_WEIGHT
         
         lateral_y = local_target[1]
         

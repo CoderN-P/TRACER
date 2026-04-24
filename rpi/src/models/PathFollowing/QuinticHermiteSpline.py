@@ -1,6 +1,6 @@
 import numpy as np
 from typing import List
-from . import ROBOT_CONFIG
+from .. import ROBOT_CONFIG
 from .TrajectoryState import TrajectoryState
 
 

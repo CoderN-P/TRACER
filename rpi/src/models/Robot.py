@@ -5,51 +5,51 @@ import time
 import struct
 from collections import deque
 import asyncio
-from . import SerialManager, SensorData, Command, CommandType, LCDCommand, StateEstimator, Mode, ROBOT_CONFIG, MagnetometerData
-from .Path import Path
-from .PurePursuit import PurePursuit
+from . import SerialManager, SensorData, Command, CommandType, LCDCommand, StateEstimator, Mode, ROBOT_CONFIG, MagnetometerData, MetaMode, Path, PurePursuit, LidarData
 from ..ai.get_commands import text_to_command
+from socketio import AsyncClient as Socket
 
 
 class Robot:
     def __init__(self, serial_manager: SerialManager, socketio):
-        self.serial = serial_manager
-        self.last_emit_time = 0
-        self.last_obstacle_detect_time = 0  # Last time ultrasonic data was processed for obstacle detection
-        self.last_cliff_detect_time = 0  # Last time cliff sensors were processed for cliff detection
+        self.serial: SerialManager = serial_manager
+        self.last_emit_time: float = 0.0
+        self.last_obstacle_detect_time: float = 0.0  # Last time ultrasonic data was processed for obstacle detection
  
-        self.socketio = socketio
-        self.cliff_clear = asyncio.Event()
-        self.running = False
-        self.left_distance_history = deque(maxlen=10)  # Store last 10 distance readings for smoothing
-        self.right_distance_history = deque(maxlen=10)
+        self.socketio: Socket = socketio
+        self.running: bool = False
+        self.left_distance_history: deque = deque(maxlen=10)  # Store last 10 distance readings for smoothing
+        self.right_distance_history: deque = deque(maxlen=10)
         
-        self.obstacle_clear = asyncio.Event()
+        self.obstacle_clear: asyncio.Event = asyncio.Event()
 
-        self._logger = logging.getLogger("RobotManager")
-        self.motor_lock = asyncio.Lock()
-        self.state_estimator = StateEstimator(self._logger)
+        self._logger: logging.Logger = logging.getLogger("RobotManager")
+        self.motor_lock: asyncio.Lock = asyncio.Lock()
+        self.state_estimator: StateEstimator = StateEstimator(self._logger)
         
-        self.state = Mode.MANUAL
-        self.state_lock = asyncio.Lock()  # Lock to protect access to the robot's state (manual, autonomous, stopped)
+        self.state: Mode = Mode.MANUAL
+        self.meta_state: MetaMode = MetaMode.USER 
+        self.state_lock: asyncio.Lock = asyncio.Lock()  # Lock to protect access to the robot's state (manual, autonomous, stopped)
+        self.lidar_lock: asyncio.Lock = asyncio.Lock()   # Lock to protect access to lidar data (written and read by both socketio server and main loop)
 
-        self.sensor_lock = threading.Lock()          # shared between serial thread and asyncio
-        self.previous_sensor_data = None             # for any processing that needs to compare current and previous sensor data, only accessed within main loop
-        self.latest_sensor_data = None               # written by serial thread, read by pose loop
-        self.main_loop_task = None
-        self.main_loop_thread = None
+        self.sensor_lock: threading.Lock = threading.Lock()          # shared between serial thread and asyncio
+        self.previous_sensor_data: SensorData | None = None             # for any processing that needs to compare current and previous sensor data, only accessed within main loop
+        self.latest_sensor_data: SensorData | None = None               # written by serial thread, read by pose loop
+        self.lidar_data: LidarData | None = None
+        self.repulsive_vector: tuple[float, float] = (0, 0) # repulsive vector calculated from lidar data for obstacle avoidance, updated in main loop after processing new lidar data, and used in path following to modify the target point for obstacle avoidance
+        self.main_loop_task: asyncio.Task = None
+        self.main_loop_thread: threading.Thread | None = None
         self.loop = None
-        self._loop_ready = threading.Event()
-        self.backup_time = 2        
-        self.cur_path = None
-        self.last_sensor_receive_time = 0
-        self.last_command_sent_at = 0.0
-        self.last_command_type = None
-        self.last_command_id = ""
+        self._loop_ready: threading.Event = threading.Event()
+     
+        self.cur_path: Path | PurePursuit | None = None 
+        self.last_sensor_receive_time: float = 0.0
+        self.last_command_sent_at: float = 0.0
+        self.last_command_type: CommandType | None = None
+        self.last_command_id: str = ""
         self.freeze_after_cmd_window_s = 0.5
         
         self.obstacle_clear.set()
-        self.cliff_clear.set()
 
     async def send_safe_command(self, command: Command, wait_after: float = 0):
         async with self.motor_lock:
@@ -103,11 +103,6 @@ class Robot:
             raise RuntimeError("Robot loop is not running")
         future = asyncio.run_coroutine_threadsafe(coro, self.loop)
         return await asyncio.wrap_future(future)
-
-    async def _reset_cliff_detected(self):
-        """Reset the cliff clear flag after a short duration."""
-        await asyncio.sleep(ROBOT_CONFIG.BACKUP_TIME)  # Wait for half a second before resetting cliff detection to ensure backup completes
-        self.cliff_clear.set()
         
     async def _reset_obstacle_clear(self):
         await asyncio.sleep(ROBOT_CONFIG.BACKUP_TIME)  # Wait for backup duration before allowing new obstacle detection
@@ -169,7 +164,7 @@ class Robot:
         # f     - magnetometer z (float, microtesla)
         # i     - left encoder ticks (int32_t)
         # i     - right encoder ticks (int32_t)
-        # B     - flags (uint8_t) bit 0: front IR, bit 1: back IR, 0 = cliff detected, 1 = no cliff, bit 2: new mag data, bit 3: motors enabled
+        # B     - flags (uint8_t) bit 0: new mag data, bit 1: motors enabled
         # B     - battery percentage (uint8_t)
         # I     - timestamp (uint32_t, microseconds)
         # B     - checksum (uint8_t)
@@ -186,11 +181,8 @@ class Robot:
             logger.error(f"Invalid checksum: calculated={calculated_checksum}, received={received_checksum}")
            
         
-        # Extract IR flags
-        ir_front = not bool(flags & 0b00000001) # True means ground detected
-        ir_back = not bool(flags & 0b00000010)
-        new_mag_data = bool(flags & 0b00000100)
-        motors_enabled = bool(flags & 0b00001000)
+        new_mag_data = bool(flags & 0b00000001)
+        motors_enabled = bool(flags & 0b00000010)
         
         mag_heading = MagnetometerData.calculate_heading(mag_x, mag_y, mag_z)
         
@@ -220,8 +212,6 @@ class Robot:
             },
             "left_encoder": left_encoder_ticks,
             "right_encoder": right_encoder_ticks,
-            "ir_front": ir_front,
-            "ir_back": ir_back,
             "battery": battery,
             "timestamp": timestamp,
             "packet_num": packet_num,
@@ -266,26 +256,7 @@ class Robot:
             asyncio.create_task(self._reset_obstacle_clear())
     
         return distance_left, distance_right
-    
-    
-    async def handle_cliff(self, sensor_data: SensorData):
-        """Handle cliff detection and stop motors if cliff is detected."""
-        async with self.state_lock:
-            cur_state = self.state
-            
-        if not sensor_data.check_cliff() or not self.cliff_clear.is_set() or cur_state == Mode.STOPPED:
-            return 
         
-        self.cliff_clear.clear()
-        asyncio.create_task(self.backup())
-        asyncio.create_task(self._reset_cliff_detected())  # Reset cliff detection after 0.5 seconds, basically halting commands
-
-        await self.socketio.emit('cliff_detected', {
-            "ir_front": sensor_data.ir_front,
-            "ir_back": sensor_data.ir_back
-        })
-                
-            
     def process_sensor_data(self, data: bytes):
         try:
             new_data = self.bytes_to_sensor_data(data)
@@ -300,6 +271,13 @@ class Robot:
             self._logger.error(f"Error processing sensor data: {e}")
             return
         
+    async def process_lidar_data(self, data: any):
+        lidar_data = LidarData.model_validate(data[0])
+        
+        async with self.lidar_lock:
+            self.lidar_data = lidar_data
+        
+        print(lidar_data.get_repulsive_vector())
         
     async def send_sensor_update(self, current_time, sensor_data: SensorData):
         dt = 1 / ROBOT_CONFIG.EMIT_SENSOR_FREQ
@@ -317,8 +295,23 @@ class Robot:
                     "state": self.state_estimator.state.model_dump(),
                     "mode": current_mode.name
                 },
-            )
+            )  
     
+    async def debug_stall(self, start):
+        no_data_for = start - self.last_sensor_receive_time
+        freeze_log = f"No sensor data received for {no_data_for:.2f} seconds"
+
+        since_last_cmd = start - self.last_command_sent_at if self.last_command_sent_at > 0 else None
+        if since_last_cmd is not None and since_last_cmd <= self.freeze_after_cmd_window_s:
+            freeze_log += (
+                f" | freeze_after_cmd={self.last_command_type}"
+                f" | cmd_id={self.last_command_id}"
+                f" | cmd_age_ms={since_last_cmd * 1000:.0f}"
+            )
+
+        self._logger.warning(freeze_log)
+        await self.emergency_stop()
+        
     async def main_loop(self):
         """Main loop to continuously read sensor data and update state estimator."""
         dt = 1/ROBOT_CONFIG.MAIN_LOOP_FREQ
@@ -327,24 +320,11 @@ class Robot:
             start = asyncio.get_event_loop().time()
             
             if (start - self.last_sensor_receive_time) > ROBOT_CONFIG.SENSOR_TIMEOUT and self.state != Mode.STOPPED:
-                no_data_for = start - self.last_sensor_receive_time
-                freeze_log = f"No sensor data received for {no_data_for:.2f} seconds"
-
-                since_last_cmd = start - self.last_command_sent_at if self.last_command_sent_at > 0 else None
-                if since_last_cmd is not None and since_last_cmd <= self.freeze_after_cmd_window_s:
-                    freeze_log += (
-                        f" | freeze_after_cmd={self.last_command_type}"
-                        f" | cmd_id={self.last_command_id}"
-                        f" | cmd_age_ms={since_last_cmd * 1000:.0f}"
-                    )
-
-                self._logger.warning(freeze_log)
-                await self.emergency_stop()
+                await self.debug_stall(start)
                 elapsed = asyncio.get_event_loop().time() - start
                 await asyncio.sleep(max(0.0001, dt - elapsed))
                 continue
                     
-            
             if self.sensor_lock.acquire(timeout=0.001):
                 try:
                     sensor_data = self.latest_sensor_data
@@ -357,19 +337,25 @@ class Robot:
 
             if not sensor_data:
                 elapsed = asyncio.get_event_loop().time() - start
-                self._logger.warning("Skipping loop as no sensor data was recieve")
+                # self._logger.warning("Skipping loop as no sensor data was recieve")
                 await asyncio.sleep(max(0.0001, dt - elapsed)) # 100Hz loop
                 continue
 
             async with self.state_lock:
-                # Only check this if we have not recently reieved a resume command (since it might take a moment for the ESTOP command to be processed and for the state estimator to reset, we want to avoid immediately switching back to STOPPED mode if we receive sensor data with motors disabled right after a resume command)
+                # Only check this if we have not recently recieved a resume command (since it might take a moment for the ESTOP command to be processed and for the state estimator to reset, we want to avoid immediately switching back to STOPPED mode if we receive sensor data with motors disabled right after a resume command)
                 if self.state != Mode.STOPPED and sensor_data.motors_enabled == False and prev_data and prev_data.motors_enabled == True:
                     self._logger.warning("Motors manually disabled via ESTOP button, switching to STOPPED mode")
                     self.state = Mode.STOPPED
                 cur_state = self.state
+                
+            async with self.lidar_lock:
+                lidar_data = self.lidar_data
+                self.repulsive_vector = lidar_data.get_repulsive_vector() if lidar_data else (0, 0)
+                self.lidar_data = None # Clear lidar data after reading it in the main loop, since it's only needed for obstacle detection and path following in the main loop, and we want to avoid processing stale lidar data in the next loop iteration
+            
             
             if cur_state != Mode.STOPPED: # Only update state estimator if not stopped
-                self.state_estimator.update(sensor_data, prev_data)
+                self.state_estimator.update(sensor_data, prev_data, lidar_data)
 
             if cur_state == Mode.PATH_FOLLOWING:
                 if self.cur_path is None:
@@ -389,7 +375,7 @@ class Robot:
                                 
                     elif isinstance(self.cur_path, PurePursuit):
                         # Run pure pursuit
-                        command = self.cur_path.calculate_control_command(self.state_estimator.state)
+                        command = self.cur_path.calculate_control_command(self.state_estimator.state, self.repulsive_vector)
                         
                         if not command:
                             exit_path = True
@@ -409,7 +395,7 @@ class Robot:
                         await self.socketio.emit('path_complete', {"status": "success"})
             
             obstacle_dt = 1 / ROBOT_CONFIG.CHECK_OBSTACLE_FREQ
-            cliff_dt = 1 / ROBOT_CONFIG.CHECK_CLIFF_FREQ
+            
             if (start - self.last_obstacle_detect_time) >= obstacle_dt:
                 self.last_obstacle_detect_time = start
                 # Will not backup if in STOPPED mode
@@ -418,11 +404,6 @@ class Robot:
                 # self.ultrasonic.distance_right = filtered_right
                 # self.left_distance_history.append(sensor_data.ultrasonic.distance) # Store the ultrasonic distance for history for smoothing
                 # self.right_distance_history.append(sensor_data.ultrasonic.left)
-                
-            if (start - self.last_cliff_detect_time) >= cliff_dt:
-                self.last_cliff_detect_time = start
-                # Will not backup if in STOPPED mode
-                await self.handle_cliff(sensor_data)
             
             await self.send_sensor_update(start, sensor_data)
             elapsed = asyncio.get_event_loop().time() - start
@@ -476,7 +457,7 @@ class Robot:
         left_y = data.get('left_y', 0)
         right_x = data.get('right_x', 0)
 
-        if self.cliff_clear.is_set() and self.obstacle_clear.is_set():
+        if self.obstacle_clear.is_set():
             if data.get("type"):
                 await self.send_safe_command(Command.from_joystick(left_y, right_x, data["type"]))
             else:

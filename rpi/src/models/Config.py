@@ -35,7 +35,6 @@ class RobotConfig:
     
     # Obstacle and Cliff avoidance
     CHECK_OBSTACLE_FREQ: float = 20.0 # Hz
-    CHECK_CLIFF_FREQ: float = 20.0 # Hz
     BACKUP_TIME: float = 2.0 # s
     OBSTACLE_DETECTED_THRESHOLD: float = 30.0 # cm
     OBSTACLE_AVOID_THRESHOLD: float = 10.0 # cm
@@ -58,30 +57,27 @@ class RobotConfig:
     
     # NOTE: Values calibrated for 2S LiPo (subject to change after testing)
     LEFT_CORRECTION = 1 # 0.9646096844 # Ratio between true distance and left encoder dist
-    RIGHT_CORRECTION = 1 # 0.9873417722 # Ratio between true distance and left encoder dist
+    RIGHT_CORRECTION = 1 # 0.9873417722 # Ratio between true distance and right encoder dist
     
     # TODO: Calibrate correction factors for each
     METERS_PER_TICK_LEFT: float = METERS_PER_TICK * LEFT_CORRECTION
     METERS_PER_TICK_RIGHT: float = METERS_PER_TICK * RIGHT_CORRECTION
 
-    
-    
     # State Estimation
-    P_THETA: float = 0.1 # Uncertainty in heading (radians)
-    P_GYRO_BIAS: float = 1.0e-4 # Uncertainty in gyro bias (rad/s)
+    P_THETA: float = 0.1 # Initial Uncertainty in heading (radians)
+    P_GYRO_BIAS: float = 1.0e-4 # Initial Uncertainty in gyro bias (rad/s)
     P_THETA_BIAS: float = 0.0 # Initial covariance between heading and gyro bias
+    P_POSITION: float = 0.01 # Initial Uncertainty in position (meters)
     
-    Q_THETA_1: float = 1.0e-4 # Process noise in heading (radians^2/s)
+    Q_THETA: float = 1.0e-4 # Process noise in heading (radians^2/s)
     Q_BIAS: float = 1.0e-6 # Process noise in gyro
     
-    
-    # not currently used, but could be added to the Kalman filter for better position estimation
     Q_X: float = 0.01 # Process noise in x position (meters^2/s)
     Q_Y: float = 0.01 # Process noise in y position (meters^2/s)
-    Q_THETA_2: float = 5.0e-5 # Process noise in layer 2 heading
     
     R_THETA_ENCODER: float = 0.01 # Measurement noise from encoders (radians^2)
-    R_THETA_MAGNETOMETER: float = 0.1
+    R_THETA_MAGNETOMETER: float = 0.1 # Measurement noise from magnetometer (radians^2)
+    R_POSITION: float = 0.05 # Measurement noise from LIDAR VIO positioning (meters^2)
     
     # Pure Pursuit
     LOOKAHEAD_DISTANCE: float = 0.05 # Meters
@@ -96,4 +92,3 @@ class RobotConfig:
     # Splines
     SPLINE_SAMPLES = 1000
     TRAJECTORY_DT = 0.01 # Time step for trajectory generation (seconds)
-    

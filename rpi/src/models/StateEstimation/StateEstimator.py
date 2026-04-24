@@ -1,5 +1,5 @@
 import math
-from . import RobotState, HeadingFilter
+from . import RobotState, HeadingFilter, PoseFilter
 from .. import SensorData, LidarData, ROBOT_CONFIG
 
 
@@ -23,6 +23,7 @@ class StateEstimator:
         self.theta_encoders = 0.0 # Cumulative heading change from encoders, in radians
         self._logger = logger
         self.heading_filter = HeadingFilter()
+        self.pose_filter = PoseFilter()
     
     def initialize(self, sensor_data: SensorData):
         self.initial_mag_heading = math.radians(sensor_data.magnetometer.heading)
@@ -41,6 +42,7 @@ class StateEstimator:
         self.theta_encoders = 0.0
         self.initial_mag_heading = None
         self.heading_filter.reset()
+        self.pose_filter.reset()
 
     # Python logic to find how many packets were missed
     @staticmethod
@@ -113,11 +115,10 @@ class StateEstimator:
     
         self.state.linear_velocity = self.estimate_linear_velocity(delta_left_ticks, delta_right_ticks, dt)
         self.state.angular_velocity = sensor_data.imu.gyroscope_z - self.heading_filter.state[1]
-        
+
         position_delta_x, position_delta_y = self.get_position_delta(delta_left_ticks, delta_right_ticks, self.state.yaw)
-        self.state.x += position_delta_x
-        self.state.y += position_delta_y
-    
+        
+        self.state.x, self.state.y = self.pose_filter.step(position_delta_x, position_delta_y, lidar_data)
         return
         
         

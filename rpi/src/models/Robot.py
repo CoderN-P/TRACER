@@ -350,9 +350,8 @@ class Robot:
                 
             async with self.lidar_lock:
                 lidar_data = self.lidar_data
-                self.repulsive_vector = lidar_data.get_repulsive_vector() if lidar_data else (0, 0)
+                self.repulsive_vector = lidar_data.get_repulsive_vector() if lidar_data is not None else (0, 0)
                 self.lidar_data = None # Clear lidar data after reading it in the main loop, since it's only needed for obstacle detection and path following in the main loop, and we want to avoid processing stale lidar data in the next loop iteration
-            
             
             if cur_state != Mode.STOPPED: # Only update state estimator if not stopped
                 self.state_estimator.update(sensor_data, prev_data, lidar_data)

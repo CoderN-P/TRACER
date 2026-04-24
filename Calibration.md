@@ -33,7 +33,7 @@ P_THETA: float = 0.1 # Uncertainty in heading (radians)
 P_GYRO_BIAS: float = 1.0e-4 # Uncertainty in gyro bias (rad/s)
 P_THETA_BIAS: float = 0.0 # Initial covariance between heading and gyro bias
 
-Q_THETA_1: float = 1.0e-4 # Process noise in heading (radians^2/s)
+Q_THETA: float = 1.0e-4 # Process noise in heading (radians^2/s)
 Q_BIAS: float = 1.0e-6 # Process noise in gyro
 ```
 

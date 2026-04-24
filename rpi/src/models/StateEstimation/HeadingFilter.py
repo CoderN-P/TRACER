@@ -11,7 +11,7 @@ class HeadingFilter:
         )
         # Process noise covariance matrix Q, representing the uncertainty in the process model
         self.Q = np.array( 
-            [[ROBOT_CONFIG.Q_THETA_1, 0], 
+            [[ROBOT_CONFIG.Q_THETA, 0], 
              [0, ROBOT_CONFIG.Q_BIAS]]
         )
         

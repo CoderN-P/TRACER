@@ -1,5 +1,6 @@
 import numpy as np
 from .. import ROBOT_CONFIG
+from ..SensorData import LidarData
 
 class PoseFilter:
     def __init__(self):
@@ -8,27 +9,33 @@ class PoseFilter:
             [0, ROBOT_CONFIG.Q_Y],
         ])
         
-        self.state = np.array([0, 0, 0])  # [x, y, theta]
+        self.state = np.array([0, 0])  # [x, y]
+        self.process_jacobian = np.eye(2)
+        self.P = np.eye(2) * ROBOT_CONFIG.P_POSITION
+
+    def reset(self):
+        self.state = np.array([0, 0])
+        
+    def predict_covariance(self):
+        return self.P + self.Q # process_jacobian is identity so it doesn't change P in this simple model
     
-    @staticmethod 
-    def get_process_jacobian(linear_vel, theta, dt):
-        return np.array([
-            [1, 0, -linear_vel*np.sin(theta)*dt],
-            [0, 1,  linear_vel*np.cos(theta)*dt],
-            [0, 0, 1]
-        ])
+    def predict(self, delta_x, delta_y):
+        self.state[0] += delta_x
+        self.state[1] += delta_y
     
-    def predict_covariance(self, linear_vel, theta, dt, P):
-        F = self.get_process_jacobian(linear_vel, theta, dt)
-        return F @ P @ F.T + self.Q
+    def update(self, glob_x, glob_y, predicted_state, P_pred):
+        y = np.array([glob_x - predicted_state[0], glob_y - predicted_state[1]])
+        S = P_pred + ROBOT_CONFIG.R_POSITION # Measurement noise covariance
+        K = P_pred @ np.linalg.inv(S) # Kalman gain
+        
+        self.state = predicted_state + K @ y
+        self.P = (np.eye(2) - K) @ P_pred
     
-    def predict(self, linear_vel, theta, dt):
-        x_pred = self.state[0] + linear_vel * np.cos(theta) * dt
-        y_pred = self.state[1] + linear_vel * np.sin(theta) * dt
-        theta_pred = (theta + np.pi) % (2 * np.pi) - np.pi
-        return np.array([x_pred, y_pred, theta_pred])
-    
-    
-    def update(self):
-        # TODO: Implement this with LIDAR data for measurement.
-        pass 
+    def step(self, delta_x, delta_y, lidar_data: LidarData | None):
+        self.predict(delta_x, delta_y)
+        
+        if lidar_data is not None:
+            P_pred = self.predict_covariance()
+            self.update(lidar_data.camera.x, lidar_data.camera.y, self.state, P_pred)
+        
+        return self.state

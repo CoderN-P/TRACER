@@ -20,7 +20,8 @@
     | {
         type: "spline";
         path: ReturnType<SplinePathSvelte["exportToJSON"]>;
-      };
+      }
+    | { type: "point"; path: { x: number; y: number } };
 
   /** Robot position in meters, updated at ~10 Hz. Pass null to hide the robot. */
   let {
@@ -211,8 +212,11 @@
   });
 
   // ── Mode ──────────────────────────────────────────────────────────────────
-  type Mode = "spline" | "freehand";
+  type Mode = "spline" | "freehand" | "point";
   let mode = $state<Mode>("spline");
+
+  // ── Point mode ────────────────────────────────────────────────────────────
+  let selectedPoint = $state<{ x: number; y: number } | null>(null);
 
   // ── Freehand drawing ──────────────────────────────────────────────────────
   // Raw canvas-pixel points captured during a stroke (in world pixels).
@@ -302,6 +306,15 @@
     rawStroke = [];
   }
 
+  function pointModeClick(e) {
+    if (mode !== "point" || running) return;
+    // Only select on left mouse button
+    if (e.evt.button !== 0) return;
+    const world = pointerToWorld(e.target.getStage());
+    // Convert world pixels → meters
+    selectedPoint = { x: world.x / SCALE, y: -world.y / SCALE };
+  }
+
   /** Flat array of world-pixel coords for rendering the live stroke. */
   let rawStrokePoints = $derived(rawStroke.flatMap((p) => [p.x, p.y]));
 
@@ -313,7 +326,7 @@
   // ── Run mode ──────────────────────────────────────────────────────────────
   // When running, we record which type of path is active and a UI offset so
   // the path appears to start at the robot's current position (display only).
-  type RunSource = "spline" | "freehand";
+  type RunSource = "spline" | "freehand" | "point";
   let running = $state(false);
   let runSource = $state<RunSource>("spline");
   // Offset in meters applied only for rendering while running.
@@ -324,7 +337,11 @@
   let canRun = $derived(
     mode === "spline"
       ? path.QuinticHermiteSplines.length > 0
-      : freehandPath.length > 0,
+      : mode === "freehand"
+        ? freehandPath.length > 0
+        : mode === "point"
+          ? selectedPoint !== null
+          : false,
   );
 
   function startRun() {
@@ -350,6 +367,13 @@
         // Center camera on robot for spline mode as well, since the path always starts at the first control point which may be far from the canvas center
         stageX = WIDTH / 2 - displayRobotPos.x * SCALE * zoom;
         stageY = HEIGHT / 2 + displayRobotPos.y * SCALE * zoom;
+      } else if (runSource === "point" && selectedPoint !== null) {
+        runOffsetX = displayRobotPos.x - selectedPoint.x;
+        runOffsetY = displayRobotPos.y - selectedPoint.y;
+
+        // Center camera on robot for point mode
+        stageX = WIDTH / 2 - displayRobotPos.x * SCALE * zoom;
+        stageY = HEIGHT / 2 + displayRobotPos.y * SCALE * zoom;
       }
     } else {
       runOffsetX = 0;
@@ -367,7 +391,7 @@
           y: p.y + runOffsetY,
         })),
       };
-    } else {
+    } else if (runSource === "spline") {
       // Export the spline definition (control points + derivatives) directly —
       // no need to pre-sample; the RPi can integrate at its own resolution.
       const splineJSON = path.exportToJSON();
@@ -386,6 +410,15 @@
               number,
             ],
           })),
+        },
+      };
+    } else {
+      // Point mode
+      payload = {
+        type: "point",
+        path: {
+          x: (selectedPoint?.x ?? 0) + runOffsetX,
+          y: (selectedPoint?.y ?? 0) + runOffsetY,
         },
       };
     }
@@ -418,7 +451,9 @@
 {#if !browser}
   <p>Loading...</p>
 {:else}
-  <div class="rounded-lg border border-gray-200 p-4 bg-white flex flex-col select-none">
+  <div
+    class="rounded-lg border border-gray-200 p-4 bg-white flex flex-col select-none"
+  >
     <!-- Toolbar -->
     <div class="flex flex-row items-center gap-2 mb-4 flex-wrap">
       <!-- Mode toggle -->
@@ -446,6 +481,18 @@
             : 'bg-gray-50 text-black hover:bg-gray-100'} disabled:opacity-40 disabled:cursor-not-allowed"
         >
           <PenLine class="w-3.5 h-3.5" /> Freehand
+        </button>
+        <button
+          onclick={() => {
+            mode = "point";
+          }}
+          disabled={running}
+          class="flex items-center gap-1 px-3 py-2 text-xs transition-colors border-l border-gray-200 {mode ===
+          'point'
+            ? 'bg-purple-600 text-white'
+            : 'bg-gray-50 text-black hover:bg-gray-100'} disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          <PlusIcon class="w-3.5 h-3.5" /> Point
         </button>
       </div>
 
@@ -532,6 +579,24 @@
         </span>
       {/if}
 
+      <!-- Point-mode controls -->
+      {#if mode === "point"}
+        <button
+          onclick={() => {
+            selectedPoint = null;
+          }}
+          class="flex items-center gap-1 px-3 py-2 text-xs bg-gray-50 text-black border border-gray-200 rounded-md hover:bg-gray-100 transition-colors"
+          title="Clear selected point"
+        >
+          <X class="w-3.5 h-3.5" /> Clear
+        </button>
+        <span class="text-xs text-gray-400">
+          {selectedPoint
+            ? `(${selectedPoint.x.toFixed(2)}, ${selectedPoint.y.toFixed(2)})`
+            : "Click to select point"}
+        </span>
+      {/if}
+
       <div class="ml-auto flex items-center gap-2">
         {#if !running}
           <button
@@ -595,7 +660,9 @@
         ? isDrawing
           ? 'crosshair'
           : 'crosshair'
-        : 'default'}"
+        : mode === 'point'
+          ? 'crosshair'
+          : 'default'}"
     >
       <Stage
         width={WIDTH}
@@ -607,7 +674,13 @@
         draggable={mode === "spline" && !running}
         onwheel={handleWheel}
         ondragend={handleDragEnd}
-        onmousedown={freehandMouseDown}
+        onmousedown={(e) => {
+          if (mode === "point") {
+            pointModeClick(e);
+          } else {
+            freehandMouseDown(e);
+          }
+        }}
         onmousemove={freehandMouseMove}
         onmouseup={freehandMouseUp}
         onmouseleave={freehandMouseUp}
@@ -747,6 +820,29 @@
               lineCap="round"
               lineJoin="round"
               opacity={0.6}
+            />
+          </Layer>
+        {/if}
+
+        <!-- Selected point (point mode) — hidden while running -->
+        {#if !running && mode === "point" && selectedPoint !== null}
+          {@const px = selectedPoint.x * SCALE}
+          {@const py = -selectedPoint.y * SCALE}
+          <Layer>
+            <Circle
+              x={px}
+              y={py}
+              radius={8 / zoom}
+              fill="#a855f7"
+              stroke="white"
+              strokeWidth={2 / zoom}
+            />
+            <Text
+              x={px + 12 / zoom}
+              y={py - 8 / zoom}
+              text={`(${selectedPoint.x.toFixed(2)}, ${selectedPoint.y.toFixed(2)})`}
+              fontSize={10 / zoom}
+              fill="#a855f7"
             />
           </Layer>
         {/if}

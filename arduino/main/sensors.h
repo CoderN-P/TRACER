@@ -18,8 +18,6 @@ void setup_magnetometer();
 void getMPUData(int &ax, int &ay, int &az, int &gx, int &gy, int &gz, float &tempC);
 void getMagnetometerData(float &magX, float &magY, float &magZ);
 uint8_t getBatteryPercent();
-uint8_t getIRFront();
-uint8_t getIRBack();
 void triggerUltrasonicPulse1();
 void triggerUltrasonicPulse2();
 void IRAM_ATTR echoISR1();

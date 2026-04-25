@@ -142,16 +142,6 @@ void getMagnetometerData(float &magX, float &magY, float &magZ)
     xSemaphoreGive(i2c_mutex);
 }
 
-uint8_t getIRFront()
-{
-    return digitalRead(IR_FRONT);
-}
-
-uint8_t getIRBack()
-{
-    return digitalRead(IR_BACK);
-}
-
 void triggerUltrasonicPulse1()
 {
     digitalWrite(TRIGGER_1, LOW);

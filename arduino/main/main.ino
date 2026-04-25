@@ -41,8 +41,6 @@ void setup()
     pinMode(IN2, OUTPUT);
     pinMode(IN3, OUTPUT);
     pinMode(IN4, OUTPUT);
-    pinMode(IR_FRONT, INPUT);
-    pinMode(IR_BACK, INPUT);
     pinMode(TRIGGER_1, OUTPUT);
     pinMode(TRIGGER_2, OUTPUT);
     pinMode(ECHO_1, INPUT);

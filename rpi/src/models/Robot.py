@@ -6,6 +6,7 @@ import struct
 from collections import deque
 import asyncio
 from . import SerialManager, SensorData, Command, CommandType, LCDCommand, StateEstimator, Mode, ROBOT_CONFIG, MagnetometerData, MetaMode, Path, PurePursuit, LidarData
+from .. import GoToGoal
 from ..ai.get_commands import text_to_command
 from socketio import AsyncClient as Socket
 
@@ -42,7 +43,7 @@ class Robot:
         self.loop = None
         self._loop_ready: threading.Event = threading.Event()
      
-        self.cur_path: Path | PurePursuit | None = None 
+        self.cur_path: Path | PurePursuit | GoToGoal | None = None 
         self.last_sensor_receive_time: float = 0.0
         self.last_command_sent_at: float = 0.0
         self.last_command_type: CommandType | None = None
@@ -378,7 +379,13 @@ class Robot:
                         
                         if not command:
                             exit_path = True
+                        else:
+                            await self.send_safe_command(command)
                             
+                    elif isinstance(self.cur_path, GoToGoal): # simple point goal (x, y)
+                        command = self.cur_path.calculate_control_command(self.state_estimator.state, self.repulsive_vector)
+                        if not command:
+                            exit_path = True
                         else:
                             await self.send_safe_command(command)
                     else:
@@ -395,7 +402,8 @@ class Robot:
             
             obstacle_dt = 1 / ROBOT_CONFIG.CHECK_OBSTACLE_FREQ
             
-            if (start - self.last_obstacle_detect_time) >= obstacle_dt:
+            # Only handle obstacle stopping and detection if in manual mode, since path following uses potential field control.
+            if (start - self.last_obstacle_detect_time) >= obstacle_dt and self.state == Mode.MANUAL: 
                 self.last_obstacle_detect_time = start
                 # Will not backup if in STOPPED mode
                 # filtered_left, filtered_right = await self.handle_obstacle(sensor_data) ## Run simple smoothing via moving average and handle obstacle detection/backup
@@ -427,6 +435,9 @@ class Robot:
                         self.state = Mode.MANUAL
                 elif data["path_type"] == "freehand":
                     self.cur_path = PurePursuit.from_xy_points(data["path"])
+                    self.state = Mode.PATH_FOLLOWING
+                elif data["path_type"] == "point":
+                    self.cur_path = GoToGoal((data["path"]["x"], data["path"]["y"]))
                     self.state = Mode.PATH_FOLLOWING
                 else:
                     self._logger.error(f"Unknown path type: {data['type']}")

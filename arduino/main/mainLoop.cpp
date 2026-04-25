@@ -143,8 +143,6 @@ void mainLoop(void *pvParameters)
         }
 
         static uint8_t curBatteryPercent = 0;
-        uint8_t irFront = getIRFront();
-        uint8_t irBack = getIRBack();
 
         if (loopCounter % 10 == 0)
         { // Read battery voltage at 10 Hz
@@ -170,7 +168,7 @@ void mainLoop(void *pvParameters)
         packet.magZ = magZ;
         packet.leftEncoder = leftEncoderCount;
         packet.rightEncoder = rightEncoderCount;
-        packet.flags = (irFront << 0) | (irBack << 1) | (newMagData << 2) | (enabled << 3); // Pack IR sensor states and new magnetometer data flag into flags byte
+        packet.flags = (newMagData << 0) | (enabled << 1);
         packet.batteryPercent = curBatteryPercent;
         packet.timestamp = micros();
         packet.checksum = computeChecksum((uint8_t *)&packet, sizeof(packet) - 1);
@@ -209,8 +207,6 @@ void mainLoop(void *pvParameters)
             robot_state.magZ = magZ;
             robot_state.distance1 = lastDistance1;
             robot_state.distance2 = lastDistance2;
-            robot_state.irFront = irFront;
-            robot_state.irBack = irBack;
             robot_state.batteryPercent = curBatteryPercent;
             robot_state.mainLoopElapsedMs = maxLoopTimeMs;
             robot_state.leftPWM = leftPWM;

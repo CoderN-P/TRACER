@@ -229,12 +229,6 @@ void drawPage3(RobotState &state, bool blinkState)
     display.print(state.distance2, 1);
     display.print(" cm");
   }
-
-  display.setCursor(0, HEIGHT - 8);
-  display.print("IR F:");
-  display.print(state.irFront ? "T" : "F");
-  display.print(" B:");
-  display.print(state.irBack ? "T" : "F");
 }
 
 void updateOLED(RobotState &state)

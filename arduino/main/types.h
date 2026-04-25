@@ -21,9 +21,6 @@ struct RobotState {
     
     float distance1, distance2, distanceFront;
     
-    uint8_t irFront;
-    uint8_t irBack;
-    
     float mainLoopElapsedMs;
     uint8_t batteryPercent;
     uint32_t timestamp;

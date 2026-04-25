@@ -6,9 +6,8 @@ from .PurePursuit import PurePursuit
 
 
 class GoToGoal:
-    def __init__(self, goal_position: tuple, logger):
+    def __init__(self, goal_position: tuple):
         self.goal_position = goal_position
-        self._logger = logger
         
     """
     Calculate the control command (linear and angular velocity) based on the current robot state and the goal position.
@@ -19,6 +18,9 @@ class GoToGoal:
         local_target = PurePursuit.get_local_target(robot_state, self.goal_position)
         
         distance_to_goal = math.hypot(local_target[0], local_target[1])
+        
+        if distance_to_goal < ROBOT_CONFIG.COMPLETION_THRESHOLD:
+            return None  # The main loop will stop the robot
         
         att_x = ROBOT_CONFIG.K_ATTRACTIVE * local_target[0] / distance_to_goal
         att_y = ROBOT_CONFIG.K_ATTRACTIVE * local_target[1] / distance_to_goal

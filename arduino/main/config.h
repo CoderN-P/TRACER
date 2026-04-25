@@ -18,23 +18,24 @@ const float METERS_PER_TICK_LEFT = METERS_PER_TICK * LEFT_CORRECTION;
 const float METERS_PER_TICK_RIGHT = METERS_PER_TICK * RIGHT_CORRECTION;
 
 // Pin definitions
-const int EN1 = 26;             // Enable pin for motor 1 - wired
-const int IN1 = 18;             // Input pin 1 for motor 1 (right) - wired
-const int IN2 = 33;             // Input pin 2 for motor 1 (right) - wired
-const int EN2 = 32;             // Enable pin for motor 2 - wired
-const int IN3 = 25;             // Input pin 1 for motor 2 (left)  - wired
-const int IN4 = 19;             // Input pin 2 for motor 2 (left) - wired
-const int STBY = 27;            // Standby pin for motor driver - wired
-const int BATTERY = 36;         // Battery voltage pin - wired
-const int TRIGGER_1 = 15;       // Trigger pin for ultrasonic sensor (PIN TBD)
-const int ECHO_1 = 23;          // Echo pin for ultrasonic sensor // Must be interrupt-capable pin (PIN TBD)
-const int TRIGGER_2 = 5;        // Trigger pin for second ultrasonic sensor - wired
-const int ECHO_2 = 2;           // Echo pin for second ultrasonic sensor - wired
-const int ENCODER_LEFT_A = 34;  // (yellow wire) Left encoder pin channel A (must be interrupt-capable) - wired
-const int ENCODER_LEFT_B = 35;  // (green wire) Left encoder pin channel B (must be interrupt-capable) - wired
-const int ENCODER_RIGHT_A = 16; // (yellow) Right encoder pin channel A (must be interrupt-capable) - wired
-const int ENCODER_RIGHT_B = 17; // (green) Right encoder pin channel B (must be interrupt-capable) - wired
-const int ESTOP_PIN = 14;       // Emergency stop pin (must be interrupt-capable) (PIN TBD)
+const int EN1 = 43;             // Enable pin for motor 1
+const int IN1 = 45;             // Input pin 1 for motor 1 (right)
+const int IN2 = 46;             // Input pin 2 for motor 1 (right) 
+const int EN2 = 44;             // Enable pin for motor 2 
+const int IN3 = 47;             // Input pin 1 for motor 2 (left) 
+const int IN4 = 48;             // Input pin 2 for motor 2 (left) 
+const int STBY = 18;            // Standby pin for motor driver
+const int BATTERY = 7;          // Battery voltage pin
+const int TRIGGER_1 = 2;        // Trigger pin for ultrasonic sensor 
+const int ECHO_1 = 1;           // Echo pin for ultrasonic sensor
+const int TRIGGER_2 = 4;        // Trigger pin for second ultrasonic sensor
+const int ECHO_2 = 3;           // Echo pin for second ultrasonic sensor
+const int ENCODER_LEFT_A = 39;  // (yellow wire) Left encoder pin channel A (must be interrupt-capable) 
+const int ENCODER_LEFT_B = 40;  // (green wire) Left encoder pin channel B (must be interrupt-capable)
+const int ENCODER_RIGHT_A = 41; // (yellow) Right encoder pin channel A (must be interrupt-capable)
+const int ENCODER_RIGHT_B = 42; // (green) Right encoder pin channel B (must be interrupt-capable)
+const int ESTOP_PIN = 5;        // Emergency stop pin (must be interrupt-capable) 
+const int SERVO_PIN = 6;        // Servo pin for gripper
 
 // NOTE:
 // System constants

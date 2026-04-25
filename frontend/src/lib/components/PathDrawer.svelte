@@ -5,6 +5,7 @@
     Trash,
     PenLine,
     Spline,
+    Image,
     X,
     Play,
     StopCircle,
@@ -212,11 +213,15 @@
   });
 
   // ── Mode ──────────────────────────────────────────────────────────────────
-  type Mode = "spline" | "freehand" | "point";
+  type Mode = "spline" | "freehand" | "point" | "svg";
   let mode = $state<Mode>("spline");
 
   // ── Point mode ────────────────────────────────────────────────────────────
   let selectedPoint = $state<{ x: number; y: number } | null>(null);
+
+  // ── SVG mode ──────────────────────────────────────────────────────────────
+  let svgPath = $state<{ x: number; y: number }[]>([]);
+  let svgFileName = $state<string | null>(null);
 
   // ── Freehand drawing ──────────────────────────────────────────────────────
   // Raw canvas-pixel points captured during a stroke (in world pixels).
@@ -315,6 +320,133 @@
     selectedPoint = { x: world.x / SCALE, y: -world.y / SCALE };
   }
 
+  /** Resample a polyline in meters so points are evenly spaced by `step`. */
+  function resamplePolylineMeters(
+    pts: { x: number; y: number }[],
+    step: number,
+  ): { x: number; y: number }[] {
+    if (pts.length < 2) return pts.length === 1 ? [{ ...pts[0] }] : [];
+    const result: { x: number; y: number }[] = [{ ...pts[0] }];
+    let carry = 0;
+    for (let i = 1; i < pts.length; i++) {
+      const dx = pts[i].x - pts[i - 1].x;
+      const dy = pts[i].y - pts[i - 1].y;
+      const segLen = Math.sqrt(dx * dx + dy * dy);
+      if (segLen === 0) continue;
+      let offset = step - carry;
+      while (offset <= segLen) {
+        const t = offset / segLen;
+        result.push({
+          x: pts[i - 1].x + t * dx,
+          y: pts[i - 1].y + t * dy,
+        });
+        offset += step;
+      }
+      carry = segLen - (offset - step);
+    }
+    return result;
+  }
+
+  async function handleSvgUpload(e: Event) {
+    const input = e.currentTarget as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file) return;
+
+    if (!file.name.toLowerCase().endsWith(".svg")) {
+      svgPath = [];
+      svgFileName = null;
+      input.value = "";
+      return;
+    }
+
+    const svgText = await file.text();
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(svgText, "image/svg+xml");
+    const parseError = doc.querySelector("parsererror");
+    if (parseError) {
+      svgPath = [];
+      svgFileName = null;
+      input.value = "";
+      return;
+    }
+
+    const sourceSvg = doc.querySelector("svg");
+    if (!sourceSvg) {
+      svgPath = [];
+      svgFileName = null;
+      input.value = "";
+      return;
+    }
+
+    // Attach the SVG off-screen so geometry APIs can evaluate lengths/points.
+    const host = document.createElement("div");
+    host.style.position = "absolute";
+    host.style.left = "-10000px";
+    host.style.top = "-10000px";
+    host.style.width = "0";
+    host.style.height = "0";
+    host.style.overflow = "hidden";
+
+    const workSvg = document.importNode(sourceSvg, true) as SVGSVGElement;
+    host.appendChild(workSvg);
+    document.body.appendChild(host);
+
+    try {
+      const geometryEls = Array.from(
+        workSvg.querySelectorAll(
+          "path, polyline, polygon, rect, circle, ellipse, line",
+        ),
+      ) as SVGGeometryElement[];
+
+      let selected: SVGGeometryElement | null = null;
+      let longest = 0;
+      for (const el of geometryEls) {
+        const length = Number(el.getTotalLength?.());
+        if (!Number.isFinite(length) || length <= 0) continue;
+        if (length > longest) {
+          longest = length;
+          selected = el;
+        }
+      }
+
+      if (!selected || longest < 2) {
+        svgPath = [];
+        svgFileName = null;
+        input.value = "";
+        return;
+      }
+
+      const sampleCount = Math.max(80, Math.min(3000, Math.round(longest / 2)));
+      const sampledPx: { x: number; y: number }[] = [];
+      for (let i = 0; i < sampleCount; i++) {
+        const d = (i / (sampleCount - 1)) * longest;
+        const p = selected.getPointAtLength(d);
+        sampledPx.push({ x: p.x, y: p.y });
+      }
+
+      const xs = sampledPx.map((p) => p.x);
+      const ys = sampledPx.map((p) => p.y);
+      const width = Math.max(...xs) - Math.min(...xs);
+      const height = Math.max(...ys) - Math.min(...ys);
+      const maxDim = Math.max(width, height, 1);
+      const targetSizeM = 2; // normalize SVG so its largest dimension is ~2m
+      const scaleToMeters = targetSizeM / maxDim;
+
+      const first = sampledPx[0];
+      const meters = sampledPx.map((p) => ({
+        x: (p.x - first.x) * scaleToMeters,
+        y: -(p.y - first.y) * scaleToMeters,
+      }));
+
+      svgPath = resamplePolylineMeters(meters, 0.01);
+      svgFileName = file.name;
+      mode = "svg";
+    } finally {
+      host.remove();
+      input.value = "";
+    }
+  }
+
   /** Flat array of world-pixel coords for rendering the live stroke. */
   let rawStrokePoints = $derived(rawStroke.flatMap((p) => [p.x, p.y]));
 
@@ -323,10 +455,15 @@
     freehandPath.flatMap((p) => [p.x * SCALE, -p.y * SCALE]),
   );
 
+  /** Flat array of world-pixel coords for rendering the imported SVG path. */
+  let svgPathPoints = $derived(
+    svgPath.flatMap((p) => [p.x * SCALE, -p.y * SCALE]),
+  );
+
   // ── Run mode ──────────────────────────────────────────────────────────────
   // When running, we record which type of path is active and a UI offset so
   // the path appears to start at the robot's current position (display only).
-  type RunSource = "spline" | "freehand" | "point";
+  type RunSource = "spline" | "freehand" | "point" | "svg";
   let running = $state(false);
   let runSource = $state<RunSource>("spline");
   // Offset in meters applied only for rendering while running.
@@ -341,7 +478,9 @@
         ? freehandPath.length > 0
         : mode === "point"
           ? selectedPoint !== null
-          : false,
+          : mode === "svg"
+            ? svgPath.length > 1
+            : false,
   );
 
   function startRun() {
@@ -372,6 +511,13 @@
         runOffsetY = displayRobotPos.y - selectedPoint.y;
 
         // Center camera on robot for point mode
+        stageX = WIDTH / 2 - displayRobotPos.x * SCALE * zoom;
+        stageY = HEIGHT / 2 + displayRobotPos.y * SCALE * zoom;
+      } else if (runSource === "svg" && svgPath.length > 0) {
+        runOffsetX = displayRobotPos.x - svgPath[0].x;
+        runOffsetY = displayRobotPos.y - svgPath[0].y;
+
+        // Center camera on robot for imported SVG paths.
         stageX = WIDTH / 2 - displayRobotPos.x * SCALE * zoom;
         stageY = HEIGHT / 2 + displayRobotPos.y * SCALE * zoom;
       }
@@ -411,6 +557,15 @@
             ],
           })),
         },
+      };
+    } else if (runSource === "svg") {
+      // SVG outline is converted to pure-pursuit points, same payload shape as freehand.
+      payload = {
+        type: "freehand",
+        path: svgPath.map((p) => ({
+          x: p.x + runOffsetX,
+          y: p.y + runOffsetY,
+        })),
       };
     } else {
       // Point mode
@@ -493,6 +648,18 @@
             : 'bg-gray-50 text-black hover:bg-gray-100'} disabled:opacity-40 disabled:cursor-not-allowed"
         >
           <PlusIcon class="w-3.5 h-3.5" /> Point
+        </button>
+        <button
+          onclick={() => {
+            mode = "svg";
+          }}
+          disabled={running}
+          class="flex items-center gap-1 px-3 py-2 text-xs transition-colors border-l border-gray-200 {mode ===
+          'svg'
+            ? 'bg-emerald-600 text-white'
+            : 'bg-gray-50 text-black hover:bg-gray-100'} disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          <Image class="w-3.5 h-3.5" /> SVG
         </button>
       </div>
 
@@ -594,6 +761,38 @@
           {selectedPoint
             ? `(${selectedPoint.x.toFixed(2)}, ${selectedPoint.y.toFixed(2)})`
             : "Click to select point"}
+        </span>
+      {/if}
+
+      <!-- SVG-mode controls -->
+      {#if mode === "svg"}
+        <label
+          class="flex items-center gap-1 px-3 py-2 text-xs bg-gray-50 text-black border border-gray-200 rounded-md hover:bg-gray-100 transition-colors cursor-pointer"
+          title="Upload an SVG outline"
+        >
+          <Image class="w-3.5 h-3.5" /> Upload SVG
+          <input
+            type="file"
+            accept=".svg,image/svg+xml"
+            onchange={handleSvgUpload}
+            class="hidden"
+            disabled={running}
+          />
+        </label>
+        <button
+          onclick={() => {
+            svgPath = [];
+            svgFileName = null;
+          }}
+          class="flex items-center gap-1 px-3 py-2 text-xs bg-gray-50 text-black border border-gray-200 rounded-md hover:bg-gray-100 transition-colors"
+          title="Clear imported SVG path"
+        >
+          <X class="w-3.5 h-3.5" /> Clear
+        </button>
+        <span class="text-xs text-gray-400">
+          {svgFileName
+            ? `${svgFileName} · ${svgPath.length} pts`
+            : "Upload an SVG; longest outline is converted to path"}
         </span>
       {/if}
 
@@ -801,6 +1000,25 @@
             <Line
               points={runFreehandPoints}
               stroke="#ea580c"
+              strokeWidth={2 / zoom}
+              closed={false}
+              lineCap="round"
+              lineJoin="round"
+            />
+          </Layer>
+        {/if}
+
+        <!-- Imported SVG outline path -->
+        {#if (!running || runSource === "svg") && svgPathPoints.length >= 4}
+          <Layer>
+            <Line
+              points={running && runSource === "svg"
+                ? svgPath.flatMap((p) => [
+                    (p.x + runOffsetX) * SCALE,
+                    -(p.y + runOffsetY) * SCALE,
+                  ])
+                : svgPathPoints}
+              stroke="#059669"
               strokeWidth={2 / zoom}
               closed={false}
               lineCap="round"

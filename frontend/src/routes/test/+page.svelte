@@ -1,5 +1,7 @@
 <script lang="ts">
-  import PathDrawer from "$lib/components/PathDrawer.svelte";
+  import PathDrawer, {
+    type RunPathPayload,
+  } from "$lib/components/PathDrawer.svelte";
 
   let robotPos = $state<{ x: number; y: number; theta: number } | null>({
     x: 3,
@@ -9,10 +11,10 @@
   let freehandPath = $state<{ x: number; y: number }[]>([]);
   let pathComplete = $state(false);
 
-  function handleRunPath(pts: { x: number; y: number }[]) {
-    console.log("Run path:", pts);
+  function handleRunPath(payload: RunPathPayload) {
+    console.log("Run path:", payload);
     pathComplete = false;
-    // TODO: socket.emit('run_path', pts);
+    // TODO: socket.emit('run_path', payload);
     // Simulate completion after 5s for testing
     setTimeout(() => {
       pathComplete = true;

@@ -218,12 +218,19 @@
       path_type: payload.type,
       path: payload.path,
     });
+
+    let message = "Sent path command";
+    if (payload.type === "freehand") {
+      message = `Sent freehand path with ${payload.path.length} points`;
+    } else if (payload.type === "spline") {
+      message = `Sent spline path with ${payload.path.splines.length} segment(s)`;
+    } else if (payload.type === "point") {
+      message = `Sent point target (${payload.path.x.toFixed(2)}, ${payload.path.y.toFixed(2)})`;
+    }
+
     logs.push({
       timestamp: new Date().toISOString(),
-      message:
-        payload.type === "freehand"
-          ? `Sent freehand path with ${payload.path.length} points`
-          : `Sent spline path with ${payload.path.splines.length} segment(s)`,
+      message,
       icon: "send",
     });
   }

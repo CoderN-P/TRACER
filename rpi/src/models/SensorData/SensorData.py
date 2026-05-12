@@ -1,3 +1,4 @@
+import numpy as np
 from pydantic import BaseModel, Field
 from . import UltrasonicSensor, IMUData, MagnetometerData, TOFData
 
@@ -33,3 +34,17 @@ class SensorData(BaseModel):
         :return: True if a cliff is detected, False otherwise
         """
         return not (self.ir_front and self.ir_back)
+
+    @staticmethod
+    def clean(x):
+
+        if isinstance(x, dict):
+            return {k: SensorData.clean(v) for k, v in x.items()}
+
+        if isinstance(x, (np.floating,)):
+             return float(x)
+
+        if isinstance(x, (np.integer,)):
+             return int(x)
+
+        return x

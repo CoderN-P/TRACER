@@ -288,12 +288,12 @@ class Robot:
                      
             async with self.state_lock:
                 current_mode = self.state
-                
+
             await self.socketio.emit(
                 'sensor_data',
                 {
-                    "sensors": sensor_data.model_dump(), 
-                    "state": self.state_estimator.state.model_dump(),
+                    "sensors": SensorData.clean(sensor_data.model_dump()), 
+                    "state": SensorData.clean(self.state_estimator.state.model_dump()),
                     "mode": current_mode.name
                 },
             )  

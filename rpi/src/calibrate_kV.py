@@ -58,7 +58,7 @@ def calibrate_kv(resolution, duration_sec, ks_left, ks_right, port=None):
             prev_sensor_data = sensor_data
 
 
-    serial_manager = SerialManager(port, 115200)
+    serial_manager = SerialManager(port, 921600)
     serial_manager.start_read(callback=callback)
 
     pwm_left = 0.5

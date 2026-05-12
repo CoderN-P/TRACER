@@ -28,7 +28,7 @@ def serial_test(port=None):
             last_print_time = time.time()
             
         
-    serial_manager = SerialManager(port, 115200)
+    serial_manager = SerialManager(port, 921600)
     serial_manager.start_read(callback=callback)
     
     serial_manager.send(Command(
@@ -41,26 +41,6 @@ def serial_test(port=None):
         duration=0,
         pause_duration=0,
     ))
-
-    serial_manager.send(Command(
-        ID="",
-        command_type=CommandType.MOTOR,
-        command=MotorCommand(
-            left_motor=ROBOT_CONFIG.MAX_LINEAR_VEL,
-            right_motor=ROBOT_CONFIG.MAX_LINEAR_VEL,
-        ),
-        duration=0,
-        pause_duration=0,
-    ))
-
-    time.sleep(1)
-
-    serial_manager.send(Command.estop())
-
-    time.sleep(1)
-
-    serial_manager.send(Command.enable())
-
 
     try:
         threading.Event().wait()

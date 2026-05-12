@@ -31,8 +31,8 @@ parser.add_argument('--calibrate-mag', action='store_true', help="Calibrate the 
 parser.add_argument('--interactive-test', action='store_true', help="Run interactive velocity test CLI (enter left/right m/s + duration repeatedly until exit).")
 parser.add_argument("--timeout", type=float, default=1.0, help="No-data timeout before mag calibration (seconds)")
 
-async def main():
-    port = SerialManager.find_port()
+async def main(p):
+    port = p if p else SerialManager.find_port()
     if not port:
         logging.error("No serial port found. Please connect the robot.")
         
@@ -78,4 +78,4 @@ if __name__ == "__main__":
     elif args.calibrate_mag:
         calibrate_mag(args.port, args.timeout)
     else:
-        asyncio.run(main())
+        asyncio.run(main(args.port))

@@ -36,7 +36,7 @@ def calibrate_max_speed(port=None):
             prev_sensor_data = sensor_data
 
 
-    serial_manager = SerialManager(port, 115200)
+    serial_manager = SerialManager(port, 921600)
     serial_manager.start_read(callback=callback)
 
     cur_time = time.time()

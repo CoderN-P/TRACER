@@ -350,7 +350,7 @@ class MagnetometerCalibrator:
             print("No serial port found. Please connect the robot.")
             return False
 
-        self.serial_manager = SerialManager(self.port, 115200)
+        self.serial_manager = SerialManager(self.port, 921600)
         self.running = True
         self.last_data_time = time.time()
 

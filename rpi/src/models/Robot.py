@@ -44,7 +44,7 @@ class Robot:
         self._loop_ready: threading.Event = threading.Event()
      
         self.cur_path: Path | PurePursuit | GoToGoal | None = None 
-        self.last_sensor_receive_time: float = 0.0
+        self.last_sensor_receive_time: float = time.monotonic()
         self.last_command_sent_at: float = 0.0
         self.last_command_type: CommandType | None = None
         self.last_command_id: str = ""
@@ -318,11 +318,11 @@ class Robot:
         dt = 1/ROBOT_CONFIG.MAIN_LOOP_FREQ
         self._logger.info("Running main loop: " + str(self.running))        
         while self.running:
-            start = asyncio.get_event_loop().time()
+            start = time.monotonic()
             
             if (start - self.last_sensor_receive_time) > ROBOT_CONFIG.SENSOR_TIMEOUT and self.state != Mode.STOPPED:
                 await self.debug_stall(start)
-                elapsed = asyncio.get_event_loop().time() - start
+                elapsed = time.monotonic() - start
                 await asyncio.sleep(max(0.0001, dt - elapsed))
                 continue
                     

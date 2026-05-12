@@ -7,7 +7,7 @@ plots the data in real-time, and calculates hard iron and soft iron calibration 
 when no new data is received for over a second.
 
 Usage:
-    python mag_calibration.py [--port /dev/tty.usbserial-XX] [--baud 115200]
+    python mag_calibration.py [--port /dev/tty.usbserial-XX] [--baud 921600]
 """
 
 import argparse
@@ -33,7 +33,7 @@ def find_serial_port():
 
 
 class MagnetometerCalibrator:
-    def __init__(self, port=None, baud_rate=115200):
+    def __init__(self, port=None, baud_rate=921600):
         self.port = port or find_serial_port()
         self.baud_rate = baud_rate
         self.serial_conn = None
@@ -685,7 +685,7 @@ def main():
     
     parser = argparse.ArgumentParser(description='Magnetometer Calibration Tool')
     parser.add_argument('--port', help='Serial port to use')
-    parser.add_argument('--baud', type=int, default=115200, help='Baud rate')
+    parser.add_argument('--baud', type=int, default=921600, help='Baud rate')
     parser.add_argument('--compare', help='Compare with previous calibration file', action='store_true')
     parser.add_argument('--load', help='Load previous calibration file', default=None)
     parser.add_argument('--sim', help='Run in simulation mode (without serial device)', action='store_true')

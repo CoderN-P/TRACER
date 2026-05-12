@@ -36,7 +36,7 @@ def calibrate_wheelbase(speed, duration_sec, port=None):
 
             prev_sensor_data = sensor_data
 
-    serial_manager = SerialManager(port, 115200)
+    serial_manager = SerialManager(port, 921600)
     serial_manager.start_read(callback=callback)
 
     logger.info(f"Spinning motors at {speed} m/s for {duration_sec} seconds...")

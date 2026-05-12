@@ -75,7 +75,7 @@ def interactive_velocity_test_twist(port=None):
                 right_encoder += (sensor_data.right_encoder - prev_sensor_data.right_encoder)
             prev_sensor_data = sensor_data
 
-    serial_manager = SerialManager(serial_port, 115200)
+    serial_manager = SerialManager(serial_port, 921600)
     serial_manager.start_read(callback=callback)
 
     print("\nInteractive twist (linear + angular) test started.")
@@ -188,7 +188,7 @@ def interactive_pwm_test(port=None):
                 right_encoder += (sensor_data.right_encoder - prev_sensor_data.right_encoder)
             prev_sensor_data = sensor_data
 
-    serial_manager = SerialManager(serial_port, 115200)
+    serial_manager = SerialManager(serial_port, 921600)
     serial_manager.start_read(callback=callback)
 
     print("\nInteractive PWM test started.")
@@ -295,7 +295,7 @@ def interactive_velocity_test(port=None):
                 right_encoder += (sensor_data.right_encoder - prev_sensor_data.right_encoder)
             prev_sensor_data = sensor_data
 
-    serial_manager = SerialManager(serial_port, 115200)
+    serial_manager = SerialManager(serial_port, 921600)
     serial_manager.start_read(callback=callback)
 
     print("\nInteractive velocity test started (wheel mode).")

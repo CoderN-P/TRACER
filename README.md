@@ -26,7 +26,7 @@ View [docs/demos](/docs/demos) for video and screenshot examples.
 │              Robot Controller (Raspberry Pi)                  │
 │   FastAPI + asyncio + state estimation + path following      │
 └───────────────────────┬─────────────────────────────────────┘
-                        │ UART Serial (115200 baud)
+                        │ UART Serial (921600 baud)
 ┌───────────────────────▼─────────────────────────────────────┐
 │                  Firmware (ESP32 / Arduino)                   │
 │       FreeRTOS + PID motor control + sensor acquisition      │

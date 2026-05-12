@@ -8,7 +8,7 @@ import serial.tools.list_ports
 from . import Command, CommandType
 
 class SerialManager:
-    def __init__(self, port='/dev/ttyUSB0', baudrate=115200):
+    def __init__(self, port='/dev/ttyUSB0', baudrate=921600):
         self.serial = serial.Serial(port, baudrate)
         time.sleep(1)  # Allow time for the serial connection to stabilize
         self.running = False
@@ -38,11 +38,11 @@ class SerialManager:
         
         if not self.serial.is_open or not self.serial.writable() or not self.serial.readable():
             self._logger.error(f"Serial port {self.serial.portstr} is not open/writable/readable")
-            return 
-            
-        thread = threading.Thread(target=self.read_loop, daemon=True)
-        thread.start()
+            return
+
         self.running = True
+        thread = threading.Thread(target=self.read_loop, args=(), daemon=True)
+        thread.start()
         self._logger.info(f"SerialManager started on {self.serial.portstr} at {self.serial.baudrate} baud")
         
     def start_read(self, callback=None):
@@ -77,8 +77,8 @@ class SerialManager:
 
                         packet = bytes(self._buffer[:self._PACKET_LENGTH])
                         del self._buffer[:self._PACKET_LENGTH]
-                        
-                        if not callback:
+                   
+                        if callback is None:
                             self.robot.process_sensor_data(bytes(packet))
                         else:
                             callback(bytes(packet))

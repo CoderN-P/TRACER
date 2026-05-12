@@ -1,4 +1,4 @@
-#include <Servo.h>
+#include <ESP32Servo.h>
 
 
 Servo s;
@@ -8,7 +8,7 @@ bool increment = true;
 void setup() {
   // put your setup code here, to run once:
   
-  s.attach(5);
+  s.attach(6);
 
 }
 

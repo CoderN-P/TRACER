@@ -13,10 +13,10 @@ extern volatile uint32_t echoStart2;
 extern volatile int32_t echoDuration2; // Can be negative to indicate errors: -1 = timeout, -2 = too close
 extern Adafruit_VL53L0X lox;
 
-bool initMPU6050();
+bool setup_lsm6dos();
 void setup_magnetometer();
-void getMPUData(int &ax, int &ay, int &az, int &gx, int &gy, int &gz, float &tempC);
-void getMagnetometerData(float &magX, float &magY, float &magZ);
+void getLSMData(int16_t &ax, int16_t &ay, int16_t &az, int16_t &gx, int16_t &gy, int16_t &gz, int16_t &tempC);
+void getMagnetometerData(int16_t &magX, int16_t &magY, int16_t &magZ);
 uint8_t getBatteryPercent();
 void triggerUltrasonicPulse1();
 void triggerUltrasonicPulse2();

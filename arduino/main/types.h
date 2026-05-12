@@ -16,8 +16,8 @@ struct RobotState {
     
     int gx, gy, gz;
     int ax, ay, az;
-    float magX, magY, magZ;
-    float tempC;
+    int magX, magY, magZ;
+    int tempC;
     
     float distance1, distance2, distanceFront;
     
@@ -39,8 +39,8 @@ struct SensorPacket {
     float distance_front; // Time-of-flight distance in cm
     int16_t ax, ay, az; // Accelerometer data
     int16_t gx, gy, gz; // Gyroscope data
-    float tempC; // Temperature in Celsius
-    float magX, magY, magZ; // Magnetometer data
+    int16_t tempC; // Temperature in Celsius
+    int16_t magX, magY, magZ; // Magnetometer data
     int32_t leftEncoder; // Left wheel encoder count
     int32_t rightEncoder; // Right wheel encoder count
     uint8_t flags; // Bit 0 = front IR, Bit 1 = back IR, Bit 2 = new magnetometer data available, Bit 3 = motors enabled

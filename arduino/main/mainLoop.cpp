@@ -34,9 +34,9 @@ void mainLoop(void *pvParameters)
         int16_t pcntRight;
         int32_t echoDurationCopy1;
         int32_t echoDurationCopy2;
-        int ax = 0, ay = 0, az = 0, gx = 0, gy = 0, gz = 0;
-        float tempC = 0.0f;
-        static float magX, magY, magZ; // Keep magnetometer data in static variables since it updates at 50 Hz
+        int16_t ax = 0, ay = 0, az = 0, gx = 0, gy = 0, gz = 0;
+        int16_t tempC = 0.0f;
+        static int16_t magX, magY, magZ; // Keep magnetometer data in static variables since it updates at 50 Hz
 
         pcnt_get_counter_value(pcnt_unit_left, &pcntLeft);
         pcnt_get_counter_value(pcnt_unit_right, &pcntRight);
@@ -57,7 +57,7 @@ void mainLoop(void *pvParameters)
         leftEncoderCount += deltaLeft;
         rightEncoderCount += deltaRight;
 
-        getMPUData(ax, ay, az, gx, gy, gz, tempC);
+        getLSMData(ax, ay, az, gx, gy, gz, tempC);
         bool newMagData = loopCounter % 2 == 0; // Magnetometer updates at 50 Hz, so new data is available every 2 loops of the main loop
 
         if (newMagData)

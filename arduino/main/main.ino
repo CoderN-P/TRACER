@@ -53,8 +53,6 @@ void setup()
     pinMode(ENCODER_RIGHT_B, INPUT_PULLUP);
     pinMode(ESTOP_PIN, INPUT_PULLUP);
 
-    digitalWrite(STBY, HIGH);
-
     WiFi.mode(WIFI_OFF);
 
     attachInterrupt(digitalPinToInterrupt(ECHO_1), echoISR1, CHANGE);
@@ -95,12 +93,12 @@ void setup()
     setupOLED();
     setup_tof();
 
-    if (initMPU6050())
+    if (setup_lsm6dos())
     {
         if (xSemaphoreTake(state_mutex, 0) == pdTRUE)
         {
             strncpy(robot_state.oledLine1, "Initialized", 16);
-            strncpy(robot_state.oledLine2, "MPU6050 OK", 16);
+            strncpy(robot_state.oledLine2, "LSM6DOS OK", 16);
             xSemaphoreGive(state_mutex);
         }
     }
@@ -109,7 +107,7 @@ void setup()
         // TODO: Display error on OLED
         if (xSemaphoreTake(state_mutex, 0) == pdTRUE)
         {
-            strncpy(robot_state.oledLine1, "MPU6050 Failed", 16);
+            strncpy(robot_state.oledLine1, "LSM6DOS Failed", 16);
             xSemaphoreGive(state_mutex);
         }
     }

@@ -18,12 +18,12 @@ const float METERS_PER_TICK_LEFT = METERS_PER_TICK * LEFT_CORRECTION;
 const float METERS_PER_TICK_RIGHT = METERS_PER_TICK * RIGHT_CORRECTION;
 
 // Pin definitions
-const int EN1 = 43;             // Enable pin for motor 1
-const int IN1 = 45;             // Input pin 1 for motor 1 (right)
-const int IN2 = 46;             // Input pin 2 for motor 1 (right) 
-const int EN2 = 44;             // Enable pin for motor 2 
-const int IN3 = 47;             // Input pin 1 for motor 2 (left) 
-const int IN4 = 48;             // Input pin 2 for motor 2 (left) 
+const int EN1 = 44;             // Enable pin for motor 1
+const int IN1 = 45;             // Input pin 1 for motor 1 (left)
+const int IN2 = 46;             // Input pin 2 for motor 1 (left) 
+const int EN2 = 43;             // Enable pin for motor 2 
+const int IN3 = 47;             // Input pin 1 for motor 2 (right) 
+const int IN4 = 48;             // Input pin 2 for motor 2 (right) 
 const int STBY = 18;            // Standby pin for motor driver
 const int BATTERY = 7;          // Battery voltage pin
 const int TRIGGER_1 = 2;        // Trigger pin for ultrasonic sensor 
@@ -59,14 +59,19 @@ const float D_LEFT = 0.0;
 const float D_RIGHT = 0.0;
 
 // I2C addresses and Register addresses
-const int MPU_ADDRESS = 0x68;  // I2C address for MPU6050
+const int LSM_ADDRESS = 0x6B;  // I2C address for LSM6DOS
 const int MAG_ADDRESS = 0x0D;  // I2C address for magnetometer
-const int PWR_MGMT_1 = 0x6B;   // Power management register for MPU6050
+const int LSM_ACCEL_CTRL = 0x10; // Accelerometer control reg on LSM6
+const int LSM_GYRO_CTRL = 0x11; // Gyroscope control reg on LSM6
+const int LSM_CTRL8_XL = 0x17; // Secondary control register for accelerometer
+const int LSM_CTRL7_G = 0x16; // Secondary control register for gyroscope
+const int LSM_CTRL3_C = 0x12; // Operating settings control register (Block data update)
+const int LSM_PIN_CTRL = 0x02; // Pin CTRL addr for LSM to enable internal pullups on SDO (hardware mistake)
+const int LSM_DATA_REG = 0x20; // Starting register for temp + accel + gyro data
 const int MAG_DATA_REG = 0x00; // Starting register for magnetometer data
 const int MAG_CTRL_REG = 0x09; // Control register for magnetometer
 
 // Sensor constants
-const float LSB_uT = 1.0 / 120.0;    // ±2G full-scale for magnetometer
 const int TOF_TIMING_BUDGET = 70000; // Timing budget for VL53L0X in microseconds (longer timing budget increases accuracy and max range but reduces update rate)
 
 // Command definitions

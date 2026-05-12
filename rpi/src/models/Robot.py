@@ -6,7 +6,7 @@ import struct
 from collections import deque
 import asyncio
 from . import SerialManager, SensorData, Command, CommandType, LCDCommand, StateEstimator, Mode, ROBOT_CONFIG, MagnetometerData, MetaMode, Path, PurePursuit, LidarData
-from .. import GoToGoal
+from .PathFollowing import GoToGoal
 from ..ai.get_commands import text_to_command
 from socketio import AsyncClient as Socket
 
@@ -159,10 +159,10 @@ class Robot:
         # h     - gx (int16_t)
         # h     - gy (int16_t)
         # h     - gz (int16_t)
-        # f     - tempC (float)
-        # f     - magnetometer x (float, microtesla)
-        # f     - magnetometer y (float, microtesla)
-        # f     - magnetometer z (float, microtesla)
+        # h     - tempC (float)
+        # h     - magnetometer x (float, microtesla)
+        # h     - magnetometer y (float, microtesla)
+        # h     - magnetometer z (float, microtesla)
         # i     - left encoder ticks (int32_t)
         # i     - right encoder ticks (int32_t)
         # B     - flags (uint8_t) bit 0: new mag data, bit 1: motors enabled
@@ -170,7 +170,7 @@ class Robot:
         # I     - timestamp (uint32_t, microseconds)
         # B     - checksum (uint8_t)
         
-        fields = struct.unpack('<BBfffhhhhhhffffiiBBIB', data)
+        fields = struct.unpack('<BBfffhhhhhhhhhhiiBBIB', data)
         start, packet_num, distance_left, distance_right, distance_front, ax, ay, az, gx, gy, gz, temp, mag_x, mag_y, mag_z, left_encoder_ticks, right_encoder_ticks, flags, battery, timestamp, received_checksum = fields
 
         # Calculate checksum (sum of all bytes except checksum byte)
@@ -196,18 +196,18 @@ class Robot:
                 "distance_front": distance_front
             },
             "imu": {
-                "acceleration_x": ax/16384,  # Convert to g's
-                "acceleration_y": ay/16384,  # Convert to g's
-                "acceleration_z": az/16384,  # Convert to g's
-                "gyroscope_x": math.radians(gx/131),  # Convert to rad per second (131 = LSB (deg/sec))
-                "gyroscope_y": math.radians(gy/131),  # Convert to degrees per second
-                "gyroscope_z": math.radians(gz/131),  # Convert to degrees per second
-                "temperature": temp
+                "acceleration_x": ax * ROBOT_CONFIG.LSB_A , 
+                "acceleration_y": ay * ROBOT_CONFIG.LSB_A,  
+                "acceleration_z": az * ROBOT_CONFIG.LSB_A,  
+                "gyroscope_x": gx * ROBOT_CONFIG.LSB_RAD,
+                "gyroscope_y": gy * ROBOT_CONFIG.LSB_RAD,
+                "gyroscope_z": gz * ROBOT_CONFIG.LSB_RAD,
+                "temperature": temp * ROBOT_CONFIG.LSB_C + ROBOT_CONFIG.TEMP_OFFSET
             },
             "magnetometer": {
-                "x": mag_x,
-                "y": mag_y,
-                "z": mag_z,
+                "x": mag_x * ROBOT_CONFIG.LSB_uT,
+                "y": mag_y * ROBOT_CONFIG.LSB_uT,
+                "z": mag_z * ROBOT_CONFIG.LSB_uT,
                 "heading": mag_heading,
                 "new": new_mag_data
             },

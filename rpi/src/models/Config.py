@@ -14,7 +14,7 @@ class RobotConfig:
     # Motor Limits
     MAX_RPM: int = 178 # With 2S LiPo the motors receive less voltage and thus have a lower max RPM, so we cut it in half to be safe. This can be adjusted after testing.
     # Max speed in m/s: (RPM * pi * D) / 60
-    MAX_LINEAR_VEL: float = 0.25 # (MAX_RPM * math.pi * WHEEL_DIAMETER) / 60.0
+    MAX_LINEAR_VEL: float = (MAX_RPM * math.pi * WHEEL_DIAMETER) / 60.0
     
     REDUCTION_RATIO: float = 56.0 
     
@@ -62,6 +62,15 @@ class RobotConfig:
     # TODO: Calibrate correction factors for each
     METERS_PER_TICK_LEFT: float = METERS_PER_TICK * LEFT_CORRECTION
     METERS_PER_TICK_RIGHT: float = METERS_PER_TICK * RIGHT_CORRECTION
+    
+    # Sensor Constants
+    G = 9.81 # m/s^2
+    LSB_G = 0.061 / 1000.0 # +2g for accelerometer
+    LSB_RAD = 8.75 / 1000.0 * math.pi / 180 # +250 dps (8.75 mdps per LSB converted to rad/s per LSB_
+    LSB_A = LSB_G * G # Acceleration in m/s^2 per LSB
+    LSB_uT = 1.0 / 120.0  # ±2G (gauss) full-scale for magnetometer
+    LSB_C = 1.0 / 256.0 # Temperature in °C per LSB (from datasheet)
+    TEMP_OFFSET = 25.0 # Temperature offset in °C (from datasheet, 0 LSB = 25°C)
 
     # State Estimation
     P_THETA: float = 0.1 # Initial Uncertainty in heading (radians)

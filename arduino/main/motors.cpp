@@ -32,10 +32,12 @@ void setup_pwm()
     pwm_config.counter_mode = MCPWM_UP_COUNTER;
     pwm_config.duty_mode = MCPWM_DUTY_MODE_0;
 
-    mcpwm_gpio_init(MCPWM_UNIT_0, MCPWM0A, EN1); // EN1 controls the right motor, which is on operator A
-    mcpwm_gpio_init(MCPWM_UNIT_0, MCPWM0B, EN2); // EN2 controls the left motor, which is on operator B
-
+    mcpwm_gpio_init(MCPWM_UNIT_0, MCPWM0A, EN1); // EN1 controls the left motor, which is on operator A of timer 0
     mcpwm_init(MCPWM_UNIT_0, MCPWM_TIMER_0, &pwm_config);
+    
+    mcpwm_gpio_init(MCPWM_UNIT_0, MCPWM1A, EN2); // EN2 controls the right motor, which is on operator A of timer 1
+    mcpwm_init(MCPWM_UNIT_0, MCPWM_TIMER_1, &pwm_config);
+    
 }
 
 void handleMovement(float left, float right)
@@ -50,51 +52,21 @@ void handleMovement(float left, float right)
 
     if (leftSpeed > 0 && enabled)
     {
-        digitalWrite(IN3, HIGH);
-        digitalWrite(IN4, LOW);
-        mcpwm_set_duty(MCPWM_UNIT_0, MCPWM_TIMER_0, MCPWM_OPR_B, leftSpeed * 100.0);
+        digitalWrite(IN1, HIGH);
+        digitalWrite(IN2, LOW);
+        mcpwm_set_duty(MCPWM_UNIT_0, MCPWM_TIMER_0, MCPWM_OPR_A, leftSpeed * 100.0);
     }
     else if (leftSpeed < 0 && enabled)
     {
-        digitalWrite(IN3, LOW);
-        digitalWrite(IN4, HIGH);
-        mcpwm_set_duty(MCPWM_UNIT_0, MCPWM_TIMER_0, MCPWM_OPR_B, -leftSpeed * 100.0);
+        digitalWrite(IN1, LOW);
+        digitalWrite(IN2, HIGH);
+        mcpwm_set_duty(MCPWM_UNIT_0, MCPWM_TIMER_0, MCPWM_OPR_A, -leftSpeed * 100.0);
     }
     else
     {
         if (enabled)
         {
             // Allow motors to coast by setting both IN pins low but keeping PWM enabled at 0 duty cycle}
-            digitalWrite(IN3, LOW);
-            digitalWrite(IN4, LOW);
-        }
-        else
-        {
-            // If motors are disabled, actively brake by setting both IN pins high
-            digitalWrite(IN3, HIGH);
-            digitalWrite(IN4, HIGH);
-        }
-        mcpwm_set_duty(MCPWM_UNIT_0, MCPWM_TIMER_0, MCPWM_OPR_B, 0.0);
-    }
-
-    if (rightSpeed > 0 && enabled)
-    {
-        // Swapped high and low for wiring
-        digitalWrite(IN1, LOW);
-        digitalWrite(IN2, HIGH);
-        mcpwm_set_duty(MCPWM_UNIT_0, MCPWM_TIMER_0, MCPWM_OPR_A, rightSpeed * 100.0);
-    }
-    else if (rightSpeed < 0 && enabled)
-    {
-        digitalWrite(IN1, HIGH);
-        digitalWrite(IN2, LOW);
-        mcpwm_set_duty(MCPWM_UNIT_0, MCPWM_TIMER_0, MCPWM_OPR_A, -rightSpeed * 100.0);
-    }
-    else
-    {
-        if (enabled)
-        {
-            // Allow motors to coast by setting both IN pins low but keeping PWM enabled at 0 duty cycle
             digitalWrite(IN1, LOW);
             digitalWrite(IN2, LOW);
         }
@@ -104,8 +76,38 @@ void handleMovement(float left, float right)
             digitalWrite(IN1, HIGH);
             digitalWrite(IN2, HIGH);
         }
-
         mcpwm_set_duty(MCPWM_UNIT_0, MCPWM_TIMER_0, MCPWM_OPR_A, 0.0);
+    }
+
+    if (rightSpeed > 0 && enabled)
+    {
+        // Swapped high and low for wiring
+        digitalWrite(IN3, LOW);
+        digitalWrite(IN4, HIGH);
+        mcpwm_set_duty(MCPWM_UNIT_0, MCPWM_TIMER_1, MCPWM_OPR_A, rightSpeed * 100.0);
+    }
+    else if (rightSpeed < 0 && enabled)
+    {
+        digitalWrite(IN3, HIGH);
+        digitalWrite(IN4, LOW);
+        mcpwm_set_duty(MCPWM_UNIT_0, MCPWM_TIMER_1, MCPWM_OPR_A, -rightSpeed * 100.0);
+    }
+    else
+    {
+        if (enabled)
+        {
+            // Allow motors to coast by setting both IN pins low but keeping PWM enabled at 0 duty cycle
+            digitalWrite(IN3, LOW);
+            digitalWrite(IN4, LOW);
+        }
+        else
+        {
+            // If motors are disabled, actively brake by setting both IN pins high
+            digitalWrite(IN3, HIGH);
+            digitalWrite(IN4, HIGH);
+        }
+
+        mcpwm_set_duty(MCPWM_UNIT_0, MCPWM_TIMER_1, MCPWM_OPR_A, 0.0);
     }
 }
 

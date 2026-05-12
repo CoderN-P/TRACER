@@ -18,16 +18,62 @@ static inline bool takeI2CMutex(TickType_t timeoutTicks = pdMS_TO_TICKS(5))
     return (i2c_mutex != NULL) && (xSemaphoreTake(i2c_mutex, timeoutTicks) == pdTRUE);
 }
 
-bool initMPU6050()
+bool setup_lsm6dos()
 {
     if (!takeI2CMutex())
     {
         return false;
     }
 
-    Wire.beginTransmission(MPU_ADDRESS);
-    Wire.write(PWR_MGMT_1); // PWR_MGMT_1 register
-    Wire.write(0);          // Wake up the MPU-6050 (0 = wake up)
+    
+    // PIN_CTRL: Pin control register
+    // 01111111 = 0x7F
+    // (SDO Pullups enabled)
+    Wire.beginTransmission(LSM_ADDRESS);
+    Wire.write(LSM_PIN_CTRL);
+    Wire.write(0x7F);
+    Wire.endTransmission();
+    
+    // CTRL2_G: Gyroscope control register
+    // 01000000 = 0x40 
+    // (ODR: 104 Hz | Range: +- 250 dps)
+    Wire.beginTransmission(LSM_ADDRESS);
+    Wire.write(LSM_GYRO_CTRL);
+    Wire.write(0x40);      
+    Wire.endTransmission(); 
+    
+    // CTRL1_XL: Accelerometer control register
+    // 01000010 = 0x42
+    // (ODR: 104 Hz | Range: +- 2g | 2 stage filtering enabled)
+    Wire.beginTransmission(LSM_ADDRESS);
+    Wire.write(LSM_ACCEL_CTRL);
+    Wire.write(0x42);
+    Wire.endTransmission();
+    
+    // CTRL8_XL: Secondary accelerometer control register
+    // 01101000 = 0x68
+    // (LP Filter Bandwidth: ODR/45 | Fast settling ode enabled | LP filter enabled)
+    Wire.beginTransmission(LSM_ADDRESS);
+    Wire.write(LSM_CTRL8_XL);
+    Wire.write(0x68);
+    Wire.endTransmission();
+    
+    // CTRL7_G: Secondary gyroscope control register
+    // 10000000 = 0x80
+    // (High performance mode enabled | High pass filter disabled )
+    Wire.beginTransmission(LSM_ADDRESS);
+    Wire.write(LSM_CTRL7_G);
+    Wire.write(0x80);
+    Wire.endTransmission();
+    
+    // CTRL3_C: Operating settings register
+    // 01000100 = 0x44
+    // (Block data update enabled | Auto increment address enabled)
+    Wire.beginTransmission(LSM_ADDRESS);
+    Wire.write(LSM_CTRL3_C);
+    Wire.write(0x44); 
+    Wire.endTransmission();
+    
     byte status = Wire.endTransmission(true);
     xSemaphoreGive(i2c_mutex);
     return status == 0; // Return true if successful
@@ -39,17 +85,6 @@ void setup_magnetometer()
     {
         return;
     }
-
-    /*
-      uint8_t MODE_CONTINUOUS = 0b00000001;
-      uint8_t ODR_50Hz = 0b00000100;
-      uint8_t LSB_2G = 0b00000000;
-      uint8_t OSR_512 = 0x00;
-      Wire.beginTransmission(MAG_ADDRESS);
-      Wire.write(MAG_CTRL_REG);
-      Wire.write(MODE_CONTINUOUS | ODR_50Hz | LSB_2G | OSR_512);
-      Wire.endTransmission();
-    */
 
     Wire.beginTransmission(MAG_ADDRESS);
     // Control Register 1 (0x09)
@@ -80,17 +115,17 @@ uint8_t getBatteryPercent()
     return constrain((uint8_t)percent, 0, 100);
 }
 
-void getMPUData(int &ax, int &ay, int &az, int &gx, int &gy, int &gz, float &tempC)
+void getLSMData(int16_t &ax, int16_t &ay, int16_t &az, int16_t &gx, int16_t &gy, int16_t &gz, int16_t &tempC)
 {
     if (!takeI2CMutex())
     {
         return;
     }
 
-    Wire.beginTransmission(MPU_ADDRESS);
-    Wire.write(0x3B); // Starting register for accelerometer data
+    Wire.beginTransmission(LSM_ADDRESS);
+    Wire.write(LSM_DATA_REG); // Starting register for accelerometer + temp + gyro data
     Wire.endTransmission(false);
-    Wire.requestFrom(MPU_ADDRESS, 14); // Request 14 bytes (6 for accelerometer, 6 for gyroscope, 2 for temperature)
+    Wire.requestFrom(LSM_ADDRESS, 14); // Request 14 bytes (6 for accelerometer, 6 for gyroscope, 2 for temperature)
 
     if (Wire.available() < 14)
     {
@@ -98,22 +133,23 @@ void getMPUData(int &ax, int &ay, int &az, int &gx, int &gy, int &gz, float &tem
         return;
     }
 
-    // Big endian data: MSB comes first
-    ax = (Wire.read() << 8) | Wire.read();
-    ay = (Wire.read() << 8) | Wire.read();
-    az = (Wire.read() << 8) | Wire.read();
-
-    int16_t tempRaw = (Wire.read() << 8) | Wire.read();
-    tempC = tempRaw / 340.0 + 36.53;
-
-    gx = (Wire.read() << 8) | Wire.read();
-    gy = (Wire.read() << 8) | Wire.read();
-    gz = (Wire.read() << 8) | Wire.read();
+    // Little endian - LSB comes first
+    // Raw values adjusted on raspberry pi side to minimize sensor packet size
+    
+    tempC = (int16_t) ((Wire.read()) | (Wire.read() << 8));
+    
+    gx = (int16_t) (((Wire.read()) | (Wire.read() << 8))); 
+    gy = (int16_t) (((Wire.read()) | (Wire.read() << 8))); 
+    gz = (int16_t) (((Wire.read()) | (Wire.read() << 8))); 
+    
+    ax = (int16_t) (((Wire.read()) | (Wire.read() << 8))); 
+    ay = (int16_t) (((Wire.read()) | (Wire.read() << 8))); 
+    az = (int16_t) (((Wire.read()) | (Wire.read() << 8))); 
 
     xSemaphoreGive(i2c_mutex);
 }
 
-void getMagnetometerData(float &magX, float &magY, float &magZ)
+void getMagnetometerData(int16_t &magX, int16_t &magY, int16_t &magZ)
 {
     if (!takeI2CMutex())
     {
@@ -131,13 +167,10 @@ void getMagnetometerData(float &magX, float &magY, float &magZ)
         return;
     }
 
-    uint16_t x_u = (uint16_t)(Wire.read() | (Wire.read() << 8)); // LSB comes first
-    uint16_t y_u = (uint16_t)(Wire.read() | (Wire.read() << 8));
-    uint16_t z_u = (uint16_t)(Wire.read() | (Wire.read() << 8));
-
-    magX = ((int16_t)x_u) * LSB_uT;
-    magY = ((int16_t)y_u) * LSB_uT;
-    magZ = ((int16_t)z_u) * LSB_uT;
+    // Little Endian - LSB comes first
+    magX = (int16_t) (Wire.read() | (Wire.read() << 8)); 
+    magY = (int16_t) (Wire.read() | (Wire.read() << 8));
+    magZ = (int16_t) (Wire.read() | (Wire.read() << 8));
 
     xSemaphoreGive(i2c_mutex);
 }
@@ -171,18 +204,7 @@ void IRAM_ATTR echoISR1()
     else
     {
         uint32_t duration = now - echoStart1;
-        if (echoDuration1 > 25000)
-        {
-            echoDuration1 = -1; // Timeout, no echo received
-        }
-        else if (echoDuration1 < 100)
-        {
-            echoDuration1 = -2; // Too close, likely noise
-        }
-        else
-        {
-            echoDuration1 = (int32_t)duration;
-        }
+        echoDuration1 = (int32_t)duration;
     }
 }
 
@@ -197,18 +219,7 @@ void IRAM_ATTR echoISR2()
     else
     {
         uint32_t duration = now - echoStart2;
-        if (echoDuration2 > 25000)
-        {
-            echoDuration2 = -1; // Timeout, no echo received
-        }
-        else if (echoDuration2 < 100)
-        {
-            echoDuration2 = -2; // Too close, likely noise
-        }
-        else
-        {
-            echoDuration2 = (int32_t)duration;
-        }
+        echoDuration2 = (int32_t)duration;
     }
 }
 

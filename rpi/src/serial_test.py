@@ -23,7 +23,7 @@ def serial_test(port=None):
         # check if its been one second since the last print, and if so, print the sensor data
         nonlocal last_print_time
         if time.time() - last_print_time >= 1:
-            print(Robot.bytes_to_sensor_data(data).magnetometer.heading)
+            print(Robot.bytes_to_sensor_data(data))
             
             last_print_time = time.time()
             
@@ -41,7 +41,7 @@ def serial_test(port=None):
         duration=0,
         pause_duration=0,
     ))
-    
+
     serial_manager.send(Command(
         ID="",
         command_type=CommandType.MOTOR,
@@ -52,14 +52,15 @@ def serial_test(port=None):
         duration=0,
         pause_duration=0,
     ))
-    
+
     time.sleep(1)
-    
+
     serial_manager.send(Command.estop())
-    
+
     time.sleep(1)
-    
+
     serial_manager.send(Command.enable())
+
 
     try:
         threading.Event().wait()

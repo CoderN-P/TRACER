@@ -9,8 +9,6 @@ export const SensorDataSchema = z.object({
     imu: IMUSchema,
     tof: TOFSchema,
     magnetometer: MagnetometerSchema,
-    ir_front: z.boolean(),
-    ir_back: z.boolean(),
     battery: z.number().min(0).max(100),
     timestamp: z.number().describe("Timestamp of the sensor data in microseconds since epoch"),
     left_encoder: z.number().describe("Left wheel encoder count"),

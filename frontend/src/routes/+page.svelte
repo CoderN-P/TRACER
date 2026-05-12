@@ -151,33 +151,37 @@
     socket.on("sensor_data", (data) => {
       previousSensorData = sensorData;
       mode = data.mode;
-      sensorData = SensorDataSchema.parse(data.sensors);
-      robotState = RobotStateSchema.parse(data.state);
+      try {
+        sensorData = SensorDataSchema.parse(data.sensors);
+        robotState = RobotStateSchema.parse(data.state);
 
-      packetCount++;
-      const now = new Date().getTime();
-      if (now - lastRateUpdate >= 1000) {
-        sensorRate = packetCount;
-        packetCount = 0;
-        lastRateUpdate = now;
+        packetCount++;
+        const now = new Date().getTime();
+        if (now - lastRateUpdate >= 1000) {
+          sensorRate = packetCount;
+          packetCount = 0;
+          lastRateUpdate = now;
+        }
+        lastSensorUpdate = now;
+
+        if (distanceHistory.length > 50) {
+          distanceHistory.shift(); // Keep the history to a maximum of 100 entries
+        }
+
+        distanceHistory.push(
+                DistanceEntrySchema.parse({
+                  timestamp: new Date().toISOString(),
+                  distance_left: sensorData.ultrasonic.distance_left,
+                  distance_right: sensorData.ultrasonic.distance_right,
+                  distance_front: sensorData.tof.distance_front,
+                  distance: sensorData.ultrasonic.distance,
+                }),
+        );
+
+        updateLogs();
+      } catch (error) {
+        console.log(error)
       }
-      lastSensorUpdate = now;
-
-      if (distanceHistory.length > 50) {
-        distanceHistory.shift(); // Keep the history to a maximum of 100 entries
-      }
-
-      distanceHistory.push(
-        DistanceEntrySchema.parse({
-          timestamp: new Date().toISOString(),
-          distance_left: sensorData.ultrasonic.distance_left,
-          distance_right: sensorData.ultrasonic.distance_right,
-          distance_front: sensorData.tof.distance_front,
-          distance: sensorData.ultrasonic.distance,
-        }),
-      );
-
-      updateLogs();
     });
 
     socket.on("gesture_data", (data) => {
@@ -244,10 +248,7 @@
       icon: "warning",
     });
   }
-
-  function cliffDetected(data: SensorData): boolean {
-    return !data.ir_back || !data.ir_front;
-  }
+  
 
   function obstacleDetected(data: SensorData): boolean {
     return data.ultrasonic.distance < 10;

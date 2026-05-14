@@ -258,7 +258,7 @@ class Robot:
         '''
         
         # Try lidar for obstacle avoidance
-        if math.hypot(*self.repulsive_vector) >= ROBOT_CONFIG.REPULSIVE_THRESHOLD:
+        if abs(self.repulsive_vector[1]) >= ROBOT_CONFIG.REPULSIVE_THRESHOLD:
             asyncio.create_task(self.obstacle_stop())
             self.obstacle_clear.clear()
             asyncio.create_task(self._reset_obstacle_clear())

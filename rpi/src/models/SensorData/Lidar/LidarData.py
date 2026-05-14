@@ -29,19 +29,25 @@ class LidarData(BaseModel):
             for col in range(self.grid.cols):
                 vec = self.grid.values[row][col]
                 dist = np.linalg.norm(vec)
-                
-                if not (0 < dist <= ROBOT_CONFIG.OBSTACLE_DETECTED_THRESHOLD/10.0):
+                    
+                if not (0 < dist <= ROBOT_CONFIG.OBSTACLE_DETECTED_THRESHOLD/100.0):
                     continue
                     
-                direction = np.array(vec) / dist
+                depth = vec[1]
+                lateral = vec[0]
+
+                if depth <= 0:
+                    continue
                 
-                if dist <= ROBOT_CONFIG.OBSTACLE_AVOID_THRESHOLD:
-                    magnitude = ROBOT_CONFIG.K_REPULSIVE_HARD * (1.0 / dist - 1.0 / (ROBOT_CONFIG.OBSTACLE_DETECTED_THRESHOLD/10.0)) 
+                if depth < ROBOT_CONFIG.OBSTACLE_AVOID_THRESHOLD/100.0:
+                    magnitude = ROBOT_CONFIG.K_REPULSIVE_HARD * (1.0 / depth - 1.0 / (ROBOT_CONFIG.OBSTACLE_AVOID_THRESHOLD/100.0)) 
                 else:
-                    magnitude = ROBOT_CONFIG.K_REPULSIVE_SOFT * (1.0 / dist - 1.0 / (ROBOT_CONFIG.OBSTACLE_DETECTED_THRESHOLD/10.0))
+                    magnitude = ROBOT_CONFIG.K_REPULSIVE_SOFT * (1.0 / depth - 1.0 / (ROBOT_CONFIG.OBSTACLE_DETECTED_THRESHOLD/100.0))
                     
-                repulsive_x -= direction[0] * magnitude
-                repulsive_y -= direction[1] * magnitude
+                magnitude *= depth/dist 
+                
+                repulsive_x -= (lateral/dist) * magnitude
+                repulsive_y -= (depth/dist) * magnitude
                 
                 count += 1  
                 

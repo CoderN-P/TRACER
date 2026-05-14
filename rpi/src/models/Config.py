@@ -41,7 +41,7 @@ class RobotConfig:
     K_REPULSIVE_SOFT: int = 40
     K_REPULSIVE_HARD: int = 100
     K_ATTRACTIVE: int = 15
-    REPULSIVE_THRESHOLD = 50 # Magnitude of repulsive vector before we begin backing up
+    REPULSIVE_THRESHOLD = 100 # Magnitude of repulsive vector before we begin backing up
     
     # IO
     EMIT_SENSOR_FREQ: float = 10.0 # Hz

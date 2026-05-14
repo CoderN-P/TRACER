@@ -130,11 +130,9 @@ class Robot:
         await self.socketio.emit('resume', {"status": "success"})
             
 
-    async def backup(self):
-        """Backup the robot for a short duration when an obstacle is detected."""
-
-        await self.send_safe_command(Command.from_joystick(-0.5, 0), wait_after=self.backup_time)
-        await self.send_safe_command(Command.stop())  # Stop after backing up
+    async def obstacle_stop(self):
+        """Stop the robot for a short duration when an obstacle is detected."""
+        await self.send_safe_command(Command.stop())  # Stop
     
     @staticmethod
     def bytes_to_sensor_data(data: bytes) -> SensorData:
@@ -252,7 +250,7 @@ class Robot:
         # If the distance is below the obstacle avoidance threshold, trigger backup and set obstacle clear flag
         obstacle_avoid = sensor_data.ultrasonic.obstacle_detected(ROBOT_CONFIG.OBSTACLE_AVOID_THRESHOLD)
         if obstacle_avoid > 0 and self.obstacle_clear.is_set():
-            asyncio.create_task(self.backup())
+            asyncio.create_task(self.obstacle_stop())
             self.obstacle_clear.clear()
             asyncio.create_task(self._reset_obstacle_clear())
     

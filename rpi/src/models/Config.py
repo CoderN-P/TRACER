@@ -37,7 +37,7 @@ class RobotConfig:
     CHECK_OBSTACLE_FREQ: float = 20.0 # Hz
     BACKUP_TIME: float = 2.0 # s
     OBSTACLE_DETECTED_THRESHOLD: float = 30.0 # cm
-    OBSTACLE_AVOID_THRESHOLD: float = 10.0 # cm
+    OBSTACLE_AVOID_THRESHOLD: float = 20.0 # cm
     K_REPULSIVE_SOFT: int = 40
     K_REPULSIVE_HARD: int = 100
     K_ATTRACTIVE: int = 15

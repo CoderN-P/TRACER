@@ -248,12 +248,21 @@ class Robot:
         await self.socketio.emit('obstacle_detected', {"distance_left": distance_left, "distance_right": distance_right})
     
         # If the distance is below the obstacle avoidance threshold, trigger backup and set obstacle clear flag
+        
+        '''
         obstacle_avoid = sensor_data.ultrasonic.obstacle_detected(ROBOT_CONFIG.OBSTACLE_AVOID_THRESHOLD)
         if obstacle_avoid > 0 and self.obstacle_clear.is_set():
             asyncio.create_task(self.obstacle_stop())
             self.obstacle_clear.clear()
             asyncio.create_task(self._reset_obstacle_clear())
-    
+        '''
+        
+        # Try lidar for obstacle avoidance
+        if math.hypot(*self.repulsive_vector) >= ROBOT_CONFIG.REPULSIVE_THRESHOLD:
+            asyncio.create_task(self.obstacle_stop())
+            self.obstacle_clear.clear()
+            asyncio.create_task(self._reset_obstacle_clear())
+            
         return distance_left, distance_right
         
     def process_sensor_data(self, data: bytes):

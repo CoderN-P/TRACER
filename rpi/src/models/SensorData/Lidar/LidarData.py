@@ -30,15 +30,15 @@ class LidarData(BaseModel):
                 vec = self.grid.values[row][col]
                 dist = np.linalg.norm(vec)
                 
-                if not (0 < dist <= ROBOT_CONFIG.OBSTACLE_DETECTED_THRESHOLD):
+                if not (0 < dist <= ROBOT_CONFIG.OBSTACLE_DETECTED_THRESHOLD/10.0):
                     continue
                     
                 direction = np.array(vec) / dist
                 
                 if dist <= ROBOT_CONFIG.OBSTACLE_AVOID_THRESHOLD:
-                    magnitude = ROBOT_CONFIG.K_REPULSIVE_HARD * (1.0 / dist - 1.0 / ROBOT_CONFIG.OBSTACLE_DETECTED_THRESHOLD) 
+                    magnitude = ROBOT_CONFIG.K_REPULSIVE_HARD * (1.0 / dist - 1.0 / (ROBOT_CONFIG.OBSTACLE_DETECTED_THRESHOLD/10.0)) 
                 else:
-                    magnitude = ROBOT_CONFIG.K_REPULSIVE_SOFT * (1.0 / dist - 1.0 / ROBOT_CONFIG.OBSTACLE_DETECTED_THRESHOLD)
+                    magnitude = ROBOT_CONFIG.K_REPULSIVE_SOFT * (1.0 / dist - 1.0 / (ROBOT_CONFIG.OBSTACLE_DETECTED_THRESHOLD/10.0))
                     
                 repulsive_x -= direction[0] * magnitude
                 repulsive_y -= direction[1] * magnitude

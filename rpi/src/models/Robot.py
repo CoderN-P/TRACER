@@ -23,7 +23,7 @@ class Robot:
         self.right_distance_history: deque = deque(maxlen=10)
         
         self.obstacle_clear: asyncio.Event = asyncio.Event()
-
+        self.backup_time = 2
         self._logger: logging.Logger = logging.getLogger("RobotManager")
         self.motor_lock: asyncio.Lock = asyncio.Lock()
         self.state_estimator: StateEstimator = StateEstimator(self._logger)
@@ -406,11 +406,11 @@ class Robot:
             if (start - self.last_obstacle_detect_time) >= obstacle_dt and self.state == Mode.MANUAL: 
                 self.last_obstacle_detect_time = start
                 # Will not backup if in STOPPED mode
-                # filtered_left, filtered_right = await self.handle_obstacle(sensor_data) ## Run simple smoothing via moving average and handle obstacle detection/backup
-                # self.ultrasonic.distance_left = filtered_left
-                # self.ultrasonic.distance_right = filtered_right
-                # self.left_distance_history.append(sensor_data.ultrasonic.distance) # Store the ultrasonic distance for history for smoothing
-                # self.right_distance_history.append(sensor_data.ultrasonic.left)
+                filtered_left, filtered_right = await self.handle_obstacle(sensor_data) ## Run simple smoothing via moving average and handle obstacle detection/backup
+                self.latest_sensor_data.ultrasonic.distance_left = filtered_left
+                self.latest_sensor_data.ultrasonic.distance_right = filtered_right
+                self.left_distance_history.append(sensor_data.ultrasonic.distance_left) # Store the ultrasonic distance for history for smoothing
+                self.right_distance_history.append(sensor_data.ultrasonic.distance_right)
             
             await self.send_sensor_update(start, sensor_data)
             elapsed = asyncio.get_event_loop().time() - start

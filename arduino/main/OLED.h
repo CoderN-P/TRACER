@@ -39,5 +39,6 @@ void drawPage2(RobotState &state);
 void drawPage3(RobotState &state, bool blinkState);
 void updateOLED(RobotState &state);
 void drawHeader(RobotState &state, bool blinkState);
+void send_oled_page(int page, int chunk);
 
 #endif

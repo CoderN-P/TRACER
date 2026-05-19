@@ -7,3 +7,4 @@ void commandProcessorTask(void* pvParameters);
 void ultrasonicTask(void* pvParameters);
 void oledUpdateTask(void* pvParameters);
 void tofTask(void* pvParameters);
+void sensorTransmitTask(void* pvParameters);

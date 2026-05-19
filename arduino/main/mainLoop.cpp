@@ -26,9 +26,7 @@ void mainLoop(void *pvParameters)
 
     while (true)
     {
-        vTaskDelayUntil(&xLastWakeTime, xFrequency);
-
-        uint32_t loop_start = micros();
+        uint32_t startTime = micros();
 
         int16_t pcntLeft;
         int16_t pcntRight;
@@ -149,38 +147,37 @@ void mainLoop(void *pvParameters)
             curBatteryPercent = getBatteryPercent();
         }
 
-        SensorPacket packet;
-
-        packet.startByte = 0xAA;
-        packet.packetSeq = packetSeq++;
-        packet.distance_left = lastDistance1;
-        packet.distance_right = lastDistance2;
-        packet.distance_front = distanceFront;
-        packet.ax = ax;
-        packet.ay = ay;
-        packet.az = az;
-        packet.gx = gx;
-        packet.gy = gy;
-        packet.gz = gz;
-        packet.tempC = tempC;
-        packet.magX = magX;
-        packet.magY = magY;
-        packet.magZ = magZ;
-        packet.leftEncoder = leftEncoderCount;
-        packet.rightEncoder = rightEncoderCount;
-        packet.flags = (newMagData << 0) | (enabled << 1);
-        packet.batteryPercent = curBatteryPercent;
-        packet.timestamp = micros();
-        packet.checksum = computeChecksum((uint8_t *)&packet, sizeof(packet) - 1);
-
-        // Avoid blocking the 100 Hz control loop when command bursts contend for UART resources.
-        if (Serial.availableForWrite() >= (int)sizeof(packet))
+        // Set global packet struct
+        if (xSemaphoreTake(sensor_mutex, 0) == pdTRUE)
         {
-            Serial.write((uint8_t *)&packet, sizeof(packet));
+            packet.startByte = 0xAA;
+            packet.packetSeq = packetSeq++;
+            packet.distance_left = lastDistance1;
+            packet.distance_right = lastDistance2;
+            packet.distance_front = distanceFront;
+            packet.ax = ax;
+            packet.ay = ay;
+            packet.az = az;
+            packet.gx = gx;
+            packet.gy = gy;
+            packet.gz = gz;
+            packet.tempC = tempC;
+            packet.magX = magX;
+            packet.magY = magY;
+            packet.magZ = magZ;
+            packet.leftEncoder = leftEncoderCount;
+            packet.rightEncoder = rightEncoderCount;
+            packet.flags = (newMagData << 0) | (enabled << 1);
+            packet.batteryPercent = curBatteryPercent;
+            packet.timestamp = micros();
+            packet.checksum = computeChecksum((uint8_t *)&packet, sizeof(packet) - 1);
+            xSemaphoreGive(sensor_mutex);
+            xTaskNotifyGive(sensorTransmitHandle);
         }
 
-        uint32_t loop_time = micros() - loop_start;
-        float elapsed_ms = loop_time / 1000.0;
+        uint32_t totalTime = micros() - startTime;
+        
+        float elapsed_ms = totalTime / 1000.0;
 
         if (elapsed_ms > maxLoopTimeMs)
         {
@@ -228,5 +225,6 @@ void mainLoop(void *pvParameters)
         }
 
         loopCounter++;
+        vTaskDelayUntil(&xLastWakeTime, xFrequency);
     }
 }

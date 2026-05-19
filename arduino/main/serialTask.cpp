@@ -9,7 +9,6 @@ void vSerialTask(void *pvParameters) {
     TickType_t xLastWakeTime = xTaskGetTickCount();
     
     while (true) {
-        vTaskDelayUntil(&xLastWakeTime, xFrequency);
         uint8_t processed = 0;
     
         while (Serial.available() && processed < MAX_BUFFER_SIZE) {
@@ -50,5 +49,7 @@ void vSerialTask(void *pvParameters) {
                 cmdIdx = 0;
             }
         }
+        
+        vTaskDelayUntil(&xLastWakeTime, xFrequency);
     }
 }

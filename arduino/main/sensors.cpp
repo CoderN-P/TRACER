@@ -4,14 +4,14 @@
 #include <Arduino.h>
 #include <Wire.h>
 #include "soc/gpio_struct.h"
-#include "Adafruit_VL53L0X.h"
+#include <VL53L0X.h>
 
 volatile uint32_t echoStart1 = 0;
 volatile int32_t echoDuration1 = 0;
 volatile uint32_t echoStart2 = 0;
 volatile int32_t echoDuration2 = 0;
 
-Adafruit_VL53L0X lox = Adafruit_VL53L0X();
+VL53L0X sensor;
 
 static inline bool takeI2CMutex(TickType_t timeoutTicks = pdMS_TO_TICKS(5))
 {
@@ -117,7 +117,7 @@ uint8_t getBatteryPercent()
 
 void getLSMData(int16_t &ax, int16_t &ay, int16_t &az, int16_t &gx, int16_t &gy, int16_t &gz, int16_t &tempC)
 {
-    if (!takeI2CMutex())
+    if (!takeI2CMutex(pdMS_TO_TICKS(3.5)))
     {
         return;
     }
@@ -151,7 +151,7 @@ void getLSMData(int16_t &ax, int16_t &ay, int16_t &az, int16_t &gx, int16_t &gy,
 
 void getMagnetometerData(int16_t &magX, int16_t &magY, int16_t &magZ)
 {
-    if (!takeI2CMutex())
+    if (!takeI2CMutex(pdMS_TO_TICKS(3.5)))
     {
         return;
     }
@@ -230,39 +230,44 @@ bool setup_tof()
         return false;
     }
 
-    bool on = lox.begin();
-
-    if (!on)
+    sensor.setTimeout(50);
+    
+    if (!sensor.init())
     {
         xSemaphoreGive(i2c_mutex);
         return false;
     }
-
-    lox.setMeasurementTimingBudgetMicroSeconds(33000); // 33 ms timing budget
-    lox.startRangeContinuous(TOF_TIMING_BUDGET);
-
+    
+    sensor.setMeasurementTimingBudget(50000);
+    sensor.startContinuous();
     xSemaphoreGive(i2c_mutex);
     return true;
 }
 
 void getToFDistance(float &distanceFront)
 {
+
     if (!takeI2CMutex(pdMS_TO_TICKS(10)))
     {
         return;
     }
-
-    VL53L0X_RangingMeasurementData_t measure;
-    lox.rangingTest(&measure, false);
-
-    if (measure.RangeStatus != 4)
-    {                                                    // 4 = out of range
-        distanceFront = measure.RangeMilliMeter / 10.0f; // Convert to cm
+    
+    uint16_t dist = sensor.readRangeContinuousMillimeters();
+    
+    if (sensor.timeoutOccurred()) 
+    {
+        xSemaphoreGive(i2c_mutex); // Bus is free for other tasks instantly (~0.5ms lock time)
+        return; // Exit and wait for the next 10Hz loop tick
+    }
+        
+    xSemaphoreGive(i2c_mutex);
+    
+    if (dist < 1200)
+    {                                                    
+        distanceFront = dist / 10.0f;
     }
     else
     {
         distanceFront = -1.0f; // Indicate out of range
     }
-
-    xSemaphoreGive(i2c_mutex);
 }

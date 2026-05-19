@@ -1,5 +1,6 @@
 #ifndef TYPES_H
 #define TYPES_H
+#include <cstdint>
 
 // Robot State struct
 struct RobotState {

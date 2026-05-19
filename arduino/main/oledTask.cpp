@@ -8,8 +8,6 @@ void oledUpdateTask(void *pvParameters) {
     TickType_t xLastWakeTime = xTaskGetTickCount();
     
     while (true) {
-        vTaskDelayUntil(&xLastWakeTime, xFrequency);
-        
         RobotState currentState;
         
         if (xSemaphoreTake(state_mutex, pdMS_TO_TICKS(10)) == pdTRUE) {
@@ -20,5 +18,18 @@ void oledUpdateTask(void *pvParameters) {
         }
         
         updateOLED(currentState);
+        
+        for (int page = 0; page < 8; page++){
+            for (int chunk = 0; chunk < 4; chunk++){
+                if (xSemaphoreTake(i2c_mutex, portMAX_DELAY) == pdTRUE){
+                    send_oled_page(page, chunk);
+                    xSemaphoreGive(i2c_mutex);
+                }
+                vTaskDelay(pdMS_TO_TICKS(4)); // Small delay between page updates to avoid I2C congestion
+            }
+        }
+        
+        vTaskDelayUntil(&xLastWakeTime, xFrequency);
+                
     }
 }

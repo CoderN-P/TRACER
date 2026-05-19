@@ -1,6 +1,8 @@
+#include "freertos/FreeRTOS.h"
+#include "freertos/queue.h"
+#include "freertos/semphr.h"
 #include <WiFi.h>
 #include "freertos/task.h"
-#include "freertos/queue.h"
 #include <Wire.h>
 #include "PID.h"
 #include "config.h"
@@ -17,6 +19,7 @@
 TaskHandle_t ultrasonicTaskHandle;
 TaskHandle_t mainLoopHandle;
 TaskHandle_t serialTaskHandle;
+TaskHandle_t sensorTransmitHandle;
 TaskHandle_t commandProcessorHandle;
 TaskHandle_t tofTaskHandle;
 TaskHandle_t oledUpdateHandle;
@@ -30,6 +33,8 @@ PIDController pidRight(P_RIGHT, I_RIGHT, D_RIGHT);
 
 RobotState robot_state;
 SemaphoreHandle_t state_mutex;
+SensorPacket packet;
+SemaphoreHandle_t sensor_mutex;
 SemaphoreHandle_t i2c_mutex;
 QueueHandle_t commandQueue;
 std::atomic<bool> motorsEnabled{true};
@@ -65,6 +70,7 @@ void setup()
 
     state_mutex = xSemaphoreCreateMutex();
     i2c_mutex = xSemaphoreCreateMutex();
+    sensor_mutex = xSemaphoreCreateMutex();
 
     if (state_mutex == NULL || i2c_mutex == NULL)
     {
@@ -115,18 +121,21 @@ void setup()
     // Create RTOS tasks
 
     // Medium priority task for triggering ultrasonic sensors at 20 Hz
-    xTaskCreate(ultrasonicTask, "Ultrasonic Task", 2048, NULL, 3, &ultrasonicTaskHandle);
+    xTaskCreatePinnedToCore(ultrasonicTask, "Ultrasonic Task", 2048, NULL, 3, &ultrasonicTaskHandle, 0);
 
-    // High priority task for main loop (PID, sensor reading, sending data) at 100 Hz,
-    xTaskCreate(mainLoop, "Main Loop", 4096, NULL, 4, &mainLoopHandle);
+    // High priority task for sensor transmit loop (Sending sensor data)
+    xTaskCreatePinnedToCore(sensorTransmitTask, "Sensor Transmit Task", 2048, NULL, 4, &sensorTransmitHandle, 0);
+        
+    // High priority task for main loop (PID, sensor reading) at 100 Hz,
+    xTaskCreate(mainLoop, "Main Loop", 16384, NULL, 4, &mainLoopHandle);
 
     // Medium priority task for serial listening (below main loop to reduce control-loop jitter)
-    xTaskCreate(vSerialTask, "Serial Task", 2048, NULL, 3, &serialTaskHandle);
+    xTaskCreatePinnedToCore(vSerialTask, "Serial Task", 2048, NULL, 3, &serialTaskHandle, 0);
+    
     // Medium priority task for processing commands from the command queue
-    xTaskCreate(commandProcessorTask, "Command Processor Task", 4096, NULL, 3, &commandProcessorHandle);
+    xTaskCreatePinnedToCore(commandProcessorTask, "Command Processor Task", 4096, NULL, 3, &commandProcessorHandle, 0);
 
     // Medium priority task for reading time-of-flight sensor at 20 Hz
-
     xTaskCreate(tofTask, "ToF Task", 2048, NULL, 3, &tofTaskHandle);
 
     // Low priority task for updating the OLED at 2 Hz

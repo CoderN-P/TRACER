@@ -3,7 +3,7 @@
 
 #include "config.h"
 #include "soc/gpio_struct.h"
-#include "Adafruit_VL53L0X.h"
+#include <VL53L0X.h>
 #include <Arduino.h>
 #include <Wire.h>
 
@@ -11,7 +11,8 @@ extern volatile uint32_t echoStart1;
 extern volatile int32_t echoDuration1; // Can be negative to indicate errors: -1 = timeout, -2 = too close
 extern volatile uint32_t echoStart2;
 extern volatile int32_t echoDuration2; // Can be negative to indicate errors: -1 = timeout, -2 = too close
-extern Adafruit_VL53L0X lox;
+extern VL53L0X sensor;
+
 
 bool setup_lsm6dos();
 void setup_magnetometer();

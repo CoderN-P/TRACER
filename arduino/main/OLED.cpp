@@ -12,6 +12,7 @@ uint32_t lastPageSwitch = 0;
 std::atomic<uint8_t> pageIndex{0};
 bool blinkState = false;
 Adafruit_SSD1306 display(OLED_WIDTH, OLED_HEIGHT, &Wire, -1);
+// Instrumentation: measure how long display.display() takes (microseconds)
 
 bool setupOLED()
 {
@@ -233,12 +234,6 @@ void drawPage3(RobotState &state, bool blinkState)
 
 void updateOLED(RobotState &state)
 {
-  // Hold mutex for entire draw+display cycle to prevent I2C buffer corruption
-  if (i2c_mutex == NULL || xSemaphoreTake(i2c_mutex, pdMS_TO_TICKS(50)) != pdTRUE)
-  {
-    return; // Skip this frame if we can't get the lock
-  }
-
   uint32_t now = millis();
   
   uint8_t idx = pageIndex.load();
@@ -269,7 +264,34 @@ void updateOLED(RobotState &state)
 
   drawPageDots();
   drawHeader(state, blinkState);
+}
 
-  display.display();
-  xSemaphoreGive(i2c_mutex);
+void send_oled_page(int page, int chunk) {
+  int startColumn = chunk * 32;       // e.g., 0, 32, 64, 96
+  int endColumn = startColumn + 31;   // e.g., 31, 63, 95, 127
+  int bufferOffset = (page * 128) + startColumn;
+
+  // Step A: Restrict the display's internal column pointer to just this 32-byte window
+  Wire.beginTransmission(0x3C);
+  Wire.write(0x00); // Command stream prefix
+  Wire.write(0x21); // Column address command
+  Wire.write(startColumn);
+  Wire.write(endColumn);
+  Wire.endTransmission();
+
+  // Step B: Set the targeted memory page
+  Wire.beginTransmission(0x3C);
+  Wire.write(0x00); // Command stream prefix
+  Wire.write(0x22); // Page address command
+  Wire.write(page);
+  Wire.write(page);
+  Wire.endTransmission();
+
+  // Step C: Stream exactly 32 bytes of pixel data
+  Wire.beginTransmission(0x3C);
+  Wire.write(0x40); // Data stream prefix
+  for (int i = 0; i < 32; i++) {
+    Wire.write(display.getBuffer()[bufferOffset + i]);
+  }
+  Wire.endTransmission(); // Bus is instantly released for sensor use after this line
 }

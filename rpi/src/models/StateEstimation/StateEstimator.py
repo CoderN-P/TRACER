@@ -100,7 +100,7 @@ class StateEstimator:
         
         self.theta_encoders += self.heading_delta_from_encoders(delta_left_ticks, delta_right_ticks)
         
-        if sensor_data.magnetometer.new:
+        if sensor_data.magnetometer.new and sensor_data.magnetometer.is_available():
             mag_heading_rad = math.radians(sensor_data.magnetometer.heading)
             if self.initial_mag_heading is not None:
                 mag_heading_rad -= self.initial_mag_heading

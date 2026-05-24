@@ -33,3 +33,6 @@ class MagnetometerData(BaseModel):
         cal_z = mx * ROBOT_CONFIG.MAGNETOMETER_SOFT_IRON_MATRIX[2][0] + my * ROBOT_CONFIG.MAGNETOMETER_SOFT_IRON_MATRIX[2][1] + mz * ROBOT_CONFIG.MAGNETOMETER_SOFT_IRON_MATRIX[2][2]
         
         return cal_x, cal_y, cal_z
+    
+    def is_available(self):
+        return self.x != 0 and self.y != 0 and self.z != 0

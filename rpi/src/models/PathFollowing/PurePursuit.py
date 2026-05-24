@@ -111,14 +111,14 @@ class PurePursuit:
         return None # no goal point found
     
     @staticmethod
-    def get_local_target(robot_state, goal_point) -> tuple:
+    def get_local_target(robot_state, goal_point) -> List[float]:
         dx = goal_point[0] - robot_state.x
         dy = goal_point[1] - robot_state.y
         
         local_x = math.cos(robot_state.yaw) * dx + math.sin(robot_state.yaw) * dy
         local_y = -math.sin(robot_state.yaw) * dx + math.cos(robot_state.yaw) * dy
         
-        return local_x, local_y,
+        return [local_x, local_y]
     
     
     @staticmethod

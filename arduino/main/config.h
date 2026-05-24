@@ -44,8 +44,8 @@ const int BAUD_RATE = 921600;
 const uint32_t MAIN_WINDOW_SIZE_MS = 500; // Window size for max loop time calculation in milliseconds
 
 // PID + Feedforward constants (for 2S lipo)
-const float kS_LEFT = 0.18;
-const float kS_RIGHT = 0.18;
+const float kS_LEFT = 0.10;
+const float kS_RIGHT = 0.10;
 const float kV_LEFT = 3.15;  // Velocity feedforward term for left motor (V = kS + kV * velocity)
 const float kV_RIGHT = 3.20; // Velocity feedforward term for right motor (V = kS + kV * velocity)
 const float kA_LEFT = 0;

@@ -71,29 +71,33 @@ def calibrate_kv(resolution, duration_sec, ks_left, ks_right, port=None):
     right_pwm_above_ks = []
 
     while True:
-        serial_manager.send(
-            Command(
-                ID="",
-                command_type=CommandType.PWM,
-                command=MotorPWMCommand(
-                    left_motor=pwm_left,
-                    right_motor=pwm_right,
-                ),
-                duration=0,
-                pause_duration=0,
+        measurement_start = time.time()
+        cur_time = time.time()
+        
+        while cur_time - measurement_start < duration_sec:
+            serial_manager.send(
+                Command(
+                    ID="",
+                    command_type=CommandType.PWM,
+                    command=MotorPWMCommand(
+                        left_motor=pwm_left,
+                        right_motor=pwm_right,
+                    ),
+                    duration=0,
+                    pause_duration=0,
+                )
             )
-
-        )
+            time.sleep(0.01)
+            cur_time = time.time()
+            
+        measurement_elapsed = time.time() - measurement_start
+        
         logger.info(f"Settling for {settle_sec:.1f}s at PWM L={pwm_left:.2f}, R={pwm_right:.2f}...")
         time.sleep(settle_sec)
 
         with lock:
             left_encoder = 0
             right_encoder = 0
-
-        measurement_start = time.time()
-        time.sleep(duration_sec)
-        measurement_elapsed = time.time() - measurement_start
 
         serial_manager.send(Command.stop())
 

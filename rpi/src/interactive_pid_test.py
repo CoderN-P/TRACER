@@ -183,12 +183,14 @@ class PIDTunerState:
 
 def _print_live_display(state: PIDTunerState):
     """Print the live display line."""
-    print(f"\r[PID] kP_l={state.kp_left:.2f} kI_l={state.ki_left:.2f} kD_l={state.kd_left:.2f} " +
-          f"kP_r={state.kp_right:.2f} kI_r={state.ki_right:.2f} kD_r={state.kd_right:.2f} | " +
-          f"target={state.target_vel_left:.2f} m/s | " +
-          f"L: act={state.actual_vel_left:.2f} err={state.error_left:+.2f} | " +
-          f"R: act={state.actual_vel_right:.2f} err={state.error_right:+.2f}    ",
-          end='', flush=True)
+    # Using \r and end='' for single line updates
+    status = (f"[PID] kP_l={state.kp_left:.2f} kI_l={state.ki_left:.2f} kD_l={state.kd_left:.2f} " +
+              f"kP_r={state.kp_right:.2f} kI_r={state.ki_right:.2f} kD_r={state.kd_right:.2f} | " +
+              f"target={state.target_vel_left:.2f} m/s | " +
+              f"L: act={state.actual_vel_left:.3f} err={state.error_left:+.3f} | " +
+              f"R: act={state.actual_vel_right:.3f} err={state.error_right:+.3f}")
+    # Pad to terminal width and use carriage return
+    print(status.ljust(120)[:120], end='\r', flush=True)
 
 
 def interactive_pid_test(port=None):
@@ -227,7 +229,7 @@ def interactive_pid_test(port=None):
     lock = threading.Lock()
     
     def sensor_callback(data):
-        """Callback for sensor data updates."""
+              """Callback for sensor data updates."""
         nonlocal run_active
         if not data:
             return
@@ -249,18 +251,12 @@ def interactive_pid_test(port=None):
     
     try:
         while True:
-            # Update display at DISPLAY_HZ
-            now = time.time()
-            if now - display_last_time >= DISPLAY_INTERVAL:
-                with lock:
-                    _print_live_display(state)
-                    if state.logging_enabled:
-                        state.log_data()
-                display_last_time = now
-            
-            # Handle active command timeout
-            if active_command is not None and command_end_time is not None:
-                if now >= command_end_time:
+            # If active command is running, show live display and re-send
+            if active_command is not None:
+                now = time.time()
+                
+                # Check if command should timeout
+                if command_end_time is not None and now >= command_end_time:
                     # Stop the command
                     serial_manager.send(Command.stop())
                     active_command = None
@@ -268,26 +264,28 @@ def interactive_pid_test(port=None):
                     with lock:
                         state.target_vel_left = 0.0
                         state.target_vel_right = 0.0
-                    print("\n")
-                else:
-                    # Repeatedly send the active command
-                    serial_manager.send(active_command)
-                    time.sleep(SEND_INTERVAL)
+                        run_active = False
+                    print("\nCommand completed.\n")
                     continue
+                
+                # Show live display
+                if now - display_last_time >= DISPLAY_INTERVAL:
+                    with lock:
+                        _print_live_display(state)
+                        if state.logging_enabled:
+                            state.log_data()
+                    display_last_time = now
+                
+                # Resend command to avoid motor watchdog timeout
+                serial_manager.send(active_command)
+                time.sleep(SEND_INTERVAL)
+                continue
             
-            # Non-blocking input with timeout
+            # No active command - prompt for input (blocking)
             try:
-                import select
-                # Use select for non-blocking input on macOS
-                if hasattr(select, 'select'):
-                    ready, _, _ = select.select([__import__('sys').stdin], [], [], 0.1)
-                    if ready:
-                        raw = input("\npid> ").strip()
-                    else:
-                        time.sleep(0.01)
-                        continue
-                else:
-                    raw = input("\npid> ").strip()
+                raw = input("pid> ").strip()
+            except KeyboardInterrupt:
+                raise
             except:
                 time.sleep(0.01)
                 continue
@@ -346,9 +344,9 @@ def interactive_pid_test(port=None):
                             duration=0
                         )
                         serial_manager.send(pid_cmd)
-                        print(f"PID gains set (both wheels): kP={kp:.2f} kI={ki:.2f} kD={kd:.2f}")
+                        print(f"✓ PID gains set (both wheels): kP={kp:.2f} kI={ki:.2f} kD={kd:.2f}\n")
                     except ValueError:
-                        print("Invalid number format. Example: pid 1.5 0.0 0.2")
+                        print("✗ Invalid number format. Example: pid 1.5 0.0 0.2\n")
                 
                 elif len(args) == 6:
                     try:
@@ -377,23 +375,23 @@ def interactive_pid_test(port=None):
                             duration=0
                         )
                         serial_manager.send(pid_cmd)
-                        print(f"PID gains set independently:")
+                        print(f"✓ PID gains set independently:")
                         print(f"  Left:  kP={kpl:.2f} kI={kil:.2f} kD={kdl:.2f}")
-                        print(f"  Right: kP={kpr:.2f} kI={kir:.2f} kD={kdr:.2f}")
+                        print(f"  Right: kP={kpr:.2f} kI={kir:.2f} kD={kdr:.2f}\n")
                     except ValueError:
-                        print("Invalid number format. Example: pid 1.5 0.0 0.2 1.8 0.0 0.25")
+                        print("✗ Invalid number format. Example: pid 1.5 0.0 0.2 1.8 0.0 0.25\n")
                 else:
-                    print("PID requires either 3 or 6 arguments")
+                    print("✗ PID requires either 3 or 6 arguments\n")
             
             elif cmd_name == "vel":
                 if len(args) != 1:
-                    print("vel requires exactly 1 argument (speed in m/s)")
+                    print("✗ vel requires exactly 1 argument (speed in m/s)\n")
                     continue
                 
                 try:
                     speed = float(args[0])
                     if not (-ROBOT_CONFIG.MAX_LINEAR_VEL <= speed <= ROBOT_CONFIG.MAX_LINEAR_VEL):
-                        print(f"Speed must be between -{ROBOT_CONFIG.MAX_LINEAR_VEL:.2f} and {ROBOT_CONFIG.MAX_LINEAR_VEL:.2f} m/s")
+                        print(f"✗ Speed must be between -{ROBOT_CONFIG.MAX_LINEAR_VEL:.2f} and {ROBOT_CONFIG.MAX_LINEAR_VEL:.2f} m/s\n")
                         continue
                     
                     with lock:
@@ -409,19 +407,20 @@ def interactive_pid_test(port=None):
                         pause_duration=0
                     )
                     command_end_time = None  # Run indefinitely
-                    print(f"Velocity command: {speed:.2f} m/s (running continuously)")
+                    print(f"✓ Velocity command: {speed:.2f} m/s (running continuously)")
+                    print("Live display (press Ctrl+C or send 'stop' to exit):\n")
                 except ValueError:
-                    print("Invalid speed value")
+                    print("✗ Invalid speed value\n")
             
             elif cmd_name == "step":
                 if len(args) != 1:
-                    print("step requires exactly 1 argument (speed in m/s)")
+                    print("✗ step requires exactly 1 argument (speed in m/s)\n")
                     continue
                 
                 try:
                     speed = float(args[0])
                     if not (0 < speed <= ROBOT_CONFIG.MAX_LINEAR_VEL):
-                        print(f"Speed must be between 0 and {ROBOT_CONFIG.MAX_LINEAR_VEL:.2f} m/s")
+                        print(f"✗ Speed must be between 0 and {ROBOT_CONFIG.MAX_LINEAR_VEL:.2f} m/s\n")
                         continue
                     
                     with lock:
@@ -437,9 +436,10 @@ def interactive_pid_test(port=None):
                         pause_duration=0
                     )
                     command_end_time = time.time() + 3.0  # 3 second step
-                    print(f"Step response test: 0→{speed:.2f} m/s for 3 seconds")
+                    print(f"✓ Step response test: 0→{speed:.2f} m/s for 3 seconds")
+                    print("Live display:\n")
                 except ValueError:
-                    print("Invalid speed value")
+                    print("✗ Invalid speed value\n")
             
             elif cmd_name == "stop":
                 serial_manager.send(Command.stop())
@@ -449,36 +449,39 @@ def interactive_pid_test(port=None):
                     state.target_vel_left = 0.0
                     state.target_vel_right = 0.0
                     run_active = False
-                print("Motors stopped")
+                print("✓ Motors stopped\n")
             
             elif cmd_name == "log":
                 if len(args) != 1:
-                    print("log requires a filename")
+                    print("✗ log requires a filename\n")
                     continue
                 
                 if state.logging_enabled:
                     state.stop_logging()
                 else:
                     state.start_logging(args[0])
+                print()
             
             elif cmd_name == "save":
                 if len(args) != 1:
-                    print("save requires a filename")
+                    print("✗ save requires a filename\n")
                     continue
                 state.save_gains_to_file(args[0])
+                print()
             
             elif cmd_name == "load":
                 if len(args) != 1:
-                    print("load requires a filename")
+                    print("✗ load requires a filename\n")
                     continue
                 state.load_gains_from_file(args[0])
+                print()
             
             elif cmd_name == "gains":
                 with lock:
                     state.print_gains()
             
             else:
-                print(f"Unknown command: {cmd_name}. Type 'help' for available commands.")
+                print(f"✗ Unknown command: {cmd_name}. Type 'help' for available commands.\n")
     
     except KeyboardInterrupt:
         print("\n\nInterrupted by user.")

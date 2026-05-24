@@ -11,7 +11,7 @@ def calibrate_wheelbase(speed, duration_sec, port=None):
     logging.basicConfig(level=logging.INFO, format='%(levelname)s:%(name)s:%(message)s')
 
     logger = logging.getLogger(__name__)
-    
+
     if not port:
         logger.error("No serial port found. Please connect the robot.")
         return
@@ -43,20 +43,21 @@ def calibrate_wheelbase(speed, duration_sec, port=None):
 
     cur_time = time.time()
 
-    serial_manager.send(
-        Command(
-            ID="",
-            command_type=CommandType.MOTOR,
-            command=MotorCommand(
-                left_motor=-speed,
-                right_motor=speed,
-            ),
-            duration=0,
-            pause_duration=0,
-        )
+    # Create motor command for differential spin (turning in place)
+    motor_command = Command(
+        ID="",
+        command_type=CommandType.MOTOR,
+        command=MotorCommand(
+            left_motor=-speed,
+            right_motor=speed,
+        ),
+        duration=0,
+        pause_duration=0,
     )
 
+    # Send motor commands every 20ms to keep the robot alive
     while time.time() - cur_time < duration_sec:
+        serial_manager.send(motor_command)
         time.sleep(0.02)
 
     serial_manager.send(Command.stop())
@@ -67,4 +68,3 @@ def calibrate_wheelbase(speed, duration_sec, port=None):
         logger.info(f"Estimated heading change: {(left_distance - right_distance) / ROBOT_CONFIG.WHEEL_BASE:.4f} radians")
         logger.info(f"Estimated heading change: {(left_distance - right_distance) / ROBOT_CONFIG.WHEEL_BASE * (180 / 3.14159):.2f} degrees")
         logger.info(f"Measure the actual heading change using a protractor or by tracking the robot's path, and use the ratio of actual to estimated heading change to calculate the correction factor for the wheelbase.")
-    

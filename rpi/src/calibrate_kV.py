@@ -71,36 +71,41 @@ def calibrate_kv(resolution, duration_sec, ks_left, ks_right, port=None):
     right_pwm_above_ks = []
 
     while True:
-        measurement_start = time.time()
-        cur_time = time.time()
-        
-        while cur_time - measurement_start < duration_sec:
-            serial_manager.send(
-                Command(
-                    ID="",
-                    command_type=CommandType.PWM,
-                    command=MotorPWMCommand(
-                        left_motor=pwm_left,
-                        right_motor=pwm_right,
-                    ),
-                    duration=0,
-                    pause_duration=0,
-                )
-            )
-            time.sleep(0.01)
-            cur_time = time.time()
-            
-        measurement_elapsed = time.time() - measurement_start
-        
-        logger.info(f"Settling for {settle_sec:.1f}s at PWM L={pwm_left:.2f}, R={pwm_right:.2f}...")
-        time.sleep(settle_sec)
+        # Create motor command for this PWM level
+        motor_command = Command(
+            ID="",
+            command_type=CommandType.PWM,
+            command=MotorPWMCommand(
+                left_motor=pwm_left,
+                right_motor=pwm_right,
+            ),
+            duration=0,
+            pause_duration=0,
+        )
 
+        # Settle phase: send commands every 20ms to keep robot alive
+        logger.info(f"Settling for {settle_sec:.1f}s at PWM L={pwm_left:.2f}, R={pwm_right:.2f}...")
+        settle_start = time.time()
+        while time.time() - settle_start < settle_sec:
+            serial_manager.send(motor_command)
+            time.sleep(0.02)
+
+        # Reset encoder counters before measurement
         with lock:
             left_encoder = 0
             right_encoder = 0
 
+        # Measurement phase: send commands every 20ms and record timing
+        measurement_start = time.time()
+        while time.time() - measurement_start < duration_sec:
+            serial_manager.send(motor_command)
+            time.sleep(0.02)
+        measurement_elapsed = time.time() - measurement_start
+
+        # Stop motors
         serial_manager.send(Command.stop())
 
+        # Collect results
         with lock:
             left_ticks = left_encoder
             right_ticks = right_encoder
@@ -114,7 +119,7 @@ def calibrate_kv(resolution, duration_sec, ks_left, ks_right, port=None):
             right_kV = (pwm_right - ks_right) / right_actual_speed if right_actual_speed > 0 else float('inf')
 
             logger.info(f"Measurement window: {measurement_elapsed:.3f}s")
-            logger.info(f"Left wheel encoder ticks {left_ticks:.4f} ticks")
+            logger.info(f"Left wheel encoder ticks: {left_ticks:.4f} ticks")
             logger.info(f"Right wheel encoder ticks: {right_ticks:.4f} ticks")
             logger.info(f"LEFT PWM value tested: {pwm_left:.2f}")
             logger.info(f"RIGHT PWM value tested: {pwm_right:.2f}")
@@ -133,7 +138,7 @@ def calibrate_kv(resolution, duration_sec, ks_left, ks_right, port=None):
         ):
             left_speeds.append(left_actual_speed)
             left_pwm_above_ks.append(pwm_left - ks_left)
-        
+
         if (
                 MIN_VEL < right_actual_speed < MAX_VEL and
                 (pwm_right - ks_right) > MIN_DELTA_PWM
@@ -169,9 +174,3 @@ def calibrate_kv(resolution, duration_sec, ks_left, ks_right, port=None):
             serial_manager.send(Command.stop())
             serial_manager.stop()
             return
-        
-        
-        
-        
-        
-        

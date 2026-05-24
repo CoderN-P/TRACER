@@ -9,12 +9,12 @@ class PoseFilter:
             [0, ROBOT_CONFIG.Q_Y],
         ])
         
-        self.state = np.array([0, 0])  # [x, y]
+        self.state = np.array([0.0, 0.0])  # [x, y]
         self.process_jacobian = np.eye(2)
         self.P = np.eye(2) * ROBOT_CONFIG.P_POSITION
 
     def reset(self):
-        self.state = np.array([0, 0])
+        self.state = np.array([0.0, 0.0])
         
     def predict_covariance(self):
         return self.P + self.Q # process_jacobian is identity so it doesn't change P in this simple model

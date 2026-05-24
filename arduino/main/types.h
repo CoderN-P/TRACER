@@ -4,9 +4,6 @@
 
 // Robot State struct
 struct RobotState {
-    int32_t leftEncoder;
-    int32_t rightEncoder;
-    
     float leftPWM;
     float rightPWM;
     float leftSpeed;
@@ -20,7 +17,7 @@ struct RobotState {
     int magX, magY, magZ;
     int tempC;
     
-    float distance1, distance2, distanceFront;
+    int16_t distance1, distance2, distanceFront;
     
     float mainLoopElapsedMs;
     uint8_t batteryPercent;
@@ -35,15 +32,15 @@ struct RobotState {
 struct SensorPacket {
     uint8_t startByte; // 0xAA
     uint8_t packetSeq; // Incrementing sequence number
-    float distance_left; // Ultrasonic distance in cm
-    float distance_right; // Ultrasonic distance in cm  
-    float distance_front; // Time-of-flight distance in cm
+    int16_t distance_left; // Ultrasonic distance in cm
+    int16_t distance_right; // Ultrasonic distance in cm  
+    int16_t distance_front; // Time-of-flight distance in cm
     int16_t ax, ay, az; // Accelerometer data
     int16_t gx, gy, gz; // Gyroscope data
     int16_t tempC; // Temperature in Celsius
     int16_t magX, magY, magZ; // Magnetometer data
-    int32_t leftEncoder; // Left wheel encoder count
-    int32_t rightEncoder; // Right wheel encoder count
+    int8_t leftEncoder; // Left wheel encoder count
+    int8_t rightEncoder; // Right wheel encoder count
     uint8_t flags; // Bit 0 = front IR, Bit 1 = back IR, Bit 2 = new magnetometer data available, Bit 3 = motors enabled
     uint8_t batteryPercent; // Battery voltage percentage (0-100)
     uint32_t timestamp; // Timestamp in microseconds

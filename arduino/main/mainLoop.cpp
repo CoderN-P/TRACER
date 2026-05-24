@@ -14,10 +14,6 @@ void mainLoop(void *pvParameters)
 
     uint8_t loopCounter = 0;
     uint8_t packetSeq = 0;
-    int16_t prevPcntLeft = 0;
-    int16_t prevPcntRight = 0;
-    int32_t leftEncoderCount = 0;
-    int32_t rightEncoderCount = 0;
     uint8_t lastPIDMode = 0;      // 0 = PID control mode, 1 = open-loop PWM control mode
     uint32_t windowStartTime = 0; // Start time of the rolling window for max loop time calculation
 
@@ -28,16 +24,19 @@ void mainLoop(void *pvParameters)
     {
         uint32_t startTime = micros();
 
-        int16_t pcntLeft;
-        int16_t pcntRight;
         int32_t echoDurationCopy1;
         int32_t echoDurationCopy2;
         int16_t ax = 0, ay = 0, az = 0, gx = 0, gy = 0, gz = 0;
-        int16_t tempC = 0.0f;
+        int16_t tempC = 0;
         static int16_t magX, magY, magZ; // Keep magnetometer data in static variables since it updates at 50 Hz
 
-        pcnt_get_counter_value(pcnt_unit_left, &pcntLeft);
-        pcnt_get_counter_value(pcnt_unit_right, &pcntRight);
+        int16_t pcntLeftRaw, pcntRightRaw;
+        
+        pcnt_get_counter_value(pcnt_unit_left, &pcntLeftRaw);
+        pcnt_counter_clear(pcnt_unit_left);
+        
+        pcnt_get_counter_value(pcnt_unit_right, &pcntRightRaw);
+        pcnt_counter_clear(pcnt_unit_right);
 
         taskENTER_CRITICAL(&spinlock);
         {
@@ -45,15 +44,9 @@ void mainLoop(void *pvParameters)
             echoDurationCopy2 = echoDuration2;
         }
         taskEXIT_CRITICAL(&spinlock);
-
-        int16_t deltaLeft = pcntLeft - prevPcntLeft;
-        int16_t pcntRightCorrected = (-1 * pcntRight); // Invert right encoder count to match physical direction
-        int16_t deltaRight = pcntRightCorrected - prevPcntRight;
-        prevPcntLeft = pcntLeft;
-        prevPcntRight = pcntRightCorrected;
-
-        leftEncoderCount += deltaLeft;
-        rightEncoderCount += deltaRight;
+        
+        int8_t pcntLeft = (int8_t) (pcntLeftRaw);
+        int8_t pcntRight = (-1 * (int8_t) (pcntRightRaw)); // Invert right encoder count to match physical direction
 
         getLSMData(ax, ay, az, gx, gy, gz, tempC);
         bool newMagData = loopCounter % 2 == 0; // Magnetometer updates at 50 Hz, so new data is available every 2 loops of the main loop
@@ -83,8 +76,8 @@ void mainLoop(void *pvParameters)
             uint32_t lastMotorCommandMsCopy = lastMotorCommandMs.load();
             const bool motorCmdFresh = (uint32_t)(millis() - lastMotorCommandMsCopy) <= MOTOR_COMMAND_TIMEOUT_MS;
 
-            leftSpeed = getLeftMotorSpeed(deltaLeft);
-            rightSpeed = getRightMotorSpeed(deltaRight);
+            leftSpeed = getLeftMotorSpeed(pcntLeft);
+            rightSpeed = getRightMotorSpeed(pcntRight);
 
             if (motorCmdFresh)
             {
@@ -112,7 +105,7 @@ void mainLoop(void *pvParameters)
             rightPWM = 0;
         }
 
-        float lastDistance1, lastDistance2;
+        int16_t lastDistance1, lastDistance2;
 
         if (echoDurationCopy1 == 0 || echoDurationCopy1 > 25000)
         {
@@ -124,7 +117,7 @@ void mainLoop(void *pvParameters)
         }
         else
         {
-            lastDistance1 = (echoDurationCopy1 / 2.0) * 0.0343;
+            lastDistance1 = (int16_t)((echoDurationCopy1 / 2.0) * 0.343);
         }
 
         if (echoDurationCopy2 == 0 || echoDurationCopy2 > 25000)
@@ -137,7 +130,7 @@ void mainLoop(void *pvParameters)
         }
         else
         {
-            lastDistance2 = (echoDurationCopy2 / 2.0) * 0.0343;
+            lastDistance2 = (int16_t)((echoDurationCopy2 / 2.0) * 0.343);
         }
 
         static uint8_t curBatteryPercent = 0;
@@ -165,8 +158,8 @@ void mainLoop(void *pvParameters)
             packet.magX = magX;
             packet.magY = magY;
             packet.magZ = magZ;
-            packet.leftEncoder = leftEncoderCount;
-            packet.rightEncoder = rightEncoderCount;
+            packet.leftEncoder = pcntLeft;
+            packet.rightEncoder = pcntRight;
             packet.flags = (newMagData << 0) | (enabled << 1);
             packet.batteryPercent = curBatteryPercent;
             packet.timestamp = micros();
@@ -186,8 +179,6 @@ void mainLoop(void *pvParameters)
 
         if (xSemaphoreTake(state_mutex, 0) == pdTRUE)
         {
-            robot_state.leftEncoder = leftEncoderCount;
-            robot_state.rightEncoder = rightEncoderCount;
             robot_state.leftSpeed = leftSpeed;
             robot_state.rightSpeed = rightSpeed;
             robot_state.leftSetpoint = pidLeft.getSetpoint();

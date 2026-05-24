@@ -244,7 +244,7 @@ bool setup_tof()
     return true;
 }
 
-void getToFDistance(float &distanceFront)
+void getToFDistance(int16_t &distanceFront)
 {
 
     if (!takeI2CMutex(pdMS_TO_TICKS(10)))
@@ -264,10 +264,10 @@ void getToFDistance(float &distanceFront)
     
     if (dist < 1200)
     {                                                    
-        distanceFront = dist / 10.0f;
+        distanceFront = dist; // Keep in mm
     }
     else
     {
-        distanceFront = -1.0f; // Indicate out of range
+        distanceFront = -1; // Indicate out of range
     }
 }

@@ -193,13 +193,13 @@ void drawPage3(RobotState &state, bool blinkState)
     }
     // distance in bold
     display.setCursor(65, Y0);
-    display.print(tofDist, 1);
+    display.print(tofDist/10.0f, 1);
     display.print("cm !");
   }
   else
   {
     display.setCursor(26, Y0);
-    display.print(tofDist, 1);
+    display.print(tofDist/10.0f, 1);
     display.print(" cm");
     // Simple proximity bar (max range mapped to 100 cm)
     uint8_t barFill = (uint8_t)(45.0f * min(tofDist, 100.0f) / 100.0f);
@@ -215,7 +215,7 @@ void drawPage3(RobotState &state, bool blinkState)
     display.print("--  cm");
   else
   {
-    display.print(state.distance1, 1);
+    display.print(state.distance1/10.0f, 1); // Convert from mm to cm
     display.print(" cm");
   }
 
@@ -227,7 +227,7 @@ void drawPage3(RobotState &state, bool blinkState)
     display.print("--  cm");
   else
   {
-    display.print(state.distance2, 1);
+    display.print(state.distance2/10.0f, 1);
     display.print(" cm");
   }
 }

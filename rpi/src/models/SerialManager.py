@@ -17,7 +17,7 @@ class SerialManager:
         self._buffer = bytearray()  # Buffer to store incoming data
         self._logger = logging.getLogger("SerialManager")
         self._START_BYTE = 0xAA
-        self._PACKET_LENGTH = 49  # Start byte (1) + Sensor data (55) + Checksum (1)
+        self._PACKET_LENGTH = 37  # Start byte (1) + Sensor data (35) + Checksum (1)
         
     @staticmethod
     def find_port():

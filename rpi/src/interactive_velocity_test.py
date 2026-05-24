@@ -55,25 +55,24 @@ def interactive_velocity_test_twist(port=None):
         return
     else:
         logger.info("Port: " + serial_port)
+        
     left_encoder = 0
     right_encoder = 0
-    prev_sensor_data = None
     run_active = False
 
     lock = threading.Lock()
 
     def callback(data):
-        nonlocal left_encoder, right_encoder, prev_sensor_data
         if not data:
             return
 
         sensor_data = Robot.bytes_to_sensor_data(data)
 
+        nonlocal left_encoder, right_encoder
         with lock:
-            if prev_sensor_data is not None and run_active:
-                left_encoder += StateEstimator.encoder_delta(sensor_data.left_encoder, prev_sensor_data.left_encoder)
-            right_encoder += StateEstimator.encoder_delta(sensor_data.right_encoder, prev_sensor_data.right_encoder)
-            prev_sensor_data = sensor_data
+            if run_active:
+                left_encoder += sensor_data.left_encoder
+                right_encoder += sensor_data.right_encoder
 
     serial_manager = SerialManager(serial_port, 921600)
     serial_manager.start_read(callback=callback)
@@ -170,23 +169,21 @@ def interactive_pwm_test(port=None):
 
     left_encoder = 0
     right_encoder = 0
-    prev_sensor_data = None
     run_active = False
 
     lock = threading.Lock()
 
     def callback(data):
-        nonlocal left_encoder, right_encoder, prev_sensor_data
+        nonlocal left_encoder, right_encoder
         if not data:
             return
 
         sensor_data = Robot.bytes_to_sensor_data(data)
 
         with lock:
-            if prev_sensor_data is not None and run_active:
-                left_encoder += (sensor_data.left_encoder - prev_sensor_data.left_encoder)
-                right_encoder += (sensor_data.right_encoder - prev_sensor_data.right_encoder)
-            prev_sensor_data = sensor_data
+            if run_active:
+                left_encoder += sensor_data.left_encoder
+                right_encoder += sensor_data.right_encoder
 
     serial_manager = SerialManager(serial_port, 921600)
     serial_manager.start_read(callback=callback)
@@ -283,17 +280,16 @@ def interactive_velocity_test(port=None):
     lock = threading.Lock()
 
     def callback(data):
-        nonlocal left_encoder, right_encoder, prev_sensor_data
+        nonlocal left_encoder, right_encoder
         if not data:
             return
 
         sensor_data = Robot.bytes_to_sensor_data(data)
 
         with lock:
-            if prev_sensor_data is not None and run_active:
-                left_encoder += (sensor_data.left_encoder - prev_sensor_data.left_encoder)
-                right_encoder += (sensor_data.right_encoder - prev_sensor_data.right_encoder)
-            prev_sensor_data = sensor_data
+            if run_active:
+                left_encoder += sensor_data.left_encoder
+                right_encoder += sensor_data.right_encoder
 
     serial_manager = SerialManager(serial_port, 921600)
     serial_manager.start_read(callback=callback)

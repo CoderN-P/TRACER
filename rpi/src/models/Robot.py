@@ -148,27 +148,27 @@ class Robot:
         # Unpack the data according to the Arduino's sendSensorData format
         # <B    - start byte (0xAA)
         # B     - packet number (uint8_t) 
-        # f     - distance_left (float)
-        # f     - distance_right (float)
-        # f     - distance_front (float)
+        # h     - distance_left (int16_t mm)
+        # h     - distance_right (int16_t mm)
+        # h     - distance_front (int16_t mm)
         # h     - ax (int16_t)
         # h     - ay (int16_t)
         # h     - az (int16_t)
         # h     - gx (int16_t)
         # h     - gy (int16_t)
         # h     - gz (int16_t)
-        # h     - tempC (float)
-        # h     - magnetometer x (float, microtesla)
-        # h     - magnetometer y (float, microtesla)
-        # h     - magnetometer z (float, microtesla)
-        # i     - left encoder ticks (int32_t)
-        # i     - right encoder ticks (int32_t)
+        # h     - tempC (int16_t raw)
+        # h     - magnetometer x (int16, raw)
+        # h     - magnetometer y (int16, raw)
+        # h     - magnetometer z (int16, raw)
+        # b     - left encoder delta ticks (int8_t)
+        # b     - right encoder delta ticks (int8_t)
         # B     - flags (uint8_t) bit 0: new mag data, bit 1: motors enabled
         # B     - battery percentage (uint8_t)
         # I     - timestamp (uint32_t, microseconds)
         # B     - checksum (uint8_t)
         
-        fields = struct.unpack('<BBfffhhhhhhhhhhiiBBIB', data)
+        fields = struct.unpack('<BBhhhhhhhhhhhhhbbBBIB', data)
         start, packet_num, distance_left, distance_right, distance_front, ax, ay, az, gx, gy, gz, temp, mag_x, mag_y, mag_z, left_encoder_ticks, right_encoder_ticks, flags, battery, timestamp, received_checksum = fields
 
         # Calculate checksum (sum of all bytes except checksum byte)
@@ -187,11 +187,11 @@ class Robot:
         
         data = {
             "ultrasonic": {
-                "distance_left": distance_left,
-                "distance_right": distance_right
+                "distance_left": distance_left / 10.0,  # Convert from mm to cm
+                "distance_right": distance_right / 10.0
             },
             "tof": {
-                "distance_front": distance_front
+                "distance_front": distance_front / 10.0
             },
             "imu": {
                 "acceleration_x": ax * ROBOT_CONFIG.LSB_A , 

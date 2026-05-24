@@ -18,7 +18,6 @@ def calibrate_wheelbase(speed, duration_sec, port=None):
 
     left_distance = 0
     right_distance = 0
-    prev_sensor_data = None
 
     lock = threading.Lock()
 
@@ -28,13 +27,10 @@ def calibrate_wheelbase(speed, duration_sec, port=None):
 
         sensor_data = Robot.bytes_to_sensor_data(data)
 
-        nonlocal left_distance, right_distance, prev_sensor_data
+        nonlocal left_distance, right_distance
         with lock:
-            if prev_sensor_data is not None:
-                left_distance += StateEstimator.encoder_delta(sensor_data.left_encoder, prev_sensor_data.left_encoder) * ROBOT_CONFIG.METERS_PER_TICK_LEFT
-                right_distance += StateEstimator.encoder_delta(sensor_data.right_encoder, prev_sensor_data.right_encoder) * ROBOT_CONFIG.METERS_PER_TICK_RIGHT
-
-            prev_sensor_data = sensor_data
+            left_distance += sensor_data.left_encoder * ROBOT_CONFIG.METERS_PER_TICK_LEFT
+            right_distance += sensor_data.right_encoder * ROBOT_CONFIG.METERS_PER_TICK_RIGHT
 
     serial_manager = SerialManager(port, 921600)
     serial_manager.start_read(callback=callback)

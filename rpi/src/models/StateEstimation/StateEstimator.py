@@ -91,8 +91,8 @@ class StateEstimator:
         
         max_pulses = ROBOT_CONFIG.ENCODER_TICKS_PER_REV * ROBOT_CONFIG.MAX_RPM / 60.0 * dt * ROBOT_CONFIG.MAX_ENCODER_MARGIN
 
-        delta_left_ticks = self.encoder_delta(sensor_data.left_encoder, previous_sensor_data.left_encoder)
-        delta_right_ticks = self.encoder_delta(sensor_data.right_encoder, previous_sensor_data.right_encoder)
+        delta_left_ticks = sensor_data.left_encoder
+        delta_right_ticks = sensor_data.right_encoder
         
         if delta_left_ticks > max_pulses:
             self._logger.error(f"Left encoder tick jump detected: {previous_sensor_data.left_encoder} -> {sensor_data.left_encoder} (max expected: {max_pulses:.2f})")
@@ -127,12 +127,3 @@ class StateEstimator:
         delta_left = left_ticks * ROBOT_CONFIG.METERS_PER_TICK_LEFT
         delta_right = right_ticks * ROBOT_CONFIG.METERS_PER_TICK_RIGHT
         return (delta_right - delta_left) / ROBOT_CONFIG.WHEEL_BASE
-    
-    @staticmethod
-    def encoder_delta(current, previous):
-        delta = current - previous
-        if delta < -32768:
-            delta += 65536
-        elif delta > 32767:
-            delta -= 65536
-        return delta

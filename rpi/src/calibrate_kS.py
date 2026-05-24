@@ -18,22 +18,18 @@ def calibrate_ks(resolution, duration_sec, port=None):
 
     left_encoder = 0
     right_encoder = 0
-    prev_sensor_data = None
+ 
 
     lock = threading.Lock()
 
     def callback(data):
         if not data: return
-
-
+        
         sensor_data = Robot.bytes_to_sensor_data(data)
-
-        nonlocal left_encoder, right_encoder, prev_sensor_data
+        nonlocal left_encoder, right_encoder
         with lock:
-            if prev_sensor_data is not None:
-                left_encoder += StateEstimator.encoder_delta(sensor_data.left_encoder, prev_sensor_data.left_encoder)
-                right_encoder += StateEstimator.encoder_delta(sensor_data.right_encoder, prev_sensor_data.right_encoder)
-            prev_sensor_data = sensor_data
+            left_encoder += sensor_data.left_encoder
+            right_encoder += sensor_data.right_encoder
             
 
     serial_manager = SerialManager(port, 921600)

@@ -24,6 +24,6 @@ void triggerUltrasonicPulse2();
 void IRAM_ATTR echoISR1();
 void IRAM_ATTR echoISR2();
 bool setup_tof();
-void getToFDistance(float &distance);
+void getToFDistance(int16_t &distance);
 
 #endif

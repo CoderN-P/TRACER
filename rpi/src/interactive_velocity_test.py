@@ -4,7 +4,7 @@ import time
 import math
 
 from . import ROBOT_CONFIG
-from .models import SerialManager, Robot, Command, CommandType, MotorCommand, PurePursuit
+from .models import SerialManager, Robot, Command, CommandType, MotorCommand, PurePursuit, StateEstimator
 from .models.Command import MotorPWMCommand
 
 # Interval (seconds) between repeated sends while a duration is active.
@@ -71,8 +71,8 @@ def interactive_velocity_test_twist(port=None):
 
         with lock:
             if prev_sensor_data is not None and run_active:
-                left_encoder += (sensor_data.left_encoder - prev_sensor_data.left_encoder)
-                right_encoder += (sensor_data.right_encoder - prev_sensor_data.right_encoder)
+                left_encoder += StateEstimator.encoder_delta(sensor_data.left_encoder, prev_sensor_data.left_encoder)
+            right_encoder += StateEstimator.encoder_delta(sensor_data.right_encoder, prev_sensor_data.right_encoder)
             prev_sensor_data = sensor_data
 
     serial_manager = SerialManager(serial_port, 921600)

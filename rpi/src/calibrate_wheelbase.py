@@ -2,7 +2,7 @@ import logging
 import time
 import threading
 from . import ROBOT_CONFIG
-from .models import SerialManager, Robot, Command, CommandType, MotorCommand
+from .models import SerialManager, Robot, Command, CommandType, MotorCommand, StateEstimator
 
 
 def calibrate_wheelbase(speed, duration_sec, port=None):
@@ -31,8 +31,8 @@ def calibrate_wheelbase(speed, duration_sec, port=None):
         nonlocal left_distance, right_distance, prev_sensor_data
         with lock:
             if prev_sensor_data is not None:
-                left_distance += (sensor_data.left_encoder - prev_sensor_data.left_encoder) * ROBOT_CONFIG.METERS_PER_TICK_LEFT
-                right_distance += (sensor_data.right_encoder - prev_sensor_data.right_encoder) * ROBOT_CONFIG.METERS_PER_TICK_RIGHT
+                left_distance += StateEstimator.encoder_delta(sensor_data.left_encoder, prev_sensor_data.left_encoder) * ROBOT_CONFIG.METERS_PER_TICK_LEFT
+                right_distance += StateEstimator.encoder_delta(sensor_data.right_encoder, prev_sensor_data.right_encoder) * ROBOT_CONFIG.METERS_PER_TICK_RIGHT
 
             prev_sensor_data = sensor_data
 

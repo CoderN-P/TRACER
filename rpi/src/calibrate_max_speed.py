@@ -2,7 +2,7 @@ import logging
 import time
 import threading
 from . import ROBOT_CONFIG
-from .models import SerialManager, Robot, Command, CommandType, MotorPWMCommand
+from .models import SerialManager, Robot, Command, CommandType, MotorPWMCommand, StateEstimator
 
 
 def calibrate_max_speed(port=None):
@@ -30,8 +30,8 @@ def calibrate_max_speed(port=None):
         nonlocal left_encoder, right_encoder, prev_sensor_data
         with lock:
             if prev_sensor_data is not None:
-                left_encoder += (sensor_data.left_encoder - prev_sensor_data.left_encoder)
-                right_encoder += (sensor_data.right_encoder - prev_sensor_data.right_encoder)
+                left_encoder += StateEstimator.encoder_delta(sensor_data.left_encoder, prev_sensor_data.left_encoder)
+                right_encoder += StateEstimator.encoder_delta(sensor_data.right_encoder, prev_sensor_data.right_encoder)
             prev_sensor_data = sensor_data
 
 

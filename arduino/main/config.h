@@ -81,7 +81,7 @@ const uint8_t CMD_PWM = 0x05;
 const uint8_t CMD_OLED_UPDATE = 0x02;
 const uint8_t CMD_ENABLE = 0x03;
 const uint8_t CMD_STOP = 0x04;
-const uint8_t CMD_PWM = 0x06
+const uint8_t CMD_PID = 0x06;
 const int NUM_TYPES = 6; // Number of command types (MOVE, OLED_UPDATE, ENABLE, STOP, PWM, PID)
 
 // Timing intervals (in milliseconds)

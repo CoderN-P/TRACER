@@ -186,11 +186,11 @@ def _print_live_display(state: PIDTunerState):
     # Using \r and end='' for single line updates
     status = (f"[PID] kP_l={state.kp_left:.2f} kI_l={state.ki_left:.2f} kD_l={state.kd_left:.2f} " +
               f"kP_r={state.kp_right:.2f} kI_r={state.ki_right:.2f} kD_r={state.kd_right:.2f} | " +
-              f"target={state.target_vel_left:.2f} m/s | " +
+              f"tgt_L={state.target_vel_left:.2f} tgt_R={state.target_vel_right:.2f} | " +
               f"L: act={state.actual_vel_left:.3f} err={state.error_left:+.3f} | " +
               f"R: act={state.actual_vel_right:.3f} err={state.error_right:+.3f}")
     # Pad to terminal width and use carriage return
-    print(status.ljust(120)[:120], end='\r', flush=True)
+    print(status.ljust(140)[:140], end='\r', flush=True)
 
 
 def interactive_pid_test(port=None):
@@ -200,9 +200,9 @@ def interactive_pid_test(port=None):
     Commands:
     - pid <kp> <ki> <kd>              — set same gains for both wheels
     - pid <kpl> <kil> <kdl> <kpr> <kir> <kdr> — set independent gains
-    - vel <speed>                     — command constant target velocity in m/s
-    - step <speed>                    — step from 0 to speed, log response for 3 seconds
-    - stop                            — stop motors
+    - vel <speed> [duration]          — command velocity (m/s) for duration (s, default 10s)
+    - step <speed> [duration]         — step response test (default 3s)
+    - stop                            — stop motors immediately
     - log <filename>                  — toggle CSV logging to file
     - save <filename>                 — save current gains to JSON
     - load <filename>                 — load gains from JSON
@@ -305,9 +305,9 @@ def interactive_pid_test(port=None):
                 print("\nAvailable Commands:")
                 print("  pid <kp> <ki> <kd>              - Set same gains for both wheels")
                 print("  pid <kpl> <kil> <kdl> <kpr> <kir> <kdr> - Set independent gains")
-                print("  vel <speed>                     - Command constant target velocity (m/s)")
-                print("  step <speed>                    - Step response test (0→speed, 3 sec)")
-                print("  stop                            - Stop motors")
+                print("  vel <speed> [duration]          - Command velocity (m/s) for duration (s, default 10s)")
+                print("  step <speed> [duration]         - Step response test (default 3s)")
+                print("  stop                            - Stop motors immediately")
                 print("  log <filename>                  - Toggle CSV logging")
                 print("  save <filename>                 - Save gains to JSON")
                 print("  load <filename>                 - Load gains from JSON")
@@ -384,43 +384,20 @@ def interactive_pid_test(port=None):
                     print("✗ PID requires either 3 or 6 arguments\n")
             
             elif cmd_name == "vel":
-                if len(args) != 1:
-                    print("✗ vel requires exactly 1 argument (speed in m/s)\n")
+                if len(args) < 1 or len(args) > 2:
+                          print("✗ vel requires 1-2 arguments: speed [duration]\n")
                     continue
                 
                 try:
                     speed = float(args[0])
+                    duration = float(args[1]) if len(args) > 1 else 10.0  # Default 10 seconds
+                    
                     if not (-ROBOT_CONFIG.MAX_LINEAR_VEL <= speed <= ROBOT_CONFIG.MAX_LINEAR_VEL):
                         print(f"✗ Speed must be between -{ROBOT_CONFIG.MAX_LINEAR_VEL:.2f} and {ROBOT_CONFIG.MAX_LINEAR_VEL:.2f} m/s\n")
                         continue
                     
-                    with lock:
-                        state.target_vel_left = speed
-                        state.target_vel_right = speed
-                        run_active = True
-                    
-                    active_command = Command(
-                        ID="",
-                        command_type=CommandType.MOTOR,
-                        command=MotorCommand(left_motor=speed, right_motor=speed),
-                        duration=0,
-                        pause_duration=0
-                    )
-                    command_end_time = None  # Run indefinitely
-                    print(f"✓ Velocity command: {speed:.2f} m/s (running continuously)")
-                    print("Live display (press Ctrl+C or send 'stop' to exit):\n")
-                except ValueError:
-                    print("✗ Invalid speed value\n")
-            
-            elif cmd_name == "step":
-                if len(args) != 1:
-                    print("✗ step requires exactly 1 argument (speed in m/s)\n")
-                    continue
-                
-                try:
-                    speed = float(args[0])
-                    if not (0 < speed <= ROBOT_CONFIG.MAX_LINEAR_VEL):
-                        print(f"✗ Speed must be between 0 and {ROBOT_CONFIG.MAX_LINEAR_VEL:.2f} m/s\n")
+                    if duration <= 0:
+                        print("✗ Duration must be > 0 seconds\n")
                         continue
                     
                     with lock:
@@ -435,11 +412,46 @@ def interactive_pid_test(port=None):
                         duration=0,
                         pause_duration=0
                     )
-                    command_end_time = time.time() + 3.0  # 3 second step
-                    print(f"✓ Step response test: 0→{speed:.2f} m/s for 3 seconds")
+                    command_end_time = time.time() + duration
+                    print(f"✓ Velocity command: {speed:.2f} m/s for {duration:.1f}s")
                     print("Live display:\n")
                 except ValueError:
-                    print("✗ Invalid speed value\n")
+                    print("✗ Invalid speed or duration value\n")
+            
+            elif cmd_name == "step":
+                if len(args) < 1 or len(args) > 2:
+                    print("✗ step requires 1-2 arguments: speed [duration]\n")
+                    continue
+                
+                try:
+                    speed = float(args[0])
+                    duration = float(args[1]) if len(args) > 1 else 3.0  # Default 3 seconds
+                    
+                    if not (0 < speed <= ROBOT_CONFIG.MAX_LINEAR_VEL):
+                        print(f"✗ Speed must be between 0 and {ROBOT_CONFIG.MAX_LINEAR_VEL:.2f} m/s\n")
+                        continue
+                    
+                    if duration <= 0:
+                        print("✗ Duration must be > 0 seconds\n")
+                        continue
+                    
+                    with lock:
+                        state.target_vel_left = speed
+                        state.target_vel_right = speed
+                        run_active = True
+                    
+                    active_command = Command(
+                        ID="",
+                        command_type=CommandType.MOTOR,
+                        command=MotorCommand(left_motor=speed, right_motor=speed),
+                        duration=0,
+                        pause_duration=0
+                    )
+                    command_end_time = time.time() + duration
+                    print(f"✓ Step response test: 0→{speed:.2f} m/s for {duration:.1f}s")
+                    print("Live display:\n")
+                except ValueError:
+                    print("✗ Invalid speed or duration value\n")
             
             elif cmd_name == "stop":
                 serial_manager.send(Command.stop())

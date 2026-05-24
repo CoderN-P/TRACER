@@ -229,7 +229,7 @@ def interactive_pid_test(port=None):
     lock = threading.Lock()
     
     def sensor_callback(data):
-              """Callback for sensor data updates."""
+        """Callback for sensor data updates."""
         nonlocal run_active
         if not data:
             return

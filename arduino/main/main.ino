@@ -36,6 +36,7 @@ SemaphoreHandle_t state_mutex;
 SensorPacket packet;
 SemaphoreHandle_t sensor_mutex;
 SemaphoreHandle_t i2c_mutex;
+
 QueueHandle_t commandQueue;
 std::atomic<bool> motorsEnabled{true};
 std::atomic<uint32_t> lastMotorCommandMs{0};
@@ -71,6 +72,7 @@ void setup()
     state_mutex = xSemaphoreCreateMutex();
     i2c_mutex = xSemaphoreCreateMutex();
     sensor_mutex = xSemaphoreCreateMutex();
+    
 
     if (state_mutex == NULL || i2c_mutex == NULL)
     {
@@ -98,7 +100,7 @@ void setup()
     setup_pwm();
     setupOLED();
     setup_tof();
-
+    
     if (setup_lsm6dos())
     {
         if (xSemaphoreTake(state_mutex, 0) == pdTRUE)

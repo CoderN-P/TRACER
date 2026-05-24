@@ -83,6 +83,7 @@ void mainLoop(void *pvParameters)
             {
                 pidLeft.setSetpoint(pidLeft.getPendingSetpoint());
                 pidRight.setSetpoint(pidRight.getPendingSetpoint());
+
                 auto [leftPWM_CPY, rightPWM_CPY] = pidLoop(leftSpeed, rightSpeed, lastPIDMode);
                 leftPWM = leftPWM_CPY;
                 rightPWM = rightPWM_CPY;

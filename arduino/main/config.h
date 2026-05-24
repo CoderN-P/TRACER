@@ -46,13 +46,14 @@ const uint32_t MAIN_WINDOW_SIZE_MS = 500; // Window size for max loop time calcu
 // PID + Feedforward constants (for 2S lipo)
 const float kS_LEFT = 0.10;
 const float kS_RIGHT = 0.10;
-const float kV_LEFT = 2.0f;  // Velocity feedforward term for left motor (V = kS + kV * velocity)
-const float kV_RIGHT = 2.0f; // Velocity feedforward term for right motor (V = kS + kV * velocity)
+const float kV_LEFT = 2.196f;  // Velocity feedforward term for left motor (V = kS + kV * velocity)
+const float kV_RIGHT = 2.474f; // Velocity feedforward term for right motor (V = kS + kV * velocity)
 const float kA_LEFT = 0;
 const float kA_RIGHT = 0;
 
-const float P_LEFT = 0.3;
-const float P_RIGHT = 0.3;
+// Constant predefined PID terms;
+const float P_LEFT = 0.0;
+const float P_RIGHT = 0.0;
 const float I_LEFT = 0.0;
 const float I_RIGHT = 0.0;
 const float D_LEFT = 0.0;
@@ -80,7 +81,8 @@ const uint8_t CMD_PWM = 0x05;
 const uint8_t CMD_OLED_UPDATE = 0x02;
 const uint8_t CMD_ENABLE = 0x03;
 const uint8_t CMD_STOP = 0x04;
-const int NUM_TYPES = 5; // Number of command types (MOVE, OLED_UPDATE, ENABLE, STOP, PWM)
+const uint8_t CMD_PWM = 0x06
+const int NUM_TYPES = 6; // Number of command types (MOVE, OLED_UPDATE, ENABLE, STOP, PWM, PID)
 
 // Timing intervals (in milliseconds)
 const int ULTRASONIC_INTERVAL = 50;            // Sample ultrasonic sensor every 50 ms (20 hz)

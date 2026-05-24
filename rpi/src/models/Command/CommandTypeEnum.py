@@ -9,6 +9,7 @@ class CommandType(str, Enum):
     STOP = "STOP"
     ENABLE = "ENABLE" 
     PWM = "PWM"
+    PID = "PID"
     
 
     def __str__(self):

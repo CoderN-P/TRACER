@@ -4,13 +4,20 @@
 
 PIDController::PIDController(float kp, float ki, float kd)
 {
-    this->kp = kp;
-    this->ki = ki;
-    this->kd = kd;
+    this->pendingKp.store(kp);
+    this->pendingKi.store(ki);
+    this->pendingKd.store(kd);
     this->setpoint = 0;
     this->pendingSetpoint.store(0);
     this->lastError = 0;
     this->integral = 0;
+}
+
+void PIDController::setPendingPIDConstants(float kp, float ki, float kd)
+{
+    this->pendingKp.store(kp);
+    this->pendingKi.store(ki);
+    this->pendingKd.store(kd);
 }
 
 void PIDController::setSetpoint(float setpoint)
@@ -35,17 +42,21 @@ float PIDController::getPendingSetpoint()
 
 float PIDController::compute(float input, float feedforward)
 {
+    float _kp = this->pendingKp.load();
+    float _ki = this->pendingKi.load();
+    float _kd = this->pendingKd.load();
+    
     float error = this->setpoint - input;
     this->integral += error;
 
-    if (this->ki > 0)
+    if (_ki > 0)
     {
-        float maxIntegral = (1 - abs(feedforward + this->kp * error)) / this->ki; // Max integral contribution to avoid windup
+        float maxIntegral = (1 - abs(feedforward + _kp * error)) / _ki; // Max integral contribution to avoid windup
         this->integral = std::clamp(this->integral, -maxIntegral, maxIntegral);
     }
-    float proportional_t = kp * error;
-    float integral_t = ki * integral;
-    float derivative_t = kd * (error - lastError) / PID_INTERVAL;
+    float proportional_t = _kp * error;
+    float integral_t = _ki * integral;
+    float derivative_t = _kd * (error - lastError) / PID_INTERVAL;
 
     this->lastError = error;
 

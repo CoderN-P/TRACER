@@ -26,9 +26,6 @@ class SerialManager:
             # Typical Arduino port names on Linux: ttyUSB*, ttyACM*
             # On Windows: COM*
             if 'USB' in port.device or 'ACM' in port.device or 'COM' in port.device:
-                if port.manufacturer and 'Arduino' in port.manufacturer:
-                    return port.device
-                
                 return port.device
         return None
 
@@ -129,6 +126,11 @@ class SerialManager:
             
             packet = struct.pack("<Bhh", 0x05, left, right)
             full = bytes([0xAA]) + packet
+            checksum = sum(full) & 0xFF
+            self.serial.write(full + bytes([checksum]))
+        elif data.command_type == CommandType.PID:
+            packet = struct.pack("<Bffffff", 0x06, data.command.p_left, data.command.p_right, data.command.i_left, data.command.i_right, data.command.d_left, data.command.d_right)
+            full = bytes([0x0AA]) + packet
             checksum = sum(full) & 0xFF
             self.serial.write(full + bytes([checksum]))
         else:

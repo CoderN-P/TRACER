@@ -9,14 +9,15 @@
 class PIDController
 {
 private:
-    float kp, ki, kd;
     float setpoint;
     std::atomic<float> pendingSetpoint; // For thread-safe setpoint updates from the command processor task
+    std::atomic<float> pendingKp, pendingKi, pendingKd;
     float lastError;
     float integral;
 
 public:
     PIDController(float kp, float ki, float kd);
+    void setPendingPIDConstants(float kp, float ki, float kd);
     void reset();
     float getSetpoint();                            // Get the current setpoint of the PID controller
     void setPendingSetpoint(float pendingSetpoint); // Set the desired setpoint for the PID controller

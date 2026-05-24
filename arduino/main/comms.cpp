@@ -15,6 +15,9 @@ uint8_t expectedCommandLength(uint8_t cmd)
         return 3;
     if (cmd == CMD_PWM)
         return 7;
+    if (cmd == CMD_PID)
+        return 27;
+    
     return 0; // invalid
 }
 
@@ -42,6 +45,8 @@ int getTypeIndex(uint8_t cmd)
         return 3;
     case CMD_PWM:
         return 4;
+    case CMD_PID:
+        return 5;
     default:
         return -1; // Invalid command type
     }
@@ -123,6 +128,23 @@ void handleCommand(byte *buffer, size_t length)
         pidLeft.setPendingSetpoint(leftPWM_raw / 1000.0f);
         pidRight.setPendingSetpoint(rightPWM_raw / 1000.0f); // Convert to -1 to 1 range
         strncpy(line1, "Direct PWM Set", 16);
+    }
+    else if (cmd == CMD_PID && length == 27)
+    {
+        // Command 0x06: Update PID constants
+        float pLeft, iLeft, dLeft, pRight, iRight, dRight;
+
+        memcpy(&pLeft, &buffer[2], 4);
+        memcpy(&iLeft, &buffer[6], 4);
+        memcpy(&dLeft, &buffer[10], 4);
+        memcpy(&pRight, &buffer[14], 4);
+        memcpy(&iRight, &buffer[18], 4);
+        memcpy(&dRight, &buffer[22], 4);
+
+        pidLeft.setPendingPIDConstants(pLeft, iLeft, dLeft);
+        pidRight.setPendingPIDConstants(pRight, iRight, dRight);
+
+        strncpy(line1, "PID Updated", 16);
     }
     else
     {

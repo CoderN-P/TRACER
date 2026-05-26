@@ -118,7 +118,7 @@ class InteractiveTesterState:
         """Start CSV logging to the specified file."""
         try:
             # Ensure calibration_files/pid directory exists
-            log_dir = Path(__file__).parent.parent / "calibration_files" / "pid"
+            log_dir = Path(__file__).parent.parent.parent / "calibration_files" / "pid"
             log_dir.mkdir(parents=True, exist_ok=True)
             
             # Construct full path
@@ -168,7 +168,7 @@ class InteractiveTesterState:
         """Save current PID gains to JSON file."""
         try:
             # Ensure calibration_files/pid directory exists
-            gains_dir = Path(__file__).parent.parent / "calibration_files" / "pid"
+            gains_dir = Path(__file__).parent.parent.parent / "calibration_files" / "pid"
             gains_dir.mkdir(parents=True, exist_ok=True)
             
             # Construct full path
@@ -193,7 +193,7 @@ class InteractiveTesterState:
         """Load PID gains from JSON file."""
         try:
             # Try to load from calibration_files/pid first
-            gains_dir = Path(__file__).parent.parent / "calibration_files" / "pid"
+            gains_dir = Path(__file__).parent.parent.parent / "calibration_files" / "pid"
             filepath = gains_dir / filename
             
             # If not found in calibration dir, try current directory or absolute path

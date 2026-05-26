@@ -234,7 +234,7 @@ def calibrate_feedforward(resolution, duration_sec, port=None):
     }
     
     # Ensure calibration_files/feedforward directory exists
-    calibration_dir = Path(__file__).parent.parent / "calibration_files" / "feedforward"
+    calibration_dir = Path(__file__).parent.parent.parent / "calibration_files" / "feedforward"
     calibration_dir.mkdir(parents=True, exist_ok=True)
     
     output_file = calibration_dir / "feedforward_lookup_table.json"

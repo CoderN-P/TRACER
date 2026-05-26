@@ -1,11 +1,13 @@
 """
-Interactive PID tuning CLI for differential drive robot velocity control.
+Interactive Control CLI for differential drive robot.
 
 Features:
-- Sends PID gain updates via binary protocol
-- Displays live velocity tracking at 10Hz
-- Logs data to CSV for post-analysis
-- Supports JSON-based gain persistence
+- PID tuning with live velocity feedback
+- Direct velocity commands (equal or independent per motor)
+- Twist commands (linear + angular velocity)
+- PWM control for motor testing
+- CSV logging of sensor data
+- JSON-based gain persistence
 """
 
 import logging
@@ -18,7 +20,8 @@ from collections import deque
 from datetime import datetime
 
 from . import ROBOT_CONFIG
-from .models import SerialManager, Robot, Command, CommandType, MotorCommand, PIDCommand
+from .models import SerialManager, Robot, Command, CommandType, MotorCommand, MotorPWMCommand, PIDCommand
+from .models.PathFollowing import PurePursuit
 
 # Interval (seconds) between repeated sends while a command is active
 SEND_INTERVAL = 0.05
@@ -27,8 +30,8 @@ DISPLAY_HZ = 10
 DISPLAY_INTERVAL = 1.0 / DISPLAY_HZ
 
 
-class PIDTunerState:
-    """Encapsulates the state of the PID tuner."""
+class InteractiveTesterState:
+    """Encapsulates the state of the interactive tester."""
     
     def __init__(self):
         # PID gains (initialize with reasonable defaults)
@@ -114,7 +117,14 @@ class PIDTunerState:
     def start_logging(self, filename):
         """Start CSV logging to the specified file."""
         try:
-            self.csv_file = open(filename, 'w', newline='')
+            # Ensure calibration_files/pid directory exists
+            log_dir = Path(__file__).parent.parent / "calibration_files" / "pid"
+            log_dir.mkdir(parents=True, exist_ok=True)
+            
+            # Construct full path
+            filepath = log_dir / filename
+            
+            self.csv_file = open(filepath, 'w', newline='')
             self.csv_writer = csv.writer(self.csv_file)
             self.csv_writer.writerow([
                 'timestamp', 
@@ -122,7 +132,7 @@ class PIDTunerState:
                 'target_r', 'actual_r', 'error_r'
             ])
             self.logging_enabled = True
-            print(f"Logging started: {filename}")
+            print(f"Logging started: {filepath}")
         except IOError as e:
             print(f"Error opening log file: {e}")
     
@@ -157,6 +167,13 @@ class PIDTunerState:
     def save_gains_to_file(self, filename):
         """Save current PID gains to JSON file."""
         try:
+            # Ensure calibration_files/pid directory exists
+            gains_dir = Path(__file__).parent.parent / "calibration_files" / "pid"
+            gains_dir.mkdir(parents=True, exist_ok=True)
+            
+            # Construct full path
+            filepath = gains_dir / filename
+            
             gains = {
                 'kp_left': self.kp_left,
                 'ki_left': self.ki_left,
@@ -166,16 +183,24 @@ class PIDTunerState:
                 'kd_right': self.kd_right,
                 'timestamp': datetime.now().isoformat()
             }
-            with open(filename, 'w') as f:
+            with open(filepath, 'w') as f:
                 json.dump(gains, f, indent=2)
-            print(f"Gains saved to {filename}")
+            print(f"Gains saved to {filepath}")
         except IOError as e:
             print(f"Error saving gains: {e}")
     
     def load_gains_from_file(self, filename):
         """Load PID gains from JSON file."""
         try:
-            with open(filename, 'r') as f:
+            # Try to load from calibration_files/pid first
+            gains_dir = Path(__file__).parent.parent / "calibration_files" / "pid"
+            filepath = gains_dir / filename
+            
+            # If not found in calibration dir, try current directory or absolute path
+            if not filepath.exists():
+                filepath = Path(filename)
+            
+            with open(filepath, 'r') as f:
                 gains = json.load(f)
             self.kp_left = gains.get('kp_left', self.kp_left)
             self.ki_left = gains.get('ki_left', self.ki_left)
@@ -183,7 +208,7 @@ class PIDTunerState:
             self.kp_right = gains.get('kp_right', self.kp_right)
             self.ki_right = gains.get('ki_right', self.ki_right)
             self.kd_right = gains.get('kd_right', self.kd_right)
-            print(f"Gains loaded from {filename}")
+            print(f"Gains loaded from {filepath}")
             self.print_gains()
         except (IOError, json.JSONDecodeError) as e:
             print(f"Error loading gains: {e}")
@@ -219,26 +244,28 @@ class PIDTunerState:
         print(f"{'='*80}\n")
 
 
-def _print_live_display(state: PIDTunerState):
+def _print_live_display(state: InteractiveTesterState):
     """Print the live display line."""
-    # Using \r and end='' for single line updates
     status = (f"[PID] kP_l={state.kp_left:.2f} kI_l={state.ki_left:.2f} kD_l={state.kd_left:.2f} " +
               f"kP_r={state.kp_right:.2f} kI_r={state.ki_right:.2f} kD_r={state.kd_right:.2f} | " +
               f"tgt_L={state.target_vel_left:.2f} tgt_R={state.target_vel_right:.2f} | " +
               f"L: act={state.actual_vel_left:.3f} err={state.error_left:+.3f} | " +
               f"R: act={state.actual_vel_right:.3f} err={state.error_right:+.3f}")
-    # Pad to terminal width and use carriage return
     print(status.ljust(140)[:140], end='\r', flush=True)
 
 
-def interactive_pid_test(port=None):
+def interactive_test(port=None):
     """
-    Interactive PID tuning CLI for differential drive robot velocity control.
+    Interactive control CLI for differential drive robot.
     
     Commands:
     - pid <kp> <ki> <kd>              — set same gains for both wheels
     - pid <kpl> <kil> <kdl> <kpr> <kir> <kdr> — set independent gains
-    - vel <speed> [duration]          — command velocity (m/s) for duration (s, default 10s)
+    - vel <speed> [duration]          — command equal velocity to both motors (m/s, default 10s)
+    - vel <left_speed> <right_speed> <duration> — command different speeds per motor (m/s)
+    - twist <linear> <angular> [duration] — command using linear and angular velocity (default 10s)
+    - pwm <pwm> [duration]            — command equal PWM to both motors (default 1s)
+    - pwm <pwm_left> <pwm_right> [duration] — command different PWM per motor (default 1s)
     - step <speed> [duration]         — step response test (default 3s)
     - stop                            — stop motors immediately
     - log <filename>                  — toggle CSV logging to file
@@ -258,8 +285,8 @@ def interactive_pid_test(port=None):
         logger.info("Port: " + serial_port)
     
     # Initialize state
-    state = PIDTunerState()
-    active_command = None  # Track current velocity command for repeated sending
+    state = InteractiveTesterState()
+    active_command = None
     command_end_time = None
     command_start_time = None
     command_duration = 0
@@ -283,9 +310,9 @@ def interactive_pid_test(port=None):
     serial_manager.start_read(callback=sensor_callback)
     
     print("\n" + "="*100)
-    print("Interactive PID Tuning CLI - Differential Drive Robot Velocity Control")
+    print("Interactive Control CLI - Differential Drive Robot")
     print("="*100)
-    print("Commands: pid, vel, step, stop, log, save, load, gains, quit")
+    print("Commands: pid, vel, twist, pwm, step, stop, log, save, load, gains, quit")
     print("Type 'help' for detailed command information.")
     print("="*100 + "\n")
     
@@ -331,7 +358,7 @@ def interactive_pid_test(port=None):
             
             # No active command - prompt for input (blocking)
             try:
-                raw = input("pid> ").strip()
+                raw = input("ctrl> ").strip()
             except KeyboardInterrupt:
                 raise
             except:
@@ -351,16 +378,34 @@ def interactive_pid_test(port=None):
             
             elif cmd_name == "help":
                 print("\nAvailable Commands:")
-                print("  pid <kp> <ki> <kd>              - Set same gains for both wheels")
-                print("  pid <kpl> <kil> <kdl> <kpr> <kir> <kdr> - Set independent gains")
-                print("  vel <speed> [duration]          - Command velocity (m/s) for duration (s, default 10s)")
-                print("  step <speed> [duration]         - Step response test (default 3s)")
-                print("  stop                            - Stop motors immediately")
-                print("  log <filename>                  - Toggle CSV logging")
-                print("  save <filename>                 - Save gains to JSON")
-                print("  load <filename>                 - Load gains from JSON")
-                print("  gains                           - Print current gains")
-                print("  quit                            - Exit\n")
+                print("  pid <kp> <ki> <kd>")
+                print("      - Set same PID gains for both wheels")
+                print("  pid <kpl> <kil> <kdl> <kpr> <kir> <kdr>")
+                print("      - Set independent PID gains for each wheel")
+                print("  vel <speed> [duration]")
+                print("      - Command equal velocity to both motors (m/s, default 10s)")
+                print("  vel <left_speed> <right_speed> <duration>")
+                print("      - Command different speeds per motor (m/s)")
+                print("  twist <linear> <angular> [duration]")
+                print("      - Command using linear (m/s) and angular (rad/s) velocity (default 10s)")
+                print("  pwm <pwm> [duration]")
+                print("      - Command equal PWM to both motors [-1.0, 1.0] (default 1s)")
+                print("  pwm <pwm_left> <pwm_right> [duration]")
+                print("      - Command different PWM per motor (default 1s)")
+                print("  step <speed> [duration]")
+                print("      - Step response test: 0→speed m/s (default 3s)")
+                print("  stop")
+                print("      - Stop motors immediately")
+                print("  log <filename>")
+                print("      - Toggle CSV logging to file")
+                print("  save <filename>")
+                print("      - Save current gains to JSON")
+                print("  load <filename>")
+                print("      - Load gains from JSON")
+                print("  gains")
+                print("      - Print current PID gains")
+                print("  quit")
+                print("      - Exit\n")
             
             elif cmd_name == "pid":
                 if len(args) == 3:
@@ -432,42 +477,289 @@ def interactive_pid_test(port=None):
                     print("✗ PID requires either 3 or 6 arguments\n")
             
             elif cmd_name == "vel":
-                if len(args) < 1 or len(args) > 2:
-                    print("✗ vel requires 1-2 arguments: speed [duration]\n")
+                if len(args) < 1 or len(args) > 3:
+                    print("✗ vel requires 1-3 arguments: speed [duration] or left_speed right_speed duration\n")
                     continue
                 
                 try:
-                    speed = float(args[0])
-                    duration = float(args[1]) if len(args) > 1 else 10.0  # Default 10 seconds
+                    if len(args) == 1:
+                        # vel <speed> [duration]
+                        speed = float(args[0])
+                        duration = 10.0  # Default 10 seconds
+                        
+                        if not (-ROBOT_CONFIG.MAX_LINEAR_VEL <= speed <= ROBOT_CONFIG.MAX_LINEAR_VEL):
+                            print(f"✗ Speed must be between -{ROBOT_CONFIG.MAX_LINEAR_VEL:.2f} and {ROBOT_CONFIG.MAX_LINEAR_VEL:.2f} m/s\n")
+                            continue
+                        
+                        with lock:
+                            state.target_vel_left = speed
+                            state.target_vel_right = speed
+                            state.reset_session_stats()
+                            run_active = True
+                        
+                        active_command = Command(
+                            ID="",
+                            command_type=CommandType.MOTOR,
+                            command=MotorCommand(left_motor=speed, right_motor=speed),
+                            duration=0,
+                            pause_duration=0
+                        )
+                        command_start_time = time.time()
+                        command_duration = duration
+                        command_end_time = command_start_time + duration
+                        print(f"✓ Velocity command: {speed:.2f} m/s (both motors) for {duration:.1f}s")
+                        print("Live display:\n")
                     
-                    if not (-ROBOT_CONFIG.MAX_LINEAR_VEL <= speed <= ROBOT_CONFIG.MAX_LINEAR_VEL):
-                        print(f"✗ Speed must be between -{ROBOT_CONFIG.MAX_LINEAR_VEL:.2f} and {ROBOT_CONFIG.MAX_LINEAR_VEL:.2f} m/s\n")
-                        continue
+                    elif len(args) == 2:
+                        # vel <speed> <duration>
+                        speed = float(args[0])
+                        duration = float(args[1])
+                        
+                        if not (-ROBOT_CONFIG.MAX_LINEAR_VEL <= speed <= ROBOT_CONFIG.MAX_LINEAR_VEL):
+                            print(f"✗ Speed must be between -{ROBOT_CONFIG.MAX_LINEAR_VEL:.2f} and {ROBOT_CONFIG.MAX_LINEAR_VEL:.2f} m/s\n")
+                            continue
+                        
+                        if duration <= 0:
+                            print("✗ Duration must be > 0 seconds\n")
+                            continue
+                        
+                        with lock:
+                            state.target_vel_left = speed
+                            state.target_vel_right = speed
+                            state.reset_session_stats()
+                            run_active = True
+                        
+                        active_command = Command(
+                            ID="",
+                            command_type=CommandType.MOTOR,
+                            command=MotorCommand(left_motor=speed, right_motor=speed),
+                            duration=0,
+                            pause_duration=0
+                        )
+                        command_start_time = time.time()
+                        command_duration = duration
+                        command_end_time = command_start_time + duration
+                        print(f"✓ Velocity command: {speed:.2f} m/s (both motors) for {duration:.1f}s")
+                        print("Live display:\n")
+                    
+                    elif len(args) == 3:
+                        # vel <left_speed> <right_speed> <duration>
+                        left_speed = float(args[0])
+                        right_speed = float(args[1])
+                        duration = float(args[2])
+                        
+                        if not (-ROBOT_CONFIG.MAX_LINEAR_VEL <= left_speed <= ROBOT_CONFIG.MAX_LINEAR_VEL):
+                            print(f"✗ Left speed must be between -{ROBOT_CONFIG.MAX_LINEAR_VEL:.2f} and {ROBOT_CONFIG.MAX_LINEAR_VEL:.2f} m/s\n")
+                            continue
+                        
+                        if not (-ROBOT_CONFIG.MAX_LINEAR_VEL <= right_speed <= ROBOT_CONFIG.MAX_LINEAR_VEL):
+                            print(f"✗ Right speed must be between -{ROBOT_CONFIG.MAX_LINEAR_VEL:.2f} and {ROBOT_CONFIG.MAX_LINEAR_VEL:.2f} m/s\n")
+                            continue
+                        
+                        if duration <= 0:
+                            print("✗ Duration must be > 0 seconds\n")
+                            continue
+                        
+                        with lock:
+                            state.target_vel_left = left_speed
+                            state.target_vel_right = right_speed
+                            state.reset_session_stats()
+                            run_active = True
+                        
+                        active_command = Command(
+                            ID="",
+                            command_type=CommandType.MOTOR,
+                            command=MotorCommand(left_motor=left_speed, right_motor=right_speed),
+                            duration=0,
+                            pause_duration=0
+                        )
+                        command_start_time = time.time()
+                        command_duration = duration
+                        command_end_time = command_start_time + duration
+                        print(f"✓ Velocity command: L={left_speed:.2f} m/s, R={right_speed:.2f} m/s for {duration:.1f}s")
+                        print("Live display:\n")
+                
+                except ValueError:
+                    print("✗ Invalid number format\n")
+            
+            elif cmd_name == "twist":
+                if len(args) < 2 or len(args) > 3:
+                    print("✗ twist requires 2-3 arguments: linear angular [duration]\n")
+                    continue
+                
+                try:
+                    linear = float(args[0])
+                    angular = float(args[1])
+                    duration = float(args[2]) if len(args) > 2 else 10.0  # Default 10 seconds
                     
                     if duration <= 0:
                         print("✗ Duration must be > 0 seconds\n")
                         continue
                     
+                    # Use PurePursuit.twist_to_wheel_speeds to convert
+                    left_speed, right_speed = PurePursuit.twist_to_wheel_speeds(linear, angular)
+                    
+                    # Clamp to max speeds
+                    left_speed = max(-ROBOT_CONFIG.MAX_LINEAR_VEL, min(ROBOT_CONFIG.MAX_LINEAR_VEL, left_speed))
+                    right_speed = max(-ROBOT_CONFIG.MAX_LINEAR_VEL, min(ROBOT_CONFIG.MAX_LINEAR_VEL, right_speed))
+                    
                     with lock:
-                        state.target_vel_left = speed
-                        state.target_vel_right = speed
+                        state.target_vel_left = left_speed
+                        state.target_vel_right = right_speed
                         state.reset_session_stats()
                         run_active = True
                     
                     active_command = Command(
                         ID="",
                         command_type=CommandType.MOTOR,
-                        command=MotorCommand(left_motor=speed, right_motor=speed),
+                        command=MotorCommand(left_motor=left_speed, right_motor=right_speed),
                         duration=0,
                         pause_duration=0
                     )
                     command_start_time = time.time()
                     command_duration = duration
                     command_end_time = command_start_time + duration
-                    print(f"✓ Velocity command: {speed:.2f} m/s for {duration:.1f}s")
+                    print(f"✓ Twist command: linear={linear:.2f} m/s, angular={angular:.2f} rad/s → L={left_speed:.2f}, R={right_speed:.2f} m/s for {duration:.1f}s")
                     print("Live display:\n")
+                
                 except ValueError:
-                    print("✗ Invalid speed or duration value\n")
+                    print("✗ Invalid number format. Example: twist 0.2 0.5 5.0\n")
+            
+            elif cmd_name == "pwm":
+                if len(args) < 1 or len(args) > 3:
+                    print("✗ pwm requires 1-3 arguments: pwm [duration] or pwm_left pwm_right [duration]\n")
+                    continue
+                
+                try:
+                    if len(args) == 1:
+                        # pwm <pwm> [duration]
+                        pwm = float(args[0])
+                        duration = 1.0  # Default 1 second
+                        
+                        if not (-1.0 <= pwm <= 1.0):
+                            print("✗ PWM must be between -1.0 and 1.0\n")
+                            continue
+                        
+                        with lock:
+                            state.target_vel_left = 0.0  # PWM mode doesn't have velocity targets
+                            state.target_vel_right = 0.0
+                            state.reset_session_stats()
+                            run_active = True
+                        
+                        active_command = Command(
+                            ID="",
+                            command_type=CommandType.PWM,
+                            command=MotorPWMCommand(left_motor=pwm, right_motor=pwm),
+                            duration=0,
+                            pause_duration=0
+                        )
+                        command_start_time = time.time()
+                        command_duration = duration
+                        command_end_time = command_start_time + duration
+                        print(f"✓ PWM command: {pwm:.3f} (both motors) for {duration:.1f}s")
+                        print("Live display:\n")
+                    
+                    elif len(args) == 2:
+                        # Could be: pwm <pwm> <duration> OR pwm <pwm_left> <pwm_right>
+                        val1 = float(args[0])
+                        val2 = float(args[1])
+                        
+                        # Check if both are PWM values (between -1 and 1)
+                        if -1.0 <= val1 <= 1.0 and -1.0 <= val2 <= 1.0:
+                            # Ambiguous case: interpret as two PWM values with default 1s duration
+                            pwm_left = val1
+                            pwm_right = val2
+                            duration = 1.0
+                            
+                            with lock:
+                                state.target_vel_left = 0.0
+                                state.target_vel_right = 0.0
+                                state.reset_session_stats()
+                                run_active = True
+                            
+                            active_command = Command(
+                                ID="",
+                                command_type=CommandType.PWM,
+                                command=MotorPWMCommand(left_motor=pwm_left, right_motor=pwm_right),
+                                duration=0,
+                                pause_duration=0
+                            )
+                            command_start_time = time.time()
+                            command_duration = duration
+                            command_end_time = command_start_time + duration
+                            print(f"✓ PWM command: L={pwm_left:.3f}, R={pwm_right:.3f} for {duration:.1f}s")
+                            print("Live display:\n")
+                        else:
+                            # Treat as pwm <pwm> <duration>
+                            pwm = val1
+                            duration = val2
+                            
+                            if not (-1.0 <= pwm <= 1.0):
+                                print("✗ PWM must be between -1.0 and 1.0\n")
+                                continue
+                            
+                            if duration <= 0:
+                                print("✗ Duration must be > 0 seconds\n")
+                                continue
+                            
+                            with lock:
+                                state.target_vel_left = 0.0
+                                state.target_vel_right = 0.0
+                                state.reset_session_stats()
+                                run_active = True
+                            
+                            active_command = Command(
+                                ID="",
+                                command_type=CommandType.PWM,
+                                command=MotorPWMCommand(left_motor=pwm, right_motor=pwm),
+                                duration=0,
+                                pause_duration=0
+                            )
+                            command_start_time = time.time()
+                            command_duration = duration
+                            command_end_time = command_start_time + duration
+                            print(f"✓ PWM command: {pwm:.3f} (both motors) for {duration:.1f}s")
+                            print("Live display:\n")
+                    
+                    elif len(args) == 3:
+                        # pwm <pwm_left> <pwm_right> <duration>
+                        pwm_left = float(args[0])
+                        pwm_right = float(args[1])
+                        duration = float(args[2])
+                        
+                        if not (-1.0 <= pwm_left <= 1.0):
+                            print("✗ Left PWM must be between -1.0 and 1.0\n")
+                            continue
+                        
+                        if not (-1.0 <= pwm_right <= 1.0):
+                            print("✗ Right PWM must be between -1.0 and 1.0\n")
+                            continue
+                        
+                        if duration <= 0:
+                            print("✗ Duration must be > 0 seconds\n")
+                            continue
+                        
+                        with lock:
+                            state.target_vel_left = 0.0
+                            state.target_vel_right = 0.0
+                            state.reset_session_stats()
+                            run_active = True
+                        
+                        active_command = Command(
+                            ID="",
+                            command_type=CommandType.PWM,
+                            command=MotorPWMCommand(left_motor=pwm_left, right_motor=pwm_right),
+                            duration=0,
+                            pause_duration=0
+                        )
+                        command_start_time = time.time()
+                        command_duration = duration
+                        command_end_time = command_start_time + duration
+                        print(f"✓ PWM command: L={pwm_left:.3f}, R={pwm_right:.3f} for {duration:.1f}s")
+                        print("Live display:\n")
+                
+                except ValueError:
+                    print("✗ Invalid number format\n")
             
             elif cmd_name == "step":
                 if len(args) < 1 or len(args) > 2:

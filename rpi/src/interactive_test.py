@@ -328,13 +328,10 @@ def interactive_test(port=None):
                 # Check if commanded duration has elapsed
                 if not coasting_down and command_end_time is not None and now >= command_end_time:
                     # Duration reached - start coast-down phase
-                    with lock:
-                        run_active = False  # Stop recording as new movement, but track coast
-                    
                     serial_manager.send(Command.stop())
                     coasting_down = True
                     coast_start_time = now
-                    coast_stopped_time = now
+                    coast_stopped_time = None
                 
                 # If coasting down, check if velocity has reached zero
                 if coasting_down:
@@ -345,9 +342,10 @@ def interactive_test(port=None):
                     
                     if left_vel < velocity_threshold and right_vel < velocity_threshold:
                         # Velocity is near zero
-                        coast_stopped_time = now
+                        if coast_stopped_time is None:
+                            coast_stopped_time = now
                         # If been zero for 0.2s, we're done
-                        if now - coast_stopped_time > 0.2 or now - coast_start_time > 3.0:
+                        elif now - coast_stopped_time > 0.2 or now - coast_start_time > 3.0:
                             # Robot has fully stopped
                             actual_duration = now - command_start_time if command_start_time else command_duration
                             
@@ -355,16 +353,19 @@ def interactive_test(port=None):
                                 state.target_vel_left = 0.0
                                 state.target_vel_right = 0.0
                                 state.report_session_stats(actual_duration)
+                                run_active = False
                             
                             active_command = None
                             coasting_down = False
                             command_end_time = None
                             command_start_time = None
+                            coast_start_time = None
+                            coast_stopped_time = None
                             print()
                             continue
                     else:
                         # Still moving - reset the stopped timer
-                        coast_stopped_time = now
+                        coast_stopped_time = None
                 
                 # Show live display
                 if now - display_last_time >= DISPLAY_INTERVAL:
@@ -374,8 +375,8 @@ def interactive_test(port=None):
                             state.log_data()
                     display_last_time = now
                 
-                # Resend command to avoid motor watchdog timeout
-                serial_manager.send(active_command)
+                # Resend the current command while active, or keep sending stop while coasting
+                serial_manager.send(Command.stop() if coasting_down else active_command)
                 time.sleep(SEND_INTERVAL)
                 continue
             

@@ -57,9 +57,7 @@ if __name__ == "__main__":
     
     args = parser.parse_args()
         
-    if args.calibrate_wheel:
-        calibrate_wheel(args.speed, args.duration, args.port)
-    elif args.calibrate_wheelbase:
+    if args.calibrate_wheelbase:
         calibrate_wheelbase(args.speed, args.duration, args.port)
     elif args.serial_test:
         serial_test(args.port)

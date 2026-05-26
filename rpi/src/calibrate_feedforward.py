@@ -98,147 +98,103 @@ def calibrate_feedforward(resolution, duration_sec, port=None):
     
     settle_sec = 1.0
     
-    # FORWARD DIRECTION: sweep from 0 to 1.0
+    # ALTERNATING SWEEP: forward and backward at each PWM level
     logger.info("\n" + "="*80)
-    logger.info("FORWARD DIRECTION CALIBRATION")
+    logger.info("ALTERNATING CALIBRATION SWEEP")
     logger.info("="*80 + "\n")
     
-    pwm_left = resolution
-    pwm_right = resolution
+    pwm_level = resolution
     
-    while pwm_left <= 1.0 and pwm_right <= 1.0:
-        motor_command = Command(
-            ID="",
-            command_type=CommandType.PWM,
-            command=MotorPWMCommand(left_motor=pwm_left, right_motor=pwm_right),
-            duration=0,
-            pause_duration=0,
-        )
-        
-        # Settle phase
-        logger.info(f"Settling for {settle_sec:.1f}s at PWM L={pwm_left:.3f}, R={pwm_right:.3f}...")
-        settle_start = time.time()
-        while time.time() - settle_start < settle_sec:
-            serial_manager.send(motor_command)
-            time.sleep(0.02)
-        
-        # Reset encoders
-        with lock:
-            left_encoder = 0
-            right_encoder = 0
-        
-        # Measurement phase
-        measurement_start = time.time()
-        while time.time() - measurement_start < duration_sec:
-            serial_manager.send(motor_command)
-            time.sleep(0.02)
-        measurement_elapsed = time.time() - measurement_start
-        
-        # Stop and collect data
-        serial_manager.send(Command.stop())
-        
-        with lock:
-            left_ticks = left_encoder
-            right_ticks = right_encoder
-            left_encoder = 0
-            right_encoder = 0
+    while pwm_level <= 1.0:
+        # Helper function to measure at a specific PWM
+        def measure_at_pwm(pwm_left_val, pwm_right_val, is_forward):
+            motor_command = Command(
+                ID="",
+                command_type=CommandType.PWM,
+                command=MotorPWMCommand(left_motor=pwm_left_val, right_motor=pwm_right_val),
+                duration=0,
+                pause_duration=0,
+            )
             
-            left_speed = left_ticks / measurement_elapsed * ROBOT_CONFIG.METERS_PER_TICK_LEFT
-            right_speed = right_ticks / measurement_elapsed * ROBOT_CONFIG.METERS_PER_TICK_RIGHT
+            # Settle phase
+            direction_str = "Forward" if is_forward else "Backward"
+            logger.info(f"[{direction_str}] Settling for {settle_sec:.1f}s at PWM L={pwm_left_val:.3f}, R={pwm_right_val:.3f}...")
+            settle_start = time.time()
+            while time.time() - settle_start < settle_sec:
+                serial_manager.send(motor_command)
+                time.sleep(0.02)
             
-            logger.info(f"  PWM L={pwm_left:.3f} → speed={left_speed:.4f} m/s")
-            logger.info(f"  PWM R={pwm_right:.3f} → speed={right_speed:.4f} m/s")
+            # Reset encoders
+            nonlocal left_encoder, right_encoder
+            with lock:
+                left_encoder = 0
+                right_encoder = 0
             
-            # Validity checks
-            MIN_VEL = 0.01
-            MAX_VEL = 0.5
+            # Measurement phase
+            measurement_start = time.time()
+            while time.time() - measurement_start < duration_sec:
+                serial_manager.send(motor_command)
+                time.sleep(0.02)
+            measurement_elapsed = time.time() - measurement_start
             
-            if MIN_VEL < left_speed < MAX_VEL:
-                forward_left.append((left_speed, pwm_left))
-                logger.info(f"  ✓ Left: Added ({left_speed:.4f}, {pwm_left:.3f})")
-            else:
-                logger.info(f"  ✗ Left: Speed {left_speed:.4f} out of bounds")
+            # Stop and collect data
+            serial_manager.send(Command.stop())
+            time.sleep(0.1)  # Brief pause before next measurement
             
-            if MIN_VEL < right_speed < MAX_VEL:
-                forward_right.append((right_speed, pwm_right))
-                logger.info(f"  ✓ Right: Added ({right_speed:.4f}, {pwm_right:.3f})")
-            else:
-                logger.info(f"  ✗ Right: Speed {right_speed:.4f} out of bounds")
+            with lock:
+                left_ticks = left_encoder
+                right_ticks = right_encoder
+                left_encoder = 0
+                right_encoder = 0
+                
+                left_speed = left_ticks / measurement_elapsed * ROBOT_CONFIG.METERS_PER_TICK_LEFT
+                right_speed = right_ticks / measurement_elapsed * ROBOT_CONFIG.METERS_PER_TICK_RIGHT
+                
+                logger.info(f"  PWM L={pwm_left_val:.3f} → speed={left_speed:.4f} m/s")
+                logger.info(f"  PWM R={pwm_right_val:.3f} → speed={right_speed:.4f} m/s")
+                
+                if is_forward:
+                    # Validity checks for forward
+                    MIN_VEL = 0.01
+                    MAX_VEL = 0.5
+                    
+                    if MIN_VEL < left_speed < MAX_VEL:
+                        forward_left.append((left_speed, pwm_left_val))
+                        logger.info(f"  ✓ Left: Added ({left_speed:.4f}, {pwm_left_val:.3f})")
+                    else:
+                        logger.info(f"  ✗ Left: Speed {left_speed:.4f} out of bounds")
+                    
+                    if MIN_VEL < right_speed < MAX_VEL:
+                        forward_right.append((right_speed, pwm_right_val))
+                        logger.info(f"  ✓ Right: Added ({right_speed:.4f}, {pwm_right_val:.3f})")
+                    else:
+                        logger.info(f"  ✗ Right: Speed {right_speed:.4f} out of bounds")
+                else:
+                    # Validity checks for backward
+                    MIN_VEL = -0.5
+                    MAX_VEL = -0.01
+                    
+                    if MIN_VEL < left_speed < MAX_VEL:
+                        backward_left.append((left_speed, pwm_left_val))
+                        logger.info(f"  ✓ Left: Added ({left_speed:.4f}, {pwm_left_val:.3f})")
+                    else:
+                        logger.info(f"  ✗ Left: Speed {left_speed:.4f} out of bounds")
+                    
+                    if MIN_VEL < right_speed < MAX_VEL:
+                        backward_right.append((right_speed, pwm_right_val))
+                        logger.info(f"  ✓ Right: Added ({right_speed:.4f}, {pwm_right_val:.3f})")
+                    else:
+                        logger.info(f"  ✗ Right: Speed {right_speed:.4f} out of bounds")
+            
+            logger.info("\n")
         
-        pwm_left += resolution
-        pwm_right += resolution
-        logger.info()
-    
-    # BACKWARD DIRECTION: sweep from -resolution to -1.0
-    logger.info("\n" + "="*80)
-    logger.info("BACKWARD DIRECTION CALIBRATION")
-    logger.info("="*80 + "\n")
-    
-    pwm_left = -resolution
-    pwm_right = -resolution
-    
-    while abs(pwm_left) <= 1.0 and abs(pwm_right) <= 1.0:
-        motor_command = Command(
-            ID="",
-            command_type=CommandType.PWM,
-            command=MotorPWMCommand(left_motor=pwm_left, right_motor=pwm_right),
-            duration=0,
-            pause_duration=0,
-        )
+        # Measure forward at this PWM level
+        measure_at_pwm(pwm_level, pwm_level, True)
         
-        # Settle phase
-        logger.info(f"Settling for {settle_sec:.1f}s at PWM L={pwm_left:.3f}, R={pwm_right:.3f}...")
-        settle_start = time.time()
-        while time.time() - settle_start < settle_sec:
-            serial_manager.send(motor_command)
-            time.sleep(0.02)
+        # Measure backward at this PWM level
+        measure_at_pwm(-pwm_level, -pwm_level, False)
         
-        # Reset encoders
-        with lock:
-            left_encoder = 0
-            right_encoder = 0
-        
-        # Measurement phase
-        measurement_start = time.time()
-        while time.time() - measurement_start < duration_sec:
-            serial_manager.send(motor_command)
-            time.sleep(0.02)
-        measurement_elapsed = time.time() - measurement_start
-        
-        # Stop and collect data
-        serial_manager.send(Command.stop())
-        
-        with lock:
-            left_ticks = left_encoder
-            right_ticks = right_encoder
-            left_encoder = 0
-            right_encoder = 0
-            
-            left_speed = left_ticks / measurement_elapsed * ROBOT_CONFIG.METERS_PER_TICK_LEFT
-            right_speed = right_ticks / measurement_elapsed * ROBOT_CONFIG.METERS_PER_TICK_RIGHT
-            
-            logger.info(f"  PWM L={pwm_left:.3f} → speed={left_speed:.4f} m/s")
-            logger.info(f"  PWM R={pwm_right:.3f} → speed={right_speed:.4f} m/s")
-            
-            # Validity checks
-            MIN_VEL = -0.5
-            MAX_VEL = -0.01
-            
-            if MIN_VEL < left_speed < MAX_VEL:
-                backward_left.append((left_speed, pwm_left))
-                logger.info(f"  ✓ Left: Added ({left_speed:.4f}, {pwm_left:.3f})")
-            else:
-                logger.info(f"  ✗ Left: Speed {left_speed:.4f} out of bounds")
-            
-            if MIN_VEL < right_speed < MAX_VEL:
-                backward_right.append((right_speed, pwm_right))
-                logger.info(f"  ✓ Right: Added ({right_speed:.4f}, {pwm_right:.3f})")
-            else:
-                logger.info(f"  ✗ Right: Speed {right_speed:.4f} out of bounds")
-        
-        pwm_left -= resolution
-        pwm_right -= resolution
-        logger.info()
+        pwm_level += resolution
     
     # Sort lookup tables by speed
     forward_left.sort(key=lambda x: x[0])

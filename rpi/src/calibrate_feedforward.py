@@ -105,7 +105,7 @@ def calibrate_feedforward(resolution, duration_sec, port=None):
     
     pwm_level = resolution
     
-    while pwm_level <= 1.0:
+    while pwm_level < 1.0 + resolution:
         # Helper function to measure at a specific PWM
         def measure_at_pwm(pwm_left_val, pwm_right_val, is_forward):
             motor_command = Command(
@@ -250,7 +250,7 @@ def calibrate_feedforward(resolution, duration_sec, port=None):
     logger.info("INTERPOLATION TEST")
     logger.info("="*80 + "\n")
     
-    test_speeds = [0.05, 0.1, 0.15, 0.2, 0.25]
+    test_speeds = [0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, -0.1, -0.15, -0.2, -0.25, -0.3, -0.35, -0.4]
     logger.info("Forward direction interpolation tests:")
     for speed in test_speeds:
         pwm_l = linear_interpolate(speed, forward_left)

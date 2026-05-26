@@ -292,6 +292,9 @@ def interactive_test(port=None):
     command_duration = 0
     display_last_time = time.time()
     run_active = False
+    coasting_down = False  # Track if we're in deceleration phase
+    coast_start_time = None
+    coast_stopped_time = None
     
     lock = threading.Lock()
     
@@ -322,30 +325,46 @@ def interactive_test(port=None):
             if active_command is not None:
                 now = time.time()
                 
-                # Check if command should timeout
-                if command_end_time is not None and now >= command_end_time:
-                    # Calculate actual elapsed time BEFORE stopping
-                    actual_duration = now - command_start_time if command_start_time else command_duration
-                    
-                    # Stop recording new data immediately
+                # Check if commanded duration has elapsed
+                if not coasting_down and command_end_time is not None and now >= command_end_time:
+                    # Duration reached - start coast-down phase
                     with lock:
-                        run_active = False
+                        run_active = False  # Stop recording as new movement, but track coast
                     
-                    # Now send stop command (no new data will be recorded)
                     serial_manager.send(Command.stop())
-                    
-                    # Update display targets and report
+                    coasting_down = True
+                    coast_start_time = now
+                    coast_stopped_time = now
+                
+                # If coasting down, check if velocity has reached zero
+                if coasting_down:
+                    velocity_threshold = 0.005  # m/s
                     with lock:
-                        state.target_vel_left = 0.0
-                        state.target_vel_right = 0.0
-                        # Report session statistics
-                        state.report_session_stats(actual_duration)
+                        left_vel = abs(state.actual_vel_left)
+                        right_vel = abs(state.actual_vel_right)
                     
-                    active_command = None
-                    command_end_time = None
-                    command_start_time = None
-                    print()
-                    continue
+                    if left_vel < velocity_threshold and right_vel < velocity_threshold:
+                        # Velocity is near zero
+                        coast_stopped_time = now
+                        # If been zero for 0.2s, we're done
+                        if now - coast_stopped_time > 0.2 or now - coast_start_time > 3.0:
+                            # Robot has fully stopped
+                            actual_duration = now - command_start_time if command_start_time else command_duration
+                            
+                            with lock:
+                                state.target_vel_left = 0.0
+                                state.target_vel_right = 0.0
+                                state.report_session_stats(actual_duration)
+                            
+                            active_command = None
+                            coasting_down = False
+                            command_end_time = None
+                            command_start_time = None
+                            print()
+                            continue
+                    else:
+                        # Still moving - reset the stopped timer
+                        coast_stopped_time = now
                 
                 # Show live display
                 if now - display_last_time >= DISPLAY_INTERVAL:
@@ -511,6 +530,7 @@ def interactive_test(port=None):
                         command_start_time = time.time()
                         command_duration = duration
                         command_end_time = command_start_time + duration
+                        coasting_down = False
                         print(f"✓ Velocity command: {speed:.2f} m/s (both motors) for {duration:.1f}s")
                         print("Live display:\n")
                     
@@ -543,6 +563,7 @@ def interactive_test(port=None):
                         command_start_time = time.time()
                         command_duration = duration
                         command_end_time = command_start_time + duration
+                        coasting_down = False
                         print(f"✓ Velocity command: {speed:.2f} m/s (both motors) for {duration:.1f}s")
                         print("Live display:\n")
                     
@@ -580,6 +601,7 @@ def interactive_test(port=None):
                         command_start_time = time.time()
                         command_duration = duration
                         command_end_time = command_start_time + duration
+                        coasting_down = False
                         print(f"✓ Velocity command: L={left_speed:.2f} m/s, R={right_speed:.2f} m/s for {duration:.1f}s")
                         print("Live display:\n")
                 
@@ -623,6 +645,7 @@ def interactive_test(port=None):
                     command_start_time = time.time()
                     command_duration = duration
                     command_end_time = command_start_time + duration
+                    coasting_down = False
                     print(f"✓ Twist command: linear={linear:.2f} m/s, angular={angular:.2f} rad/s → L={left_speed:.2f}, R={right_speed:.2f} m/s for {duration:.1f}s")
                     print("Live display:\n")
                 
@@ -660,6 +683,7 @@ def interactive_test(port=None):
                         command_start_time = time.time()
                         command_duration = duration
                         command_end_time = command_start_time + duration
+                        coasting_down = False
                         print(f"✓ PWM command: {pwm:.3f} (both motors) for {duration:.1f}s")
                         print("Live display:\n")
                     
@@ -691,6 +715,7 @@ def interactive_test(port=None):
                             command_start_time = time.time()
                             command_duration = duration
                             command_end_time = command_start_time + duration
+                            coasting_down = False
                             print(f"✓ PWM command: L={pwm_left:.3f}, R={pwm_right:.3f} for {duration:.1f}s")
                             print("Live display:\n")
                         else:
@@ -722,6 +747,7 @@ def interactive_test(port=None):
                             command_start_time = time.time()
                             command_duration = duration
                             command_end_time = command_start_time + duration
+                            coasting_down = False
                             print(f"✓ PWM command: {pwm:.3f} (both motors) for {duration:.1f}s")
                             print("Live display:\n")
                     
@@ -759,6 +785,7 @@ def interactive_test(port=None):
                         command_start_time = time.time()
                         command_duration = duration
                         command_end_time = command_start_time + duration
+                        coasting_down = False
                         print(f"✓ PWM command: L={pwm_left:.3f}, R={pwm_right:.3f} for {duration:.1f}s")
                         print("Live display:\n")
                 
@@ -798,6 +825,7 @@ def interactive_test(port=None):
                     command_start_time = time.time()
                     command_duration = duration
                     command_end_time = command_start_time + duration
+                    coasting_down = False
                     print(f"✓ Step response test: 0→{speed:.2f} m/s for {duration:.1f}s")
                     print("Live display:\n")
                 except ValueError:

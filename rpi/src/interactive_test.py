@@ -324,20 +324,24 @@ def interactive_test(port=None):
                 
                 # Check if command should timeout
                 if command_end_time is not None and now >= command_end_time:
-                    # Stop the command
-                    serial_manager.send(Command.stop())
-                    active_command = None
-                    
-                    # Calculate actual elapsed time
+                    # Calculate actual elapsed time BEFORE stopping
                     actual_duration = now - command_start_time if command_start_time else command_duration
                     
+                    # Stop recording new data immediately
+                    with lock:
+                        run_active = False
+                    
+                    # Now send stop command (no new data will be recorded)
+                    serial_manager.send(Command.stop())
+                    
+                    # Update display targets and report
                     with lock:
                         state.target_vel_left = 0.0
                         state.target_vel_right = 0.0
-                        run_active = False
                         # Report session statistics
                         state.report_session_stats(actual_duration)
                     
+                    active_command = None
                     command_end_time = None
                     command_start_time = None
                     print()

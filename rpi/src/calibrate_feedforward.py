@@ -106,7 +106,7 @@ def calibrate_feedforward(resolution, duration_sec, port=None):
     pwm_level = resolution
     
     while pwm_level < 1.0 + resolution:
-        # Helper function to measure at a specific PWM
+              # Helper function to measure at a specific PWM
         def measure_at_pwm(pwm_left_val, pwm_right_val, is_forward):
             motor_command = Command(
                 ID="",
@@ -137,13 +137,18 @@ def calibrate_feedforward(resolution, duration_sec, port=None):
                 time.sleep(0.02)
             measurement_elapsed = time.time() - measurement_start
             
-            # Stop and collect data
-            serial_manager.send(Command.stop())
-            time.sleep(0.1)  # Brief pause before next measurement
-            
+            # Capture encoder ticks IMMEDIATELY after measurement window closes
+            # This ensures ticks and elapsed time are from the same window
             with lock:
                 left_ticks = left_encoder
                 right_ticks = right_encoder
+            
+            # NOW send stop command (no more ticks will be counted for this measurement)
+            serial_manager.send(Command.stop())
+            time.sleep(0.1)  # Brief pause before next measurement
+            
+            # Clear encoders for next iteration
+            with lock:
                 left_encoder = 0
                 right_encoder = 0
                 

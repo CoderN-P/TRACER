@@ -54,6 +54,11 @@ class PIDTunerState:
         self.last_encoder_right = 0
         self.last_timestamp = None
         
+        # Session statistics (reset at start of each command)
+        self.session_packets = 0
+        self.session_total_ticks_left = 0
+        self.session_total_ticks_right = 0
+        
         # Logging
         self.csv_file = None
         self.csv_writer = None
@@ -69,11 +74,19 @@ class PIDTunerState:
             self.last_timestamp = current_time
             self.last_encoder_left = sensor_data.left_encoder
             self.last_encoder_right = sensor_data.right_encoder
+            self.session_packets += 1
+            self.session_total_ticks_left += sensor_data.left_encoder
+            self.session_total_ticks_right += sensor_data.right_encoder
             return
         
         dt = current_time - self.last_timestamp
         if dt <= 0:
             return
+        
+        # Track total encoder ticks
+        self.session_packets += 1
+        self.session_total_ticks_left += sensor_data.left_encoder
+        self.session_total_ticks_right += sensor_data.right_encoder
         
         # Calculate distance traveled
         delta_left = sensor_data.left_encoder * ROBOT_CONFIG.METERS_PER_TICK_LEFT
@@ -179,6 +192,31 @@ class PIDTunerState:
         """Print current PID gains."""
         print(f"\n[PID] kP_l={self.kp_left:.2f} kI_l={self.ki_left:.2f} kD_l={self.kd_left:.2f} " +
               f"kP_r={self.kp_right:.2f} kI_r={self.ki_right:.2f} kD_r={self.kd_right:.2f}\n")
+    
+    def reset_session_stats(self):
+        """Reset session statistics for a new command."""
+        self.session_packets = 0
+        self.session_total_ticks_left = 0
+        self.session_total_ticks_right = 0
+        self.last_timestamp = None
+    
+    def report_session_stats(self, duration):
+        """Print session statistics at the end of a command."""
+        # Calculate distances
+        distance_left = self.session_total_ticks_left * ROBOT_CONFIG.METERS_PER_TICK_LEFT
+        distance_right = self.session_total_ticks_right * ROBOT_CONFIG.METERS_PER_TICK_RIGHT
+        avg_distance = (distance_left + distance_right) / 2.0
+        
+        print(f"\n{'='*80}")
+        print(f"Session Report ({duration:.1f}s)")
+        print(f"{'='*80}")
+        print(f"Total Packets:        {self.session_packets}")
+        print(f"Left Encoder Ticks:   {self.session_total_ticks_left}")
+        print(f"Right Encoder Ticks:  {self.session_total_ticks_right}")
+        print(f"Left Distance:        {distance_left:.4f} m ({distance_left*100:.2f} cm)")
+        print(f"Right Distance:       {distance_right:.4f} m ({distance_right*100:.2f} cm)")
+        print(f"Average Distance:     {avg_distance:.4f} m ({avg_distance*100:.2f} cm)")
+        print(f"{'='*80}\n")
 
 
 def _print_live_display(state: PIDTunerState):
@@ -223,6 +261,8 @@ def interactive_pid_test(port=None):
     state = PIDTunerState()
     active_command = None  # Track current velocity command for repeated sending
     command_end_time = None
+    command_start_time = None
+    command_duration = 0
     display_last_time = time.time()
     run_active = False
     
@@ -260,12 +300,20 @@ def interactive_pid_test(port=None):
                     # Stop the command
                     serial_manager.send(Command.stop())
                     active_command = None
-                    command_end_time = None
+                    
+                    # Calculate actual elapsed time
+                    actual_duration = now - command_start_time if command_start_time else command_duration
+                    
                     with lock:
                         state.target_vel_left = 0.0
                         state.target_vel_right = 0.0
                         run_active = False
-                    print("\nCommand completed.\n")
+                        # Report session statistics
+                        state.report_session_stats(actual_duration)
+                    
+                    command_end_time = None
+                    command_start_time = None
+                    print()
                     continue
                 
                 # Show live display
@@ -385,7 +433,7 @@ def interactive_pid_test(port=None):
             
             elif cmd_name == "vel":
                 if len(args) < 1 or len(args) > 2:
-                          print("✗ vel requires 1-2 arguments: speed [duration]\n")
+                    print("✗ vel requires 1-2 arguments: speed [duration]\n")
                     continue
                 
                 try:
@@ -403,6 +451,7 @@ def interactive_pid_test(port=None):
                     with lock:
                         state.target_vel_left = speed
                         state.target_vel_right = speed
+                        state.reset_session_stats()
                         run_active = True
                     
                     active_command = Command(
@@ -412,7 +461,9 @@ def interactive_pid_test(port=None):
                         duration=0,
                         pause_duration=0
                     )
-                    command_end_time = time.time() + duration
+                    command_start_time = time.time()
+                    command_duration = duration
+                    command_end_time = command_start_time + duration
                     print(f"✓ Velocity command: {speed:.2f} m/s for {duration:.1f}s")
                     print("Live display:\n")
                 except ValueError:
@@ -438,6 +489,7 @@ def interactive_pid_test(port=None):
                     with lock:
                         state.target_vel_left = speed
                         state.target_vel_right = speed
+                        state.reset_session_stats()
                         run_active = True
                     
                     active_command = Command(
@@ -447,7 +499,9 @@ def interactive_pid_test(port=None):
                         duration=0,
                         pause_duration=0
                     )
-                    command_end_time = time.time() + duration
+                    command_start_time = time.time()
+                    command_duration = duration
+                    command_end_time = command_start_time + duration
                     print(f"✓ Step response test: 0→{speed:.2f} m/s for {duration:.1f}s")
                     print("Live display:\n")
                 except ValueError:
@@ -457,6 +511,7 @@ def interactive_pid_test(port=None):
                 serial_manager.send(Command.stop())
                 active_command = None
                 command_end_time = None
+                command_start_time = None
                 with lock:
                     state.target_vel_left = 0.0
                     state.target_vel_right = 0.0

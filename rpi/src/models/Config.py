@@ -7,14 +7,14 @@ class RobotConfig:
     MEASURED_WHEEL_BASE: float = 0.278
     WHEEL_DIAMETER: float = 0.05411268
     WHEEL_RADIUS: float = WHEEL_DIAMETER / 2.0
-    WHEEL_CIRCUMFERENCE: float = math.pi * WHEEL_DIAMETER
+    WHEEL_CIRCUMFERENCE: float = 0.17
 
     WHEEL_BASE_CORRECTION: float = 1.0 # Ratio between true distance and encoder distance, to be calibrated
     WHEEL_BASE: float = MEASURED_WHEEL_BASE * WHEEL_BASE_CORRECTION
     # Motor Limits
     MAX_RPM: int = 178 # With 2S LiPo the motors receive less voltage and thus have a lower max RPM, so we cut it in half to be safe. This can be adjusted after testing.
     # Max speed in m/s: (RPM * pi * D) / 60
-    MAX_LINEAR_VEL: float = (MAX_RPM * math.pi * WHEEL_DIAMETER) / 60.0
+    MAX_LINEAR_VEL: float = (MAX_RPM * WHEEL_CIRCUMFERENCE) / 60.0
     
     REDUCTION_RATIO: float = 56.0 
     

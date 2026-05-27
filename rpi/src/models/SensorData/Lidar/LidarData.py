@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 import numpy as np
 from .LidarCamera import LidarCamera
 from .LidarGrid import LidarGrid
@@ -12,9 +12,12 @@ class LidarData(BaseModel):
     timestamp: float = Field(..., description="Timestamp of the LIDAR reading in seconds since epoch")
     camera: LidarCamera = Field(..., description="Position and orientation of the LIDAR camera")
     grid: LidarGrid = Field(..., description="Grid of distance measurements from the LIDAR sensor")
-    
-    
-    
+
+
+    @model_validator(mode='after')
+    def swap_xy(self):
+        self.camera.y, self.camera.x = self.camera.x, self.camera.y
+        
     def get_repulsive_vector(self):
         """
             Computes a repulsive vector based on the LIDAR grid data to help avoid obstacles.

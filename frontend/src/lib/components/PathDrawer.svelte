@@ -572,8 +572,8 @@
       payload = {
         type: "point",
         path: {
-          x: (selectedPoint?.x ?? 0) + runOffsetX,
-          y: (selectedPoint?.y ?? 0) + runOffsetY,
+          x: (selectedPoint?.x ?? 0),
+          y: (selectedPoint?.y ?? 0),
         },
       };
     }

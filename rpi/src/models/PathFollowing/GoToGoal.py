@@ -1,4 +1,7 @@
 import math
+
+import numpy as np
+
 from .. import ROBOT_CONFIG
 from ..StateEstimation import RobotState
 from ..Command import Command, CommandType, MotorCommand
@@ -22,15 +25,20 @@ class GoToGoal:
         if distance_to_goal < ROBOT_CONFIG.COMPLETION_THRESHOLD:
             return None  # The main loop will stop the robot
         
-        att_x = ROBOT_CONFIG.K_ATTRACTIVE * local_target[0] / distance_to_goal
-        att_y = ROBOT_CONFIG.K_ATTRACTIVE * local_target[1] / distance_to_goal
+        att_x = ROBOT_CONFIG.K_ATTRACTIVE * local_target[0]
+        att_y = ROBOT_CONFIG.K_ATTRACTIVE * local_target[1]
         
         combined_x = att_x + repulsive_vector[0]
         combined_y = att_y + repulsive_vector[1]
+
+        norm = math.hypot(combined_x, combined_y)
+
+        if norm < 1e-6:
+            return None
         
         heading_error = math.atan2(combined_y, combined_x)
-        
-        v = ROBOT_CONFIG.MAX_LINEAR_VEL * (combined_y / math.hypot(combined_x, combined_y))
+
+        v = ROBOT_CONFIG.MAX_LINEAR_VEL * (1 - np.exp(-ROBOT_CONFIG.KV * distance_to_goal))
         omega = ROBOT_CONFIG.K_OMEGA * heading_error
         
         vl, vr = PurePursuit.twist_to_wheel_speeds(v, omega)

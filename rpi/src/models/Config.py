@@ -105,3 +105,4 @@ class RobotConfig:
 
     # Go to Goal
     K_OMEGA = 0.8
+    K_V = 5.0

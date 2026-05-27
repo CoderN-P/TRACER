@@ -106,6 +106,7 @@ def calibrate_feedforward(resolution, duration_sec, port=None):
     pwm_level = resolution
 
     while pwm_level < 1.0 + resolution:
+        if pwm_level > 1.0: pwm_level = 1.0
         # Helper function to measure at a specific PWM
         def measure_at_pwm(pwm_left_val, pwm_right_val, is_forward):
             motor_command = Command(

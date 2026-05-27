@@ -58,7 +58,7 @@ class RobotConfig:
     MAX_ENCODER_MARGIN = 1.15  # 15% margin for acceleration transients when validating encoder readings
     
     # NOTE: Values calibrated for 2S LiPo (subject to change after testing)
-    LEFT_CORRECTION = 1 # 0.9646096844 # Ratio between true distance and left encoder dist
+    LEFT_CORRECTION = 0.951 # 0.9646096844 # Ratio between true distance and left encoder dist
     RIGHT_CORRECTION = 1 # 0.9873417722 # Ratio between true distance and right encoder dist
     
     # TODO: Calibrate correction factors for each

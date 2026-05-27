@@ -28,8 +28,8 @@ class GoToGoal:
         att_x = ROBOT_CONFIG.K_ATTRACTIVE * local_target[0]
         att_y = ROBOT_CONFIG.K_ATTRACTIVE * local_target[1]
         
-        combined_x = att_x + repulsive_vector[0]
-        combined_y = att_y + repulsive_vector[1]
+        combined_x = att_x + repulsive_vector[1] # x is vertical relative to robot, so it corresponds to y of repulsive vector
+        combined_y = att_y + repulsive_vector[0] # y is lateral relative to robot, so it corresponds to x of repulsive vector
 
         norm = math.hypot(combined_x, combined_y)
 

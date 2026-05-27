@@ -251,7 +251,7 @@ def _print_live_display(state: InteractiveTesterState):
               f"tgt_L={state.target_vel_left:.2f} tgt_R={state.target_vel_right:.2f} | " +
               f"L: act={state.actual_vel_left:.3f} err={state.error_left:+.3f} | " +
               f"R: act={state.actual_vel_right:.3f} err={state.error_right:+.3f}")
-    print(status.ljust(140)[:140], end='\r', flush=True)
+    print(status.ljust(140)[:140], end='\n')
 
 
 def interactive_test(port=None):

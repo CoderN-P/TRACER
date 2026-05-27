@@ -129,7 +129,7 @@ class PurePursuit:
             1
         )
 
-        return left * scale, right * scale,
+        return max(-ROBOT_CONFIG.MAX_LINEAR_VEL, min(left * scale, ROBOT_CONFIG.MAX_LINEAR_VEL)),  max(-ROBOT_CONFIG.MAX_LINEAR_VEL, min(right * scale, ROBOT_CONFIG.MAX_LINEAR_VEL))
     
     def calculate_control_command(self, robot_state: RobotState, repulsive_vector: tuple[float, float]) -> Command | None:
         """

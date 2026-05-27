@@ -88,12 +88,12 @@ static const CalibrationPoint_t calibration_backward_right[LOOKUP_TABLE_SIZE] = 
 
 
 // Constant predefined PID terms;
-const float P_LEFT = 0.0;
-const float P_RIGHT = 0.0;
+const float P_LEFT = 1.0;
+const float P_RIGHT = 1.0;
 const float I_LEFT = 0.0;
-const float I_RIGHT = 0.0;
-const float D_LEFT = 0.0;
-const float D_RIGHT = 0.0;
+const float I_RIGHT = 0.5;
+const float D_LEFT = 0.25;
+const float D_RIGHT = 0.25;
 
 const float I_ZONE = 0.05; // Error zone for integral control in PID (in m/s, so 5 cm/s)
 

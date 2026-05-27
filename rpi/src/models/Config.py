@@ -14,7 +14,7 @@ class RobotConfig:
     # Motor Limits
     MAX_RPM: int = 178 # With 2S LiPo the motors receive less voltage and thus have a lower max RPM, so we cut it in half to be safe. This can be adjusted after testing.
     # Max speed in m/s: (RPM * pi * D) / 60
-    MAX_LINEAR_VEL: float = (MAX_RPM * WHEEL_CIRCUMFERENCE) / 60.0
+    MAX_LINEAR_VEL: float = 0.4 # (MAX_RPM * WHEEL_CIRCUMFERENCE) / 60.0
     
     REDUCTION_RATIO: float = 56.0 
     

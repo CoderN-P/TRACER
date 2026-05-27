@@ -91,7 +91,7 @@ class RobotConfig:
     
     # Pure Pursuit
     LOOKAHEAD_DISTANCE: float = 0.05 # Meters
-    COMPLETION_THRESHOLD: float = 0.01 # Meters
+    COMPLETION_THRESHOLD: float = 0.03 # Meters
     MAX_SEARCH_POINTS: int = 50 # Only search 50 points ahead in pure pursuit. 
     END_LOOKAHEAD_MULTIPLIER: float = 1.5 # Increase lookahead distance near the end of the path
     
@@ -106,3 +106,4 @@ class RobotConfig:
     # Go to Goal
     K_OMEGA = 0.8
     K_V = 5.0
+    K_D = 4.0

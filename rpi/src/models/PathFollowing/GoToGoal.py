@@ -38,8 +38,8 @@ class GoToGoal:
         
         heading_error = math.atan2(combined_y, combined_x)
 
-        v = ROBOT_CONFIG.MAX_LINEAR_VEL * (1 - np.exp(-ROBOT_CONFIG.KV * distance_to_goal))
-        omega = ROBOT_CONFIG.K_OMEGA * heading_error
+        v = ROBOT_CONFIG.MAX_LINEAR_VEL * (1 - np.exp(-ROBOT_CONFIG.K_V * distance_to_goal))
+        omega = ROBOT_CONFIG.K_OMEGA * heading_error * (1 - np.exp(-ROBOT_CONFIG.K_D * distance_to_goal))
         
         vl, vr = PurePursuit.twist_to_wheel_speeds(v, omega)
 

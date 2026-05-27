@@ -5,6 +5,7 @@
 #define PID_INTERVAL (1000.0f / PID_FREQ) // PID loop interval in milliseconds
 
 #include <atomic>
+#include "config.h"
 
 class PIDController
 {

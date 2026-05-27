@@ -2,17 +2,19 @@
 #define CONFIG_H
 
 #include <Arduino.h>
+#include "types.h"
 
 // Constants for motor control
 const float WHEEL_DIAMETER = 0.05411268; // wheel diameter in meters
+const float WHEEL_CIRCUMFERENCE = 0.17;
 const float MAX_PWM = 1.0;               // Max PWM Value (scaled 0-1)
 const int REDUCTION_RATIO = 56;
 const int MAX_OUTPUT_RPM = 178;
 const int ENCODER_PPR = 11;
 const int ENCODER_TICKS_PER_REV = ENCODER_PPR * REDUCTION_RATIO * 4;            // Total ticks per wheel revolution with 4x quadrature decoding
-const float MAX_OUTPUT_SPEED = (MAX_OUTPUT_RPM / 60.0) * (PI * WHEEL_DIAMETER); // in m/s
-const float METERS_PER_TICK = (PI * WHEEL_DIAMETER) / ENCODER_TICKS_PER_REV;    // Distance traveled per encoder tick
-const float LEFT_CORRECTION = 1.0f;                                     // Correction factor for left motor speed (accounts for slight differences in motors/wheels)
+const float MAX_OUTPUT_SPEED = (MAX_OUTPUT_RPM / 60.0) * WHEEL_CIRCUMFERENCE; // in m/s
+const float METERS_PER_TICK = WHEEL_CIRCUMFERENCE / ENCODER_TICKS_PER_REV;    // Distance traveled per encoder tick
+const float LEFT_CORRECTION = 0.951f;                                     // Correction factor for left motor speed (accounts for slight differences in motors/wheels)
 const float RIGHT_CORRECTION = 1.0f;                                    // Correction factor for right motor speed (accounts for slight differences in motors/wheels)
 const float METERS_PER_TICK_LEFT = METERS_PER_TICK * LEFT_CORRECTION;
 const float METERS_PER_TICK_RIGHT = METERS_PER_TICK * RIGHT_CORRECTION;
@@ -37,19 +39,53 @@ const int ENCODER_RIGHT_B = 42; // (green) Right encoder pin channel B (must be 
 const int ESTOP_PIN = 5;        // Emergency stop pin (must be interrupt-capable) 
 const int SERVO_PIN = 6;        // Servo pin for gripper
 
-// NOTE:
 // System constants
 const int MAX_BUFFER_SIZE = 64;
 const int BAUD_RATE = 921600;
 const uint32_t MAIN_WINDOW_SIZE_MS = 500; // Window size for max loop time calculation in milliseconds
 
-// PID + Feedforward constants (for 2S lipo)
-const float kS_LEFT = 0.10;
-const float kS_RIGHT = 0.10;
-const float kV_LEFT = 2.196f;  // Velocity feedforward term for left motor (V = kS + kV * velocity)
-const float kV_RIGHT = 2.474f; // Velocity feedforward term for right motor (V = kS + kV * velocity)
-const float kA_LEFT = 0;
-const float kA_RIGHT = 0;
+// Feedforward LUTs (3S LiPo)
+const int LOOKUP_TABLE_SIZE = 18;
+// Forward Left Calibration Lookup Table
+static const CalibrationPoint_t calibration_forward_left[LOOKUP_TABLE_SIZE] = {
+    {0.03208356f, 0.15000000f}, {0.05985626f, 0.20000000f}, {0.08052401f, 0.25000000f},
+    {0.10990567f, 0.30000000f}, {0.12869394f, 0.35000000f}, {0.14624962f, 0.40000000f},
+    {0.17565832f, 0.45000000f}, {0.19509651f, 0.50000000f}, {0.22233995f, 0.55000000f},
+    {0.25259421f, 0.60000000f}, {0.27213039f, 0.65000000f}, {0.29865987f, 0.70000000f},
+    {0.31931582f, 0.75000000f}, {0.34433533f, 0.80000000f}, {0.36373416f, 0.85000000f},
+    {0.38855099f, 0.90000000f}, {0.39979501f, 0.95000000f}, {0.43707099f, 1.00000000f}
+};
+
+// Forward Right Calibration Lookup Table
+static const CalibrationPoint_t calibration_forward_right[LOOKUP_TABLE_SIZE] = {
+    {0.03174203f, 0.15000000f}, {0.06142785f, 0.20000000f}, {0.08343488f, 0.25000000f},
+    {0.11360916f, 0.30000000f}, {0.13436194f, 0.35000000f}, {0.15450661f, 0.40000000f},
+    {0.18288639f, 0.45000000f}, {0.20325819f, 0.50000000f}, {0.23066767f, 0.55000000f},
+    {0.26017513f, 0.60000000f}, {0.27893272f, 0.65000000f}, {0.29710146f, 0.70000000f},
+    {0.32789273f, 0.75000000f}, {0.34945531f, 0.80000000f}, {0.35449280f, 0.85000000f},
+    {0.36922913f, 0.90000000f}, {0.38639564f, 0.95000000f}, {0.44556604f, 1.00000000f}
+};
+
+// Backward Left Calibration Lookup Table
+static const CalibrationPoint_t calibration_backward_left[LOOKUP_TABLE_SIZE] = {
+    {-0.41898294f, -1.00000000f}, {-0.37063282f, -0.95000000f}, {-0.35721870f, -0.90000000f},
+    {-0.34070188f, -0.85000000f}, {-0.33017248f, -0.80000000f}, {-0.29560263f, -0.75000000f},
+    {-0.28004269f, -0.70000000f}, {-0.25753444f, -0.65000000f}, {-0.24002648f, -0.60000000f},
+    {-0.21297467f, -0.55000000f}, {-0.18599313f, -0.50000000f}, {-0.16893043f, -0.45000000f},
+    {-0.13981713f, -0.40000000f}, {-0.12353716f, -0.35000000f}, {-0.10560398f, -0.30000000f},
+    {-0.07820181f, -0.25000000f}, {-0.06151400f, -0.20000000f}, {-0.03229817f, -0.15000000f}
+};
+
+// Backward Right Calibration Lookup Table
+static const CalibrationPoint_t calibration_backward_right[LOOKUP_TABLE_SIZE] = {
+    {-0.45522107f, -1.00000000f}, {-0.42370881f, -0.95000000f}, {-0.40363799f, -0.90000000f},
+    {-0.37371927f, -0.85000000f}, {-0.35464383f, -0.80000000f}, {-0.32856985f, -0.75000000f},
+    {-0.30877256f, -0.70000000f}, {-0.27850376f, -0.65000000f}, {-0.26129734f, -0.60000000f},
+    {-0.23103248f, -0.55000000f}, {-0.20238560f, -0.50000000f}, {-0.18299967f, -0.44999997f},
+    {-0.15258989f, -0.40000000f}, {-0.13395861f, -0.35000000f}, {-0.11372761f, -0.30000000f},
+    {-0.08202478f, -0.25000000f}, {-0.06251706f, -0.20000000f}, {-0.03069671f, -0.15000000f}
+};
+
 
 // Constant predefined PID terms;
 const float P_LEFT = 0.0;
@@ -58,6 +94,8 @@ const float I_LEFT = 0.0;
 const float I_RIGHT = 0.0;
 const float D_LEFT = 0.0;
 const float D_RIGHT = 0.0;
+
+const float I_ZONE = 0.05; // Error zone for integral control in PID (in m/s, so 5 cm/s)
 
 // I2C addresses and Register addresses
 const int LSM_ADDRESS = 0x6B;  // I2C address for LSM6DOS

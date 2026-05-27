@@ -117,13 +117,68 @@ void IRAM_ATTR estopISR()
     GPIO.out_w1tc = (1ULL << STBY);
 }
 
-float sign(float v)
-{
-    if (v > 0)
-        return 1.0;
-    if (v < 0)
-        return -1.0;
-    return 0.0;
+float interpolate(CalibrationPoint_t a, CalibrationPoint_t b, float t){
+    if (t <= a.input) return a.output;
+    if (t >= b.input) return b.output;
+    
+    float ratio = (t - a.input) / (b.input - a.input);
+    return a.output + ratio * (b.output - a.output);
+}
+
+float compute_left_feedforward(float target){
+    if (target > 0){
+        for (int i = 1; i < LOOKUP_TABLE_SIZE; i++){
+            CalibrationPoint_t a = calibration_forward_left[i-1];
+            CalibrationPoint_t b = calibration_forward_left[i];
+            
+            if (target < a.input) break;
+            
+            if (target >= a.input && target <= b.input){
+                return interpolate(a, b, target);
+            }
+        }
+    } else {
+        for (int i = 1; i < LOOKUP_TABLE_SIZE; i++){
+            CalibrationPoint_t a = calibration_backward_left[i-1];
+            CalibrationPoint_t b = calibration_backward_left[i];
+            
+            if (target < a.input) break;
+            
+            if (target >= a.input && target <= b.input){
+                return interpolate(a, b, target);
+            }
+        }
+    }
+    
+    return 0;
+}
+
+float compute_right_feedforward(float target){
+    if (target > 0){
+        for (int i = 1; i < LOOKUP_TABLE_SIZE; i++){
+            CalibrationPoint_t a = calibration_forward_right[i-1];
+            CalibrationPoint_t b = calibration_forward_right[i];
+            
+            if (target < a.input) break;
+            
+            if (target >= a.input && target <= b.input){
+                return interpolate(a, b, target);
+            }
+        }
+    } else {
+        for (int i = 1; i < LOOKUP_TABLE_SIZE; i++){
+            CalibrationPoint_t a = calibration_backward_right[i-1];
+            CalibrationPoint_t b = calibration_backward_right[i];
+            
+            if (target < a.input) break;
+            
+            if (target >= a.input && target <= b.input){
+                return interpolate(a, b, target);
+            }
+        }
+    }
+    
+    return 0;
 }
 
 std::pair<float, float> pidLoop(float leftSpeed, float rightSpeed, uint8_t mode)
@@ -138,8 +193,8 @@ std::pair<float, float> pidLoop(float leftSpeed, float rightSpeed, uint8_t mode)
         return {pidLeft.getSetpoint(), pidRight.getSetpoint()};
     }
 
-    float leftFeedforward = pidLeft.getSetpoint() * kV_LEFT + kS_LEFT * sign(pidLeft.getSetpoint());
-    float rightFeedforward = pidRight.getSetpoint() * kV_RIGHT + kS_RIGHT * sign(pidRight.getSetpoint());
+    float leftFeedforward = compute_left_feedforward(pidLeft.getSetpoint());
+    float rightFeedforward = compute_right_feedforward(pidRight.getSetpoint());
 
     float outputLeft = constrain(pidLeft.compute(leftSpeed, leftFeedforward), -MAX_PWM, MAX_PWM);
     float outputRight = constrain(pidRight.compute(rightSpeed, rightFeedforward), -MAX_PWM, MAX_PWM);

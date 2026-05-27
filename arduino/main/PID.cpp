@@ -1,4 +1,5 @@
 #include "PID.h"
+#include "config.h"
 #include <cmath>
 #include <algorithm>
 
@@ -47,17 +48,32 @@ float PIDController::compute(float input, float feedforward)
     float _kd = this->pendingKd.load();
     
     float error = this->setpoint - input;
-    this->integral += error;
+    
+    float proportional_t = _kp * error;
+    float derivative_t = _kd * (error - lastError) / PID_INTERVAL;
+    float baseOutput = feedforward + proportional_t + derivative_t;
+    
+    if (abs(error) < I_ZONE){
+        this->integral += error;
+    } else {
+        this->integral = 0; // Reset integral outside of I_ZONE to prevent windup
+    }
 
     if (_ki > 0)
     {
-        float maxIntegral = (1 - abs(feedforward + _kp * error)) / _ki; // Max integral contribution to avoid windup
-        this->integral = std::clamp(this->integral, -maxIntegral, maxIntegral);
+        float min_i_sum = (-1.0 - baseOutput) / _ki;
+        float max_i_sum = (1.0 - baseOutput) / _ki;
+        
+        if (min_i_sum > max_i_sum){
+            float temp = max_i_sum;
+            max_i_sum = min_i_sum;
+            min_i_sum = temp;
+        }
+        
+        this->integral = std::clamp(this->integral, min_i_sum, max_i_sum);
     }
-    float proportional_t = _kp * error;
+    
     float integral_t = _ki * integral;
-    float derivative_t = _kd * (error - lastError) / PID_INTERVAL;
-
     this->lastError = error;
 
     return feedforward + proportional_t + integral_t + derivative_t;

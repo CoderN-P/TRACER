@@ -2,6 +2,11 @@
 #define TYPES_H
 #include <cstdint>
 
+typedef struct {
+    float input;   // Measured Value
+    float output;  // Target Command
+} CalibrationPoint_t;
+
 // Robot State struct
 struct RobotState {
     float leftPWM;

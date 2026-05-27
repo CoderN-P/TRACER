@@ -69,17 +69,23 @@ class StateEstimator:
         delta_right = right_ticks * ROBOT_CONFIG.METERS_PER_TICK_RIGHT
         linear_velocity = (delta_left + delta_right) / (2 * dt)
         return linear_velocity
+
+    @staticmethod
+    def _wrap_to_pi(angle: float) -> float:
+        return (angle + math.pi) % (2 * math.pi) - math.pi
     
-    @staticmethod 
-    def get_position_delta(left_ticks, right_ticks, heading):
+    @staticmethod
+    def get_position_delta(left_ticks, right_ticks, heading, prev_heading):
         delta_l = left_ticks * ROBOT_CONFIG.METERS_PER_TICK_LEFT
         delta_r = right_ticks * ROBOT_CONFIG.METERS_PER_TICK_RIGHT
-        
-        delta_s = ( delta_l + delta_r ) / 2
-        
-        # Heading must be in radians
-        return delta_s * math.cos(heading), delta_s * math.sin(heading),
-        
+        delta_s = 0.5 * (delta_l + delta_r)
+    
+        # Use midpoint of filtered heading over the interval, with wrap-safe delta
+        d_heading = StateEstimator._wrap_to_pi(heading - prev_heading)
+        heading_mid = StateEstimator._wrap_to_pi(prev_heading + 0.5 * d_heading)
+    
+        return delta_s * math.cos(heading_mid), delta_s * math.sin(heading_mid)
+    
     def update(self, sensor_data: SensorData, previous_sensor_data: SensorData, lidar_data: LidarData | None):
         # Previous sensor data is needed to determine dt
         if not previous_sensor_data: return
@@ -116,7 +122,7 @@ class StateEstimator:
         self.state.linear_velocity = self.estimate_linear_velocity(delta_left_ticks, delta_right_ticks, dt)
         self.state.angular_velocity = sensor_data.imu.gyroscope_z - self.heading_filter.state[1]
 
-        position_delta_x, position_delta_y = self.get_position_delta(delta_left_ticks, delta_right_ticks, self.state.yaw)
+        position_delta_x, position_delta_y = self.get_position_delta(delta_left_ticks, delta_right_ticks, self.state.yaw, self.prev_state.yaw)
         
         self.state.x, self.state.y = self.pose_filter.step(position_delta_x, position_delta_y, lidar_data)
         return

@@ -61,7 +61,6 @@ class RobotConfig:
     LEFT_CORRECTION = 0.951 # Ratio between true distance and left encoder dist
     RIGHT_CORRECTION = 1 # Ratio between true distance and right encoder dist
     
-    # TODO: Calibrate correction factors for each
     METERS_PER_TICK_LEFT: float = METERS_PER_TICK * LEFT_CORRECTION
     METERS_PER_TICK_RIGHT: float = METERS_PER_TICK * RIGHT_CORRECTION
     
@@ -103,3 +102,6 @@ class RobotConfig:
     # Splines
     SPLINE_SAMPLES = 1000
     TRAJECTORY_DT = 0.01 # Time step for trajectory generation (seconds)
+
+    # Go to Goal
+    K_OMEGA = 0.8

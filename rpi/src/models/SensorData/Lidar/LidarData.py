@@ -17,6 +17,7 @@ class LidarData(BaseModel):
     @model_validator(mode='after')
     def swap_xy(self):
         self.camera.y, self.camera.x = -self.camera.x, self.camera.y
+        return self
         
     def get_repulsive_vector(self):
         """

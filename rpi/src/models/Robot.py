@@ -384,7 +384,7 @@ class Robot:
                         # Run pure pursuit
                         command = self.cur_path.calculate_control_command(self.state_estimator.state, self.repulsive_vector)
                         
-                        if isinstance(command, bool):
+                        if commad is None:
                             exit_path = True
                         else:
                             await self.send_safe_command(command)

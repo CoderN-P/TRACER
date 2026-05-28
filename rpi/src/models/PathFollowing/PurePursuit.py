@@ -107,7 +107,7 @@ class PurePursuit:
         return None # no goal point found
 
     
-    def calculate_control_command(self, robot_state: RobotState, repulsive_vector: tuple[float, float]) -> Command | True | False:
+    def calculate_control_command(self, robot_state: RobotState, repulsive_vector: tuple[float, float]) -> Command | None:
         """
         Calculate the control command (linear and angular velocity) based on the current robot state and the path.
         """
@@ -115,7 +115,7 @@ class PurePursuit:
         current_pos = (robot_state.x, robot_state.y,)
 
         if math.dist(current_pos, self.path[-1]) <= ROBOT_CONFIG.COMPLETION_THRESHOLD and self.last_found_index >= len(self.path) * 0.9:
-            return True
+            return None
         
         goal_point = self.find_goal_point(current_pos)
         
@@ -124,7 +124,7 @@ class PurePursuit:
             logger.warning("PurePursuit lost the path")
             
             if not self.go_to_goal:
-                self.go_to_goal = GoToGoal(self.path[self.last_found_index])
+                self.go_to_goal = GoToGoal(self.path[self.last_found_index +  1])
 
             return self.go_to_goal.calculate_control_command(robot_state, repulsive_vector)
         

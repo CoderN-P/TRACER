@@ -73,19 +73,36 @@ class StateEstimator:
     @staticmethod
     def _wrap_to_pi(angle: float) -> float:
         return (angle + math.pi) % (2 * math.pi) - math.pi
-    
+
+    import math
+
     @staticmethod
     def get_position_delta(left_ticks, right_ticks, heading, prev_heading):
+        # 1. Distances of each wheel
         delta_l = left_ticks * ROBOT_CONFIG.METERS_PER_TICK_LEFT
         delta_r = right_ticks * ROBOT_CONFIG.METERS_PER_TICK_RIGHT
-        delta_s = 0.5 * (delta_l + delta_r)
     
-        # Use midpoint of filtered heading over the interval, with wrap-safe delta
+        # 2. Wrap-safe heading and angular delta
         d_heading = StateEstimator._wrap_to_pi(heading - prev_heading)
-        heading_mid = StateEstimator._wrap_to_pi(prev_heading + 0.5 * d_heading)
     
-        return delta_s * math.cos(heading_mid), delta_s * math.sin(heading_mid)
+        # 3. Handle pure translation vs curvature (arc)
+        if abs(d_heading) < 1e-6:
+            delta_s = 0.5 * (delta_l + delta_r)
+            return delta_s * math.cos(heading), delta_s * math.sin(heading)
+        else:
+            # Radius of curvature (R = arc_length / angle)
+            radius = 0.5 * (delta_l + delta_r) / d_heading
     
+            # 4. Exact arc translation delta (using chord length)
+            delta_x = 2 * radius * math.sin(0.5 * d_heading)
+    
+            # 5. Rotate the chord vector to the field frame 
+            # (Alternatively: theta_c = prev_heading + 0.5 * d_heading)
+            # Using the midpoint angle as the rotation vector aligns the chord perfectly
+            theta_c = StateEstimator._wrap_to_pi(prev_heading + 0.5 * d_heading)
+            return delta_x * math.cos(theta_c), delta_x * math.sin(theta_c)
+
+
     def update(self, sensor_data: SensorData, previous_sensor_data: SensorData, lidar_data: LidarData | None):
         # Previous sensor data is needed to determine dt
         if not previous_sensor_data: return

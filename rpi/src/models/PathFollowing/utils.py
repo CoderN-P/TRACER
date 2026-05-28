@@ -11,7 +11,7 @@ def scale_to_max(left, right) -> tuple:
 
     return max(-ROBOT_CONFIG.MAX_LINEAR_VEL, min(left * scale, ROBOT_CONFIG.MAX_LINEAR_VEL)),  max(-ROBOT_CONFIG.MAX_LINEAR_VEL, min(right * scale, ROBOT_CONFIG.MAX_LINEAR_VEL))
 
-def twist_to_wheel_speeds(cls, v, w):
+def twist_to_wheel_speeds(v, w):
     left = v - (w * ROBOT_CONFIG.WHEEL_BASE / 2.0)
     right = v + (w * ROBOT_CONFIG.WHEEL_BASE / 2.0)
 

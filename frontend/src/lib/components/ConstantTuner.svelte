@@ -4,6 +4,19 @@
   import { SlidersHorizontal, RotateCcw } from "lucide-svelte";
 
   const DEFAULT_CONSTANTS = {
+    MEASURED_WHEEL_BASE: 0.278,
+    WHEEL_BASE_CORRECTION: 1.0,
+    P_THETA: 0.1,
+    P_GYRO_BIAS: 1.0e-4,
+    P_THETA_BIAS: 0.0,
+    P_POSITION: 0.01,
+    Q_THETA: 1.0e-4,
+    Q_BIAS: 1.0e-6,
+    Q_X: 0.01,
+    Q_Y: 0.01,
+    R_THETA_ENCODER: 0.01,
+    R_THETA_MAGNETOMETER: 0.1,
+    R_POSITION: 0.05,
     K_REPULSIVE_SOFT: 40,
     K_REPULSIVE_HARD: 100,
     K_ATTRACTIVE: 15,
@@ -35,6 +48,52 @@
   };
 
   const CONSTANT_SECTIONS: ConstantSection[] = [
+    {
+      title: "EKF (State Estimation)",
+      subtitle:
+        "Kalman covariance (P), process noise (Q), and measurement noise (R)",
+      fields: [
+        { key: "P_THETA", label: "P_THETA", step: "0.0001", min: 0 },
+        { key: "P_GYRO_BIAS", label: "P_GYRO_BIAS", step: "1e-6", min: 0 },
+        { key: "P_THETA_BIAS", label: "P_THETA_BIAS", step: "1e-6", min: 0 },
+        { key: "P_POSITION", label: "P_POSITION", step: "0.001", min: 0 },
+        { key: "Q_THETA", label: "Q_THETA", step: "1e-6", min: 0 },
+        { key: "Q_BIAS", label: "Q_BIAS", step: "1e-6", min: 0 },
+        { key: "Q_X", label: "Q_X", step: "0.0001", min: 0 },
+        { key: "Q_Y", label: "Q_Y", step: "0.0001", min: 0 },
+        {
+          key: "R_THETA_ENCODER",
+          label: "R_THETA_ENCODER",
+          step: "0.0001",
+          min: 0,
+        },
+        {
+          key: "R_THETA_MAGNETOMETER",
+          label: "R_THETA_MAGNETOMETER",
+          step: "0.0001",
+          min: 0,
+        },
+        { key: "R_POSITION", label: "R_POSITION", step: "0.001", min: 0 },
+      ],
+    },
+    {
+      title: "Physical Dimensions",
+      subtitle: "Wheelbase and calibration corrections.",
+      fields: [
+        {
+          key: "MEASURED_WHEEL_BASE",
+          label: "MEASURED_WHEEL_BASE",
+          step: "0.001",
+          min: 0,
+        },
+        {
+          key: "WHEEL_BASE_CORRECTION",
+          label: "WHEEL_BASE_CORRECTION",
+          step: "0.001",
+          min: 0,
+        },
+      ],
+    },
     {
       title: "Attractive Potential Field",
       subtitle: "Obstacle avoidance and path attraction tuning.",

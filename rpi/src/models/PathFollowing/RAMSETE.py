@@ -4,7 +4,7 @@ from .. import ROBOT_CONFIG
 from ..StateEstimation import RobotState
 from ..Command import Command, CommandType, MotorCommand
 from .TrajectoryState import TrajectoryState
-from .PurePursuit import PurePursuit
+from .utils import twist_to_wheel_speeds, get_local_target
 
 
 class RAMSETE:
@@ -15,7 +15,7 @@ class RAMSETE:
     
     @staticmethod
     def get_error(current_state: RobotState, target_state: TrajectoryState) -> tuple:
-        error_x, error_y = PurePursuit.get_local_target(current_state, (target_state.x, target_state.y,))
+        error_x, error_y = get_local_target(current_state, (target_state.x, target_state.y,))
         error_theta = (target_state.theta - current_state.yaw + np.pi) % (2*np.pi) - np.pi
         return error_x, error_y, error_theta,
     
@@ -63,7 +63,7 @@ class RAMSETE:
         
         omega_command = target_state.omega + k * error_theta + ROBOT_CONFIG.BETA * target_state.v * sinc * error_y
         
-        v_left, v_right = PurePursuit.twist_to_wheel_speeds(v_command, omega_command)
+        v_left, v_right = twist_to_wheel_speeds(v_command, omega_command)
         
         self.running_time += dt
 

@@ -2,6 +2,8 @@ import math
 from typing import List
 import logging
 
+from .GoToGoal import GoToGoal
+from .utils import twist_to_wheel_speeds, get_local_target
 from .. import ROBOT_CONFIG
 from ..Command import Command, CommandType, MotorCommand
 from ..StateEstimation import RobotState
@@ -16,19 +18,13 @@ class PurePursuit:
     def __init__(self, path: List[tuple]):
         self.path = path
         self.last_found_index = 0 # to prevent the robot from going backwards along the path
+        self.go_to_goal = None
 
 
     @classmethod
     def from_xy_points(cls, points: List[dict]) -> 'PurePursuit':
         path = [(point['x'], point['y'],) for point in points]
         return cls(path)
-    
-    @classmethod
-    def twist_to_wheel_speeds(cls, v, w):
-        left = v - (w * ROBOT_CONFIG.WHEEL_BASE / 2.0)
-        right = v + (w * ROBOT_CONFIG.WHEEL_BASE / 2.0)
-    
-        return cls.scale_to_max(left, right)
     
     @staticmethod
     def sgn(num):
@@ -109,29 +105,9 @@ class PurePursuit:
                 return goal_point
         
         return None # no goal point found
-    
-    @staticmethod
-    def get_local_target(robot_state, goal_point) -> List[float]:
-        dx = goal_point[0] - robot_state.x
-        dy = goal_point[1] - robot_state.y
-        
-        local_x = math.cos(robot_state.yaw) * dx + math.sin(robot_state.yaw) * dy
-        local_y = -math.sin(robot_state.yaw) * dx + math.cos(robot_state.yaw) * dy
-        
-        return [local_x, local_y]
-    
-    
-    @staticmethod
-    def scale_to_max(left, right) -> tuple:
-        scale = min(
-            ROBOT_CONFIG.MAX_LINEAR_VEL / abs(left),
-            ROBOT_CONFIG.MAX_LINEAR_VEL / abs(right),
-            1
-        )
 
-        return max(-ROBOT_CONFIG.MAX_LINEAR_VEL, min(left * scale, ROBOT_CONFIG.MAX_LINEAR_VEL)),  max(-ROBOT_CONFIG.MAX_LINEAR_VEL, min(right * scale, ROBOT_CONFIG.MAX_LINEAR_VEL))
     
-    def calculate_control_command(self, robot_state: RobotState, repulsive_vector: tuple[float, float]) -> Command | None:
+    def calculate_control_command(self, robot_state: RobotState, repulsive_vector: tuple[float, float]) -> Command | True | False:
         """
         Calculate the control command (linear and angular velocity) based on the current robot state and the path.
         """
@@ -139,16 +115,20 @@ class PurePursuit:
         current_pos = (robot_state.x, robot_state.y,)
 
         if math.dist(current_pos, self.path[-1]) <= ROBOT_CONFIG.COMPLETION_THRESHOLD and self.last_found_index >= len(self.path) * 0.9:
-            return Command.stop()
+            return True
         
         goal_point = self.find_goal_point(current_pos)
         
         if not goal_point:
             logger = logging.getLogger("RobotManager")
             logger.warning("PurePursuit lost the path")
-            return None # The main loop will fall back to manual control
+            
+            if not self.go_to_goal:
+                self.go_to_goal = GoToGoal(self.path[self.last_found_index])
+
+            return self.go_to_goal.calculate_control_command(robot_state, repulsive_vector)
         
-        local_target = self.get_local_target(robot_state, goal_point)
+        local_target = get_local_target(robot_state, goal_point)
         # Repulsive vector is already in the robot's local frame
         # Only apply lateral force to avoid pushing waypoints behind us
         local_target[1] += repulsive_vector[0] * ROBOT_CONFIG.REPULSIVE_WEIGHT
@@ -160,7 +140,7 @@ class PurePursuit:
         linear_velocity = ROBOT_CONFIG.MAX_LINEAR_VEL
         angular_velocity = curvature * linear_velocity
         
-        motor_speeds = self.twist_to_wheel_speeds(linear_velocity, angular_velocity)
+        motor_speeds = twist_to_wheel_speeds(linear_velocity, angular_velocity)
         
         return Command(
             ID="",

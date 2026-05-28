@@ -5,7 +5,7 @@ import numpy as np
 from .. import ROBOT_CONFIG
 from ..StateEstimation import RobotState
 from ..Command import Command, CommandType, MotorCommand
-from .PurePursuit import PurePursuit
+from .utils import twist_to_wheel_speeds, get_local_target
 
 
 class GoToGoal:
@@ -18,7 +18,7 @@ class GoToGoal:
     """
   
     def calculate_control_command(self, robot_state: RobotState, repulsive_vector: tuple[float, float]):
-        local_target = PurePursuit.get_local_target(robot_state, self.goal_position)
+        local_target = get_local_target(robot_state, self.goal_position)
         
         distance_to_goal = math.hypot(local_target[0], local_target[1])
         
@@ -41,7 +41,7 @@ class GoToGoal:
         v = ROBOT_CONFIG.MAX_LINEAR_VEL * (1 - np.exp(-ROBOT_CONFIG.K_V * distance_to_goal))
         omega = ROBOT_CONFIG.K_OMEGA * heading_error * (1 - np.exp(-ROBOT_CONFIG.K_D * distance_to_goal))
         
-        vl, vr = PurePursuit.twist_to_wheel_speeds(v, omega)
+        vl, vr = twist_to_wheel_speeds(v, omega)
 
         return Command(
             ID="",

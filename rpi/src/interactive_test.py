@@ -21,8 +21,7 @@ from datetime import datetime
 
 from . import ROBOT_CONFIG
 from .models import SerialManager, Robot, Command, CommandType, MotorCommand, MotorPWMCommand, PIDCommand
-from .models.PathFollowing import PurePursuit
-
+from .models.PathFollowing import twist_to_wheel_speeds
 # Interval (seconds) between repeated sends while a command is active
 SEND_INTERVAL = 0.05
 # Display update frequency (Hz)
@@ -623,8 +622,8 @@ def interactive_test(port=None):
                         print("✗ Duration must be > 0 seconds\n")
                         continue
                     
-                    # Use PurePursuit.twist_to_wheel_speeds to convert
-                    left_speed, right_speed = PurePursuit.twist_to_wheel_speeds(linear, angular)
+                    # Use twist_to_wheel_speeds to convert
+                    left_speed, right_speed = twist_to_wheel_speeds(linear, angular)
                     
                     # Clamp to max speeds
                     left_speed = max(-ROBOT_CONFIG.MAX_LINEAR_VEL, min(ROBOT_CONFIG.MAX_LINEAR_VEL, left_speed))

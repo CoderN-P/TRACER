@@ -245,7 +245,7 @@ class Robot:
         if obstacle_detected == 0 or not self.obstacle_clear.is_set() or cur_state == Mode.STOPPED:
             return distance_left, distance_right
     
-        await self.socketio.emit('obstacle_detected', {"distance_left": distance_left, "distance_right": distance_right})
+        # await self.socketio.emit('obstacle_detected', {"distance_left": distance_left, "distance_right": distance_right})
     
         # If the distance is below the obstacle avoidance threshold, trigger backup and set obstacle clear flag
         
@@ -384,7 +384,7 @@ class Robot:
                         # Run pure pursuit
                         command = self.cur_path.calculate_control_command(self.state_estimator.state, self.repulsive_vector)
                         
-                        if not command:
+                        if isinstance(command, bool):
                             exit_path = True
                         else:
                             await self.send_safe_command(command)

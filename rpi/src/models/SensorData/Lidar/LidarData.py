@@ -59,5 +59,9 @@ class LidarData(BaseModel):
             repulsive_x /= count
             repulsive_y /= count
             
+            # Break symmetry by giving the robot a lateral nudge if it faces an obstacle dead on
+            
+            
+            
         return repulsive_x, repulsive_y
                 

@@ -1,7 +1,7 @@
 import math
 from dataclasses import dataclass
 
-@dataclass(frozen=True) # frozen=True makes it read-only for safety
+@dataclass
 class RobotConfig:
     # Physical Dimensions (Meters)
     MEASURED_WHEEL_BASE: float = 0.278
@@ -12,7 +12,7 @@ class RobotConfig:
     WHEEL_BASE_CORRECTION: float = 1.0 # Ratio between true distance and encoder distance, to be calibrated
     WHEEL_BASE: float = MEASURED_WHEEL_BASE * WHEEL_BASE_CORRECTION
     # Motor Limits
-    MAX_RPM: int = 178 # With 2S LiPo the motors receive less voltage and thus have a lower max RPM, so we cut it in half to be safe. This can be adjusted after testing.
+    MAX_RPM: int = 178 
     # Max speed in m/s: (RPM * pi * D) / 60
     MAX_LINEAR_VEL: float = 0.4 # (MAX_RPM * WHEEL_CIRCUMFERENCE) / 60.0
     
@@ -33,7 +33,7 @@ class RobotConfig:
         (0.0, 0.0, 1.0),  # Row 3
     )
     
-    # Obstacle and Cliff avoidance
+    # Obstacle avoidance
     CHECK_OBSTACLE_FREQ: float = 20.0 # Hz
     BACKUP_TIME: float = 2.0 # s
     OBSTACLE_DETECTED_THRESHOLD: float = 30.0 # cm
@@ -42,7 +42,7 @@ class RobotConfig:
     K_REPULSIVE_HARD: int = 100
     K_ATTRACTIVE: int = 15
     REPULSIVE_THRESHOLD = 100 # Magnitude of repulsive vector before we begin backing up
-    REPULSIVE_WEIGHT = 100 # Weight given to repulsive vector in path following
+    REPULSIVE_WEIGHT = 0.5 # Weight given to repulsive vector in path following
     
     # IO
     EMIT_SENSOR_FREQ: float = 10.0 # Hz
@@ -57,7 +57,7 @@ class RobotConfig:
     METERS_PER_TICK: float = WHEEL_CIRCUMFERENCE / ENCODER_TICKS_PER_REV
     MAX_ENCODER_MARGIN = 1.15  # 15% margin for acceleration transients when validating encoder readings
     
-    # NOTE: Values calibrated for 2S LiPo (subject to change after testing)
+    # NOTE: Values calibrated for 3S LiPo (subject to change after testing)
     LEFT_CORRECTION = 0.951 # Ratio between true distance and left encoder dist
     RIGHT_CORRECTION = 1 # Ratio between true distance and right encoder dist
     
@@ -90,7 +90,7 @@ class RobotConfig:
     R_POSITION: float = 0.05 # Measurement noise from LIDAR VIO positioning (meters^2)
     
     # Pure Pursuit
-    LOOKAHEAD_DISTANCE: float = 0.05 # Meters
+    LOOKAHEAD_DISTANCE: float = 0.3 # Meters
     COMPLETION_THRESHOLD: float = 0.03 # Meters
     MAX_SEARCH_POINTS: int = 50 # Only search 50 points ahead in pure pursuit. 
     END_LOOKAHEAD_MULTIPLIER: float = 1.5 # Increase lookahead distance near the end of the path

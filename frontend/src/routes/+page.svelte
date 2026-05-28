@@ -36,6 +36,7 @@
   import RobotControls from "$lib/components/RobotControls.svelte";
   import GyroMagDebug from "$lib/components/GyroMagDebug.svelte";
   import VelocityDebug from "$lib/components/VelocityDebug.svelte";
+  import ConstantTuner from "$lib/components/ConstantTuner.svelte";
 
   let sensorData = $state<SensorData | null>(null);
   let robotState = $state<RobotState | null>(null);
@@ -169,18 +170,18 @@
         }
 
         distanceHistory.push(
-                DistanceEntrySchema.parse({
-                  timestamp: new Date().toISOString(),
-                  distance_left: sensorData.ultrasonic.distance_left,
-                  distance_right: sensorData.ultrasonic.distance_right,
-                  distance_front: sensorData.tof.distance_front,
-                  distance: sensorData.ultrasonic.distance,
-                }),
+          DistanceEntrySchema.parse({
+            timestamp: new Date().toISOString(),
+            distance_left: sensorData.ultrasonic.distance_left,
+            distance_right: sensorData.ultrasonic.distance_right,
+            distance_front: sensorData.tof.distance_front,
+            distance: sensorData.ultrasonic.distance,
+          }),
         );
 
         updateLogs();
       } catch (error) {
-        console.log(error)
+        console.log(error);
       }
     });
 
@@ -248,7 +249,6 @@
       icon: "warning",
     });
   }
-  
 
   function obstacleDetected(data: SensorData): boolean {
     return data.ultrasonic.distance < 10;
@@ -383,6 +383,10 @@
 
   <div class="w-full">
     <GyroMagDebug {sensorData} lastSensorUpdateTime={lastSensorUpdate} />
+  </div>
+
+  <div class="w-full">
+    <ConstantTuner />
   </div>
 
   <!-- Recordings and Command List Section - Side by side on large screens -->

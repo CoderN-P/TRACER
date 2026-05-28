@@ -150,7 +150,7 @@ class PurePursuit:
         
         local_target = self.get_local_target(robot_state, goal_point)
         # Repulsive vector is already in the robot's local frame
-        local_target[0] += repulsive_vector[1] * ROBOT_CONFIG.REPULSIVE_WEIGHT
+        # Only apply lateral force to avoid pushing waypoints behind us
         local_target[1] += repulsive_vector[0] * ROBOT_CONFIG.REPULSIVE_WEIGHT
         
         lateral_y = local_target[1]

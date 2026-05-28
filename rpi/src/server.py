@@ -4,7 +4,7 @@ import socketio
 from fastapi import FastAPI
 import uvicorn
 
-from .models import Command
+from .models import Command, ROBOT_CONFIG
 
 sio = socketio.AsyncServer(cors_allowed_origins='*', async_mode='asgi', logger=False, engineio_logger=False)
 app = FastAPI()
@@ -40,6 +40,12 @@ def setup_routes(robot):
     @sio.on('set_state') # Manual, path following, LLM control
     async def on_set_state(sid, data):
         await on_robot_loop(robot.set_state(data))
+        
+    @sio.on('update_constants')
+    async def update_constants(sid, data):
+        for attr, val in data.items():
+            setattr(ROBOT_CONFIG, attr, val)
+        logger.info(f"Updated constants: {data}")
         
     @sio.event
     async def connect(sid, environ):

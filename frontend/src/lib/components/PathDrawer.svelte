@@ -462,13 +462,49 @@
 
   // ── Run mode ──────────────────────────────────────────────────────────────
   // When running, we record which type of path is active and a UI offset so
-  // the path appears to start at the robot's current position (display only).
+  // spline/freehand-style paths appear to start at the robot's current position.
   type RunSource = "spline" | "freehand" | "point" | "svg";
   let running = $state(false);
   let runSource = $state<RunSource>("spline");
   // Offset in meters applied only for rendering while running.
   let runOffsetX = $state(0);
   let runOffsetY = $state(0);
+
+  function translatePathPoint(point: { x: number; y: number }) {
+    return {
+      x: point.x + runOffsetX,
+      y: point.y + runOffsetY,
+    };
+  }
+
+  function translateSplineJSON(
+    splineJSON: ReturnType<SplinePathSvelte["exportToJSON"]>,
+  ) {
+    return {
+      splines: splineJSON.splines.map((spline) => ({
+        ...spline,
+        start: [spline.start[0] + runOffsetX, spline.start[1] + runOffsetY] as [
+          number,
+          number,
+        ],
+        end: [spline.end[0] + runOffsetX, spline.end[1] + runOffsetY] as [
+          number,
+          number,
+        ],
+      })),
+    };
+  }
+
+  function setRunOffsetFromStartPoint(startPoint: { x: number; y: number }) {
+    if (displayRobotPos === null) {
+      runOffsetX = 0;
+      runOffsetY = 0;
+      return;
+    }
+
+    runOffsetX = displayRobotPos.x - startPoint.x;
+    runOffsetY = displayRobotPos.y - startPoint.y;
+  }
 
   /** True when the active mode has a drawable path ready. */
   let canRun = $derived(
@@ -486,44 +522,38 @@
   function startRun() {
     if (!canRun) return;
     runSource = mode;
+    runOffsetX = 0;
+    runOffsetY = 0;
+
     // Shift the path so its first point coincides with the robot's current pos.
-    if (displayRobotPos !== null) {
-      if (runSource === "freehand" && freehandPath.length > 0) {
-        runOffsetX = displayRobotPos.x - freehandPath[0].x;
-        runOffsetY = displayRobotPos.y - freehandPath[0].y;
+    if (runSource === "freehand" && freehandPath.length > 0) {
+      setRunOffsetFromStartPoint(freehandPath[0]);
 
-        // Set camera to center on robot for freehand mode since the path can start anywhere
-        stageX = WIDTH / 2 - displayRobotPos.x * SCALE * zoom;
-        stageY = HEIGHT / 2 + displayRobotPos.y * SCALE * zoom;
-      } else if (
-        runSource === "spline" &&
-        path.QuinticHermiteSplines.length > 0
-      ) {
-        const firstSpline = path.QuinticHermiteSplines[0];
-        runOffsetX = displayRobotPos.x - firstSpline.x0;
-        runOffsetY = displayRobotPos.y - firstSpline.y0;
-
-        // Center camera on robot for spline mode as well, since the path always starts at the first control point which may be far from the canvas center
-        stageX = WIDTH / 2 - displayRobotPos.x * SCALE * zoom;
-        stageY = HEIGHT / 2 + displayRobotPos.y * SCALE * zoom;
-      } else if (runSource === "point" && selectedPoint !== null) {
-        runOffsetX = displayRobotPos.x - selectedPoint.x;
-        runOffsetY = displayRobotPos.y - selectedPoint.y;
-
-        // Center camera on robot for point mode
-        stageX = WIDTH / 2 - displayRobotPos.x * SCALE * zoom;
-        stageY = HEIGHT / 2 + displayRobotPos.y * SCALE * zoom;
-      } else if (runSource === "svg" && svgPath.length > 0) {
-        runOffsetX = displayRobotPos.x - svgPath[0].x;
-        runOffsetY = displayRobotPos.y - svgPath[0].y;
-
-        // Center camera on robot for imported SVG paths.
+      // Set camera to center on robot for freehand mode since the path can start anywhere
+      if (displayRobotPos !== null) {
         stageX = WIDTH / 2 - displayRobotPos.x * SCALE * zoom;
         stageY = HEIGHT / 2 + displayRobotPos.y * SCALE * zoom;
       }
-    } else {
-      runOffsetX = 0;
-      runOffsetY = 0;
+    } else if (
+      runSource === "spline" &&
+      path.QuinticHermiteSplines.length > 0
+    ) {
+      const firstSpline = path.QuinticHermiteSplines[0];
+      setRunOffsetFromStartPoint({ x: firstSpline.x0, y: firstSpline.y0 });
+
+      // Center camera on robot for spline mode as well, since the path always starts at the first control point which may be far from the canvas center
+      if (displayRobotPos !== null) {
+        stageX = WIDTH / 2 - displayRobotPos.x * SCALE * zoom;
+        stageY = HEIGHT / 2 + displayRobotPos.y * SCALE * zoom;
+      }
+    } else if (runSource === "svg" && svgPath.length > 0) {
+      // SVG outlines are treated like freehand paths for the emitted payload.
+      setRunOffsetFromStartPoint(svgPath[0]);
+
+      if (displayRobotPos !== null) {
+        stageX = WIDTH / 2 - displayRobotPos.x * SCALE * zoom;
+        stageY = HEIGHT / 2 + displayRobotPos.y * SCALE * zoom;
+      }
     }
     running = true;
 
@@ -532,40 +562,21 @@
     if (runSource === "freehand") {
       payload = {
         type: "freehand",
-        path: freehandPath.map((p) => ({
-          x: p.x + runOffsetX,
-          y: p.y + runOffsetY,
-        })),
+        path: freehandPath.map(translatePathPoint),
       };
     } else if (runSource === "spline") {
       // Export the spline definition (control points + derivatives) directly —
       // no need to pre-sample; the RPi can integrate at its own resolution.
-      const splineJSON = path.exportToJSON();
-      // Apply run offset to every spline's start/end positions.
+      const splineJSON = translateSplineJSON(path.exportToJSON());
       payload = {
         type: "spline",
-        path: {
-          splines: splineJSON.splines.map((s) => ({
-            ...s,
-            start: [s.start[0] + runOffsetX, s.start[1] + runOffsetY] as [
-              number,
-              number,
-            ],
-            end: [s.end[0] + runOffsetX, s.end[1] + runOffsetY] as [
-              number,
-              number,
-            ],
-          })),
-        },
+        path: splineJSON,
       };
     } else if (runSource === "svg") {
       // SVG outline is converted to pure-pursuit points, same payload shape as freehand.
       payload = {
         type: "freehand",
-        path: svgPath.map((p) => ({
-          x: p.x,
-          y: p.y,
-        })),
+        path: svgPath.map(translatePathPoint),
       };
     } else {
       // Point mode

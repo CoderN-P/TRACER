@@ -4,7 +4,7 @@
   import { SlidersHorizontal, RotateCcw } from "lucide-svelte";
 
   const DEFAULT_CONSTANTS = {
-    MEASURED_WHEEL_BASE: 0.278,
+    MEASURED_WHEEL_BASE: 0.255,
     WHEEL_BASE_CORRECTION: 1.0,
     P_THETA: 0.1,
     P_GYRO_BIAS: 1.0e-4,
@@ -22,11 +22,13 @@
     K_ATTRACTIVE: 15,
     REPULSIVE_THRESHOLD: 100,
     REPULSIVE_WEIGHT: 0.5,
-    LOOKAHEAD_DISTANCE: 0.3,
-    COMPLETION_THRESHOLD: 0.03,
-    END_LOOKAHEAD_MULTIPLIER: 1.5,
-    BETA: 2.0,
-    ZETA: 0.7,
+    LOOKAHEAD_DISTANCE: 0.4,
+    COMPLETION_THRESHOLD: 0.04,
+    END_LOOKAHEAD_MULTIPLIER: 1.1,
+    BETA: 3.2,
+    ZETA: 0.8,
+    MAX_LATERAL_ACCEL: 0.29,
+    MAX_LONG_ACCEL: 0.5,
     K_OMEGA: 0.8,
     K_V: 5.0,
     K_D: 4.0,
@@ -140,6 +142,8 @@
       fields: [
         { key: "BETA", label: "BETA", step: "0.01", min: 0 },
         { key: "ZETA", label: "ZETA", step: "0.01", min: 0 },
+        { key: "MAX_LATERAL_ACCEL", label: "MAX_LATERAL_ACCEL", step: "0.01", min: 0 },
+        { key: "MAX_LONG_ACCEL", label: "MAX_LONG_ACCEL", step: "0.01", min: 0 },
       ],
     },
     {

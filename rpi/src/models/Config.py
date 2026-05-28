@@ -21,7 +21,7 @@ class RobotConfig:
     JOYSTICK_DEADZONE: float = 0.15 # Minimum joystick input to register movement
     
     # Environment
-    MAX_LATERAL_ACCEL: float = 0.5 # m/s^2, for path following constraints
+    MAX_LATERAL_ACCEL: float = 0.29 # m/s^2, for path following constraints
     MAX_LONG_ACCEL: float = 0.5
     # Magnetometer
     # TODO: Calibrate these values for the actual robot
@@ -90,13 +90,13 @@ class RobotConfig:
     
     # Pure Pursuit
     LOOKAHEAD_DISTANCE: float = 0.4 # Meters
-    COMPLETION_THRESHOLD: float = 0.03 # Meters
+    COMPLETION_THRESHOLD: float = 0.04 # Meters
     MAX_SEARCH_POINTS: int = 50 # Only search 50 points ahead in pure pursuit. 
-    END_LOOKAHEAD_MULTIPLIER: float = 1.5 # Increase lookahead distance near the end of the path
+    END_LOOKAHEAD_MULTIPLIER: float = 1.1 # Increase lookahead distance near the end of the path
     
     # RAMSETE
-    BETA: float = 2.0
-    ZETA: float = 0.7
+    BETA: float = 3.2
+    ZETA: float = 0.8
     
     # Splines
     SPLINE_SAMPLES = 1000

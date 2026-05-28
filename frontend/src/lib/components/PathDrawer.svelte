@@ -563,8 +563,8 @@
       payload = {
         type: "freehand",
         path: svgPath.map((p) => ({
-          x: p.x + runOffsetX,
-          y: p.y + runOffsetY,
+          x: p.x,
+          y: p.y,
         })),
       };
     } else {
@@ -572,8 +572,8 @@
       payload = {
         type: "point",
         path: {
-          x: (selectedPoint?.x ?? 0),
-          y: (selectedPoint?.y ?? 0),
+          x: selectedPoint?.x ?? 0,
+          y: selectedPoint?.y ?? 0,
         },
       };
     }
@@ -601,6 +601,11 @@
         ])
       : freehandPathPoints,
   );
+
+  function clampDegrees(degrees: number): number {
+    let angle = degrees % 360;
+    return angle < 0 ? angle + 360 : angle;
+  }
 </script>
 
 {#if !browser}
@@ -1096,7 +1101,7 @@
             <Text
               x={cx + 12 / zoom}
               y={cy - 8 / zoom}
-              text={`(${displayRobotPos.x.toFixed(2)}, ${displayRobotPos.y.toFixed(2)}) ${((displayRobotPos.theta * 180) / Math.PI).toFixed(1)}°`}
+              text={`(${displayRobotPos.x.toFixed(2)}, ${displayRobotPos.y.toFixed(2)}) ${clampDegrees((displayRobotPos.theta * 180) / Math.PI).toFixed(1)}°`}
               fontSize={10 / zoom}
               fill="#16a34a"
             />

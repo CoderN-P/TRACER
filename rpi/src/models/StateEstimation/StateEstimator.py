@@ -98,7 +98,7 @@ class StateEstimator:
     
             # 5. Rotate the chord vector to the field frame 
             # (Alternatively: theta_c = prev_heading + 0.5 * d_heading)
-            # Using the midpoint angle as the rotation vector aligns the chord perfectly
+            # Using the midpoint angle as the rotation vector aligns the chord correctly with the actual arc path, especially for larger turns, and avoids underestimating the lateral movement that occurs during a turn.
             theta_c = StateEstimator._wrap_to_pi(prev_heading + 0.5 * d_heading)
             return delta_x * math.cos(theta_c), delta_x * math.sin(theta_c)
 

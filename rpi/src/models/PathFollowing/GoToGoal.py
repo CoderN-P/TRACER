@@ -40,7 +40,21 @@ class GoToGoal:
 
         v = ROBOT_CONFIG.MAX_LINEAR_VEL * (1 - np.exp(-ROBOT_CONFIG.K_V * distance_to_goal))
         omega = ROBOT_CONFIG.K_OMEGA * heading_error * (1 - np.exp(-ROBOT_CONFIG.K_D * distance_to_goal))
+
+        reverse = False
         
+        if abs(heading_error) > math.pi / 2:
+            reverse = True
+        
+            if heading_error > 0:
+                heading_error -= math.pi
+            else:
+                heading_error += math.pi
+
+        if reverse: 
+            v *= -1
+            omega *= -1
+            
         vl, vr = twist_to_wheel_speeds(v, omega)
 
         return Command(

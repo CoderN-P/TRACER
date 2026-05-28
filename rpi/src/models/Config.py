@@ -4,13 +4,12 @@ from dataclasses import dataclass
 @dataclass
 class RobotConfig:
     # Physical Dimensions (Meters)
-    MEASURED_WHEEL_BASE: float = 0.278
+    MEASURED_WHEEL_BASE: float = 0.255
     WHEEL_DIAMETER: float = 0.05411268
     WHEEL_RADIUS: float = WHEEL_DIAMETER / 2.0
     WHEEL_CIRCUMFERENCE: float = 0.17
 
     WHEEL_BASE_CORRECTION: float = 1.0 # Ratio between true distance and encoder distance, to be calibrated
-    WHEEL_BASE: float = MEASURED_WHEEL_BASE * WHEEL_BASE_CORRECTION
     # Motor Limits
     MAX_RPM: int = 178 
     # Max speed in m/s: (RPM * pi * D) / 60
@@ -90,7 +89,7 @@ class RobotConfig:
     R_POSITION: float = 0.05 # Measurement noise from LIDAR VIO positioning (meters^2)
     
     # Pure Pursuit
-    LOOKAHEAD_DISTANCE: float = 0.3 # Meters
+    LOOKAHEAD_DISTANCE: float = 0.4 # Meters
     COMPLETION_THRESHOLD: float = 0.03 # Meters
     MAX_SEARCH_POINTS: int = 50 # Only search 50 points ahead in pure pursuit. 
     END_LOOKAHEAD_MULTIPLIER: float = 1.5 # Increase lookahead distance near the end of the path
@@ -107,3 +106,7 @@ class RobotConfig:
     K_OMEGA = 0.8
     K_V = 5.0
     K_D = 4.0
+    
+    @property
+    def WHEEL_BASE(self) -> float:
+        return self.MEASURED_WHEEL_BASE * self.WHEEL_BASE_CORRECTION

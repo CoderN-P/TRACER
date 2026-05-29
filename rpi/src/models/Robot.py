@@ -5,9 +5,9 @@ import time
 import struct
 from collections import deque
 import asyncio
-from . import SerialManager, SensorData, Command, CommandType, LCDCommand, StateEstimator, Mode, ROBOT_CONFIG, MagnetometerData, MetaMode, Path, PurePursuit, LidarData
-from .PathFollowing import GoToGoal
-from .. import PIDCommand, MotorCommand, twist_to_wheel_speeds, MotorPWMCommand
+from . import SerialManager, SensorData,  StateEstimator, Mode, ROBOT_CONFIG, MagnetometerData, MetaMode, Path, PurePursuit, LidarData
+from .PathFollowing import GoToGoal, twist_to_wheel_speeds
+from .Command import PIDCommand, MotorCommand, MotorPWMCommand, Command, CommandType, LCDCommand
 from ..ai.get_commands import text_to_command
 from socketio import AsyncClient as Socket
 

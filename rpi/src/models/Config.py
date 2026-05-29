@@ -21,8 +21,8 @@ class RobotConfig:
     JOYSTICK_DEADZONE: float = 0.15 # Minimum joystick input to register movement
     
     # Environment
-    MAX_LATERAL_ACCEL: float = 0.29 # m/s^2, for path following constraints
-    MAX_LONG_ACCEL: float = 0.5
+    MAX_LATERAL_ACCEL: float = 0.3 # m/s^2, for path following constraints
+    MAX_LONG_ACCEL: float = 0.8
     # Magnetometer
     # TODO: Calibrate these values for the actual robot
     MAGNETOMETER_HARD_IRON_OFFSETS: tuple = (0.0, 0.0, 0.0) # microteslas (x, y, z)
@@ -96,7 +96,7 @@ class RobotConfig:
     
     # RAMSETE
     BETA: float = 3.2
-    ZETA: float = 0.8
+    ZETA: float = 0.7
     
     # Splines
     SPLINE_SAMPLES = 1000

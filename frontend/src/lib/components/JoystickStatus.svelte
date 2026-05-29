@@ -1,7 +1,6 @@
 <script lang="ts">
   import * as Card from "$lib/components/ui/card";
   import { type Joystick } from "$lib/types";
-  import { Skeleton } from "$lib/components/ui/skeleton";
   import { Button } from "$lib/components/ui/button";
   import { io as socket } from "$lib/api/socket";
   import { Gamepad2, Car, Fuel as Tank, Target, Gamepad } from "lucide-svelte";
@@ -46,10 +45,8 @@
         return Gamepad2;
     }
   }
-  
+
   let CurrentModeIcon = $derived.by(() => getModeIcon(currentMode));
-  
-  
 
   // Handle mode change from UI
   function changeMode(mode: JoystickMode) {
@@ -84,25 +81,29 @@
   });
 </script>
 
-{#if lastUpdateTime === 0 || !joystick}
-  <Skeleton class="w-full h-48 rounded-sm " />
-{:else}
-  <Card.Root class="w-full h-full {className}">
-    <Card.Header>
-      <div class="flex items-center justify-between">
-        <div>
-          <Card.Title>Joystick Status</Card.Title>
-          <Card.Description>Showing current joystick position</Card.Description>
-        </div>
-        <div class="flex items-center">
-          <CurrentModeIcon
-            class="w-5 h-5 text-blue-500 mr-1"
-          />
-          <span class="text-xs font-medium">{modeNames[currentMode]}</span>
-        </div>
+<Card.Root class="w-full h-full min-h-0 {className} flex flex-col">
+  <Card.Header>
+    <div class="flex items-center justify-between">
+      <div>
+        <Card.Title>Joystick Status</Card.Title>
+        <Card.Description>Showing current joystick position</Card.Description>
       </div>
-    </Card.Header>
-    <Card.Content class="flex flex-col items-center justify-center p-4">
+      <div class="flex items-center">
+        <CurrentModeIcon class="w-5 h-5 text-blue-500 mr-1" />
+        <span class="text-xs font-medium">{modeNames[currentMode]}</span>
+      </div>
+    </div>
+  </Card.Header>
+  <Card.Content
+    class="flex min-h-0 flex-1 flex-col items-center justify-center overflow-y-auto p-4"
+  >
+    {#if !joystick || lastUpdateTime === 0}
+      <div
+        class="w-full rounded-md border border-dashed border-gray-200 bg-gray-50 p-4 text-center text-sm text-gray-500"
+      >
+        No joystick data yet.
+      </div>
+    {:else}
       <div
         class="relative w-20 h-20 mx-auto bg-gray-100 rounded-full border border-gray-200"
       >
@@ -178,6 +179,6 @@
           {/each}
         </div>
       </div>
-    </Card.Content>
-  </Card.Root>
-{/if}
+    {/if}
+  </Card.Content>
+</Card.Root>

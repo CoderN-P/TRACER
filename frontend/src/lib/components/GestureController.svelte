@@ -1,4 +1,3 @@
-<!-- filepath: /Users/neel123/Desktop/python/TRACER/frontend/src/lib/components/GestureController.svelte -->
 <script lang="ts">
   import { onMount, onDestroy } from "svelte";
   import * as THREE from "three";
@@ -369,7 +368,7 @@
 
   // Function to calculate magnetometer field strength
   function getMagFieldStrength(
-    mag: { x: number; y: number; z: number } | undefined
+    mag: { x: number; y: number; z: number } | undefined,
   ): number {
     if (!mag) return 0;
     return Math.sqrt(mag.x * mag.x + mag.y * mag.y + mag.z * mag.z);
@@ -377,12 +376,12 @@
 
   // Function to assess if magnetometer is calibrated
   function getMagCalibrationStatus(
-    mag: { x: number; y: number; z: number } | undefined
+    mag: { x: number; y: number; z: number } | undefined,
   ): { status: string; color: string } {
     if (!mag) return { status: "Unknown", color: "text-gray-500" };
-    
+
     // Convert values from q8_7 16 bit int to float
-    
+
     const strength = getMagFieldStrength(mag);
 
     // Earth's magnetic field is typically around 25-65 μT (0.25-0.65 Gauss)
@@ -420,7 +419,7 @@
   });
 </script>
 
-<Card class="w-full">
+<Card class="w-full h-full overflow-y-scroll">
   <CardHeader>
     <CardTitle>Board Orientation</CardTitle>
     <CardDescription>
@@ -459,7 +458,7 @@
   <CardContent>
     <div
       bind:this={container}
-      class="w-full h-[300px] rounded-md overflow-hidden {manualViewEnabled
+      class="w-full h-[220px] rounded-md overflow-hidden {manualViewEnabled
         ? 'cursor-move'
         : ''}"
     ></div>
@@ -506,7 +505,8 @@
             {getMagCalibrationStatus(gestureData.magnetometer).status}
           </span>
         </div>
-      </div>      <!-- Ambient Light data -->
+      </div>
+      <!-- Ambient Light data -->
       <div class="w-full mt-2 pt-2 border-t">
         <div class="font-semibold mb-1">Light:</div>
         <div class="grid grid-cols-3 gap-4 w-full">
@@ -520,7 +520,7 @@
       <div class="w-full mt-2 pt-2 border-t">
         <div>Temperature: {gestureData.temperature?.toFixed(1) ?? "N/A"}°C</div>
       </div>
-      
+
       <!-- Debug toggle -->
       <div class="w-full mt-2 pt-2 border-t flex justify-end">
         <label class="flex items-center cursor-pointer">

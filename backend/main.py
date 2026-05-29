@@ -80,8 +80,12 @@ def setup_routes(controller: Controller):
         
     @socket.on('update_constants')
     def update_constants(data):
-        controller.rumble(0.5, 0.5, 500)
         sio_client.emit('update_constants', data)
+        
+    @socket.on('update_pid')
+    def update_pid(data):
+        controller.rumble(0.5, 0.5, 500)
+        sio_client.emit('update_pid', data)
         
     @socket.on('play_recording')
     def handle_play_recording(data):

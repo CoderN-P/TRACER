@@ -7,6 +7,7 @@ from collections import deque
 import asyncio
 from . import SerialManager, SensorData, Command, CommandType, LCDCommand, StateEstimator, Mode, ROBOT_CONFIG, MagnetometerData, MetaMode, Path, PurePursuit, LidarData
 from .PathFollowing import GoToGoal
+from .. import PIDCommand, MotorCommand, twist_to_wheel_speeds, MotorPWMCommand
 from ..ai.get_commands import text_to_command
 from socketio import AsyncClient as Socket
 
@@ -521,5 +522,71 @@ class Robot:
         commands = await text_to_command(query)
         command_task = asyncio.create_task(self._run_command_sequence(commands))
         return command_task
+    
+    async def execute_velocity_command(self, v1: float, v2: float, mode: str = 'wheel'):
+        with self.state_lock:
+            if self.state in [Mode.STOPPED, Mode.PATH_FOLLOWING]:
+                return
+            
+        if mode == 'twist':
+            vl, vr = twist_to_wheel_speeds(v1, v2)
+            
+            await self.send_safe_command(
+                Command(
+                    ID="",
+                    type=CommandType.MOTOR,
+                    command=MotorCommand(
+                        left_motor=vl,
+                        right_motor=vr
+                    ),
+                    pause_duration=0,
+                    duration=0,
+                )
+            )
+        elif mode == 'pwm':
+            await self.send_safe_command(
+                Command(
+                    ID="",
+                    type=CommandType.MOTOR,
+                    command=MotorPWMCommand(
+                        left_motor=v1,
+                        right_motor=v2
+                    ),
+                    pause_duration=0,
+                    duration=0,
+                )
+            )
+        else:
+            await self.send_safe_command(
+                Command(
+                    ID="",
+                    type=CommandType.MOTOR,
+                    command=MotorCommand(
+                        left_motor=v1,
+                        right_motor=v2
+                    ),
+                    pause_duration=0,
+                    duration=0,
+                )
+            )
+            
+        
+    async def set_pid(self, data):
+        await self.send_safe_command(
+            Command(
+                id="",
+                type=CommandType.PID,
+                command=PIDCommand(
+                    p_left=data["kp_left"],
+                    p_right=data["kp_right"],
+                    i_left=data["ki_left"],
+                    i_right=data["i_right"],
+                    d_left=data["kd_left"],
+                    d_right=data["kd_right"],
+                ),
+                pause_duration=0,
+                duration=0
+            )
+        )
     
 

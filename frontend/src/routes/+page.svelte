@@ -37,6 +37,53 @@
   import GyroMagDebug from "$lib/components/GyroMagDebug.svelte";
   import VelocityDebug from "$lib/components/VelocityDebug.svelte";
   import ConstantTuner from "$lib/components/ConstantTuner.svelte";
+  import PIDTuner from "$lib/components/PIDTuner.svelte";
+  import VelocityCommandWidget from "$lib/components/VelocityCommandWidget.svelte";
+  import {
+    Activity,
+    Bot,
+    Gauge,
+    Route,
+    Settings2,
+    SlidersHorizontal,
+  } from "lucide-svelte";
+
+  type DashboardPage =
+    | "overview"
+    | "navigation"
+    | "diagnostics"
+    | "operations"
+    | "settings"
+    | "pid";
+
+  const PAGE_CONFIG: {
+    id: DashboardPage;
+    label: string;
+    short: string;
+    icon: typeof Gauge;
+  }[] = [
+    { id: "overview", label: "Overview", short: "OVR", icon: Gauge },
+    { id: "navigation", label: "Navigation", short: "NAV", icon: Route },
+    {
+      id: "diagnostics",
+      label: "Diagnostics",
+      short: "DBG",
+      icon: Activity,
+    },
+    { id: "operations", label: "Operations", short: "OPS", icon: Bot },
+    {
+      id: "settings",
+      label: "Settings",
+      short: "SET",
+      icon: Settings2,
+    },
+    {
+      id: "pid",
+      label: "PID",
+      short: "PID",
+      icon: SlidersHorizontal,
+    },
+  ];
 
   let sensorData = $state<SensorData | null>(null);
   let robotState = $state<RobotState | null>(null);
@@ -74,8 +121,9 @@
   let pathComplete = $state(false);
   let joystickSendInterval: ReturnType<typeof setInterval> | null = null;
   let wasJoystickActive = false;
+  let activePage = $state<DashboardPage>("overview");
 
-  function onSubmit(e) {
+  function onSubmit(e: Event) {
     if (input.trim() === "") return;
     loadingAICommands = true;
     socket.emit("query", {
@@ -269,16 +317,6 @@
       return;
     }
 
-    if (cliffDetected(sensorData) !== cliffDetected(previousSensorData)) {
-      if (cliffDetected(sensorData)) {
-        newLog.message = "Cliff detected!";
-        newLog.icon = "warning";
-      } else {
-        newLog.message = "Cliff cleared!";
-        newLog.icon = "check";
-      }
-    }
-
     if (obstacleDetected(sensorData) !== obstacleDetected(previousSensorData)) {
       if (obstacleDetected(sensorData)) {
         newLog.message = "Obstacle detected!";
@@ -301,117 +339,184 @@
 </script>
 
 <KeyboardHandler bind:joystick={uiJoystick} {inputFocus} />
-<div class="flex flex-col gap-2 p-4">
-  <!-- Status bar - Keep row on mobile but make it wrap -->
-  <div
-    class="w-full flex flex-col md:flex-row items-center gap-2 justify-between"
-  >
-    <Status {lastSensorUpdate} {mode} bind:logs />
-    <div class="flex flex-row gap-2 w-full justify-between md:justify-end">
-      <RobotControls lastSensorUpdateTime={lastSensorUpdate} />
-      <BatteryPercentage
-        percent={sensorData?.battery ?? 0}
-        lastSensorUpdateTime={lastSensorUpdate}
-      />
-    </div>
-    <div class="flex flex-row gap-2 w-full justify-between md:justify-end">
-      <Uptime {lastSensorUpdate} />
-      <SensorRate rate={sensorRate} />
-    </div>
-  </div>
-
-  <!-- Main content area - Stack on mobile, side by side on desktop -->
-  <div class="w-full flex flex-col md:flex-row items-stretch gap-2">
-    <!-- Left column on desktop, top section on mobile -->
-    <div class="w-full md:w-1/2 flex-grow">
-      <UltrasonicGraph {distanceHistory} />
-    </div>
-
-    <!-- Right column on desktop, bottom section on mobile -->
-    <div class="flex flex-col w-full md:w-1/2 items-start gap-2">
-      <!-- Temperature and Control Pad - Stack on small mobile, side by side otherwise -->
-      <div class="flex flex-col sm:flex-row w-full gap-2">
-        <TemperatureDisplay temperature={sensorData?.imu.temperature ?? null} />
-        <ControlPad
-          bind:joystick={uiJoystick}
-          lastUpdateTime={lastSensorUpdate}
-          class="w-full sm:w-1/2"
-        />
+<div class="h-screen w-full overflow-hidden bg-gray-50">
+  <div class="flex h-full">
+    <aside
+      class="flex w-20 flex-col items-center border-r border-gray-200 bg-white py-3"
+    >
+      <div class="mb-4 text-[10px] font-black tracking-[0.2em] text-gray-500">
+        TRACER
       </div>
+      <nav class="flex w-full flex-1 flex-col items-center gap-2 px-2">
+        {#each PAGE_CONFIG as page}
+          <button
+            type="button"
+            title={page.label}
+            onclick={() => (activePage = page.id)}
+            class="flex w-full flex-col items-center gap-1 rounded-lg border px-2 py-2 text-[10px] font-bold tracking-wide transition-colors {activePage ===
+            page.id
+              ? 'border-gray-300 bg-gray-100 text-gray-900'
+              : 'border-transparent bg-white text-gray-500 hover:bg-gray-50 hover:text-gray-800'}"
+          >
+            <svelte:component this={page.icon} class="h-4 w-4" />
+            <span>{page.short}</span>
+          </button>
+        {/each}
+      </nav>
+    </aside>
 
-      <!-- Logs section with mobile optimizations -->
+    <main class="min-w-0 flex-1 p-3">
+      <div class="flex h-full min-h-0 flex-col gap-2">
+        <div class="grid w-full grid-cols-1 gap-2 lg:grid-cols-[1fr_auto_auto]">
+          <Status {lastSensorUpdate} {mode} bind:logs />
+          <div class="flex flex-row gap-2 justify-between lg:justify-end">
+            <RobotControls lastSensorUpdateTime={lastSensorUpdate} />
+            <BatteryPercentage
+              percent={sensorData?.battery ?? 0}
+              lastSensorUpdateTime={lastSensorUpdate}
+            />
+          </div>
+          <div class="flex flex-row gap-2 justify-between lg:justify-end">
+            <Uptime {lastSensorUpdate} />
+            <SensorRate rate={sensorRate} />
+          </div>
+        </div>
 
-      <ObstructionStatus
-        {sensorData}
-        {lastSensorUpdate}
-        class="w-full h-full"
-      />
-    </div>
-  </div>
+        <div class="min-h-0 flex-1 overflow-hidden">
+          {#if activePage === "overview"}
+            <div class="grid h-full grid-cols-12 grid-rows-12 gap-2">
+              <div class="col-span-8 row-span-8 min-h-0 overflow-hidden">
+                <UltrasonicGraph {distanceHistory} />
+              </div>
 
-  <!-- Joystick status and obstruction area -->
-  <div class="w-full flex flex-col sm:flex-row items-stretch gap-2">
-    <JoystickStatus
-      lastUpdateTime={lastSensorUpdate}
-      joystick={joystickInput}
-      class="w-full h-full sm:w-1/2"
-    />
-    <Logs {logs} class="w-full h-full" />
-  </div>
+              <div class="col-span-4 row-span-8 min-h-0 flex flex-col gap-2">
+                <div class="grid grid-cols-1 gap-2 md:grid-cols-2">
+                  <TemperatureDisplay
+                    temperature={sensorData?.imu.temperature ?? null}
+                    class="h-full"
+                  />
+                  <ControlPad
+                    bind:joystick={uiJoystick}
+                    lastUpdateTime={lastSensorUpdate}
+                  />
+                </div>
+                <ObstructionStatus
+                  {sensorData}
+                  {lastSensorUpdate}
+                  class="h-full"
+                />
+              </div>
 
-  <!-- Velocity Debug Widget -->
-  <div class="w-full">
-    <VelocityDebug {robotState} lastSensorUpdateTime={lastSensorUpdate} />
-  </div>
+              <div class="col-span-5 row-span-4 min-h-0">
+                <JoystickStatus
+                  lastUpdateTime={lastSensorUpdate}
+                  joystick={joystickInput}
+                  class="h-full"
+                />
+              </div>
 
-  <div class="w-full">
-    <PathDrawer
-      robotPos={robotState
-        ? { x: robotState.x, y: robotState.y, theta: robotState.yaw }
-        : null}
-      {pathComplete}
-      bind:freehandPath
-      onRunPath={runPath}
-      onStopRun={stopPathRun}
-    />
-  </div>
-
-  <!-- Board Orientation Visualization -->
-  <div class="w-full">
-    <GestureController {gestureData} />
-  </div>
-
-  <div class="w-full">
-    <GyroMagDebug {sensorData} lastSensorUpdateTime={lastSensorUpdate} />
-  </div>
-
-  <div class="w-full">
-    <ConstantTuner />
-  </div>
-
-  <!-- Recordings and Command List Section - Side by side on large screens -->
-  <div class="w-full flex flex-col lg:flex-row items-stretch gap-2">
-    <!-- Recordings section -->
-    <div class="w-full lg:w-2/5">
-      <Recordings
-        lastSensorUpdateTime={lastSensorUpdate}
-        bind:recordings
-        class="h-full"
-      />
-    </div>
-
-    <!-- Command list section - Full width with mobile optimizations -->
-    <div class="w-full lg:w-3/5">
-      <CommandList
-        commands={aiCommands}
-        {activeCommand}
-        lastSensorUpdateTime={lastSensorUpdate}
-        loading={loadingAICommands}
-        bind:query={input}
-        {onSubmit}
-        bind:inputFocus
-        class="overscroll-contain touch-manipulation hide-scrollbar"
-      />
-    </div>
+              <div class="col-span-7 row-span-4 min-h-0">
+                <Logs {logs} class="h-full" />
+              </div>
+            </div>
+          {:else if activePage === "navigation"}
+            <div class="grid h-full grid-cols-12 grid-rows-12 gap-2">
+              <div class="col-span-7 row-span-12 min-h-0">
+                <PathDrawer
+                  robotPos={robotState
+                    ? {
+                        x: robotState.x,
+                        y: robotState.y,
+                        theta: robotState.yaw,
+                      }
+                    : null}
+                  {pathComplete}
+                  bind:freehandPath
+                  onRunPath={runPath}
+                  onStopRun={stopPathRun}
+                />
+              </div>
+              <div class="col-span-5 row-span-8 min-h-0">
+                <VelocityDebug
+                  {robotState}
+                  lastSensorUpdateTime={lastSensorUpdate}
+                />
+              </div>
+              <div class="col-span-5 row-span-4 min-h-0">
+                <ObstructionStatus
+                  {sensorData}
+                  {lastSensorUpdate}
+                  class="h-full"
+                />
+              </div>
+            </div>
+          {:else if activePage === "diagnostics"}
+            <div class="grid h-full grid-cols-12 grid-rows-12 gap-2">
+              <div class="col-span-6 row-span-6 min-h-0 overflow-y-auto">
+                <GyroMagDebug
+                  {sensorData}
+                  lastSensorUpdateTime={lastSensorUpdate}
+                />
+              </div>
+              <div class="col-span-6 row-span-6 min-h-0 overflow-y-hidden">
+                <GestureController {gestureData} />
+              </div>
+              <div class="col-span-12 row-span-6 min-h-0 overflow-hidden">
+                <VelocityDebug
+                  {robotState}
+                  lastSensorUpdateTime={lastSensorUpdate}
+                />
+              </div>
+            </div>
+          {:else if activePage === "operations"}
+            <div class="grid h-full grid-cols-12 grid-rows-12 gap-2">
+              <div class="col-span-8 row-span-12 min-h-0">
+                <CommandList
+                  commands={aiCommands}
+                  {activeCommand}
+                  lastSensorUpdateTime={lastSensorUpdate}
+                  loading={loadingAICommands}
+                  bind:query={input}
+                  {onSubmit}
+                  bind:inputFocus
+                  class="h-full overscroll-contain touch-manipulation hide-scrollbar"
+                />
+              </div>
+              <div class="col-span-4 row-span-7 min-h-0">
+                <Recordings
+                  lastSensorUpdateTime={lastSensorUpdate}
+                  bind:recordings
+                  class="h-full"
+                />
+              </div>
+              <div class="col-span-4 row-span-5 min-h-0">
+                <Logs {logs} class="h-full" />
+              </div>
+            </div>
+          {:else if activePage === "settings"}
+            <div class="grid h-full min-h-0 grid-cols-12 grid-rows-12 gap-2">
+              <div class="col-span-12 row-span-12 min-h-0">
+                <ConstantTuner class="h-full" />
+              </div>
+            </div>
+          {:else}
+            <div class="grid h-full min-h-0 grid-cols-12 grid-rows-12 gap-2">
+              <div class="col-span-12 row-span-7 min-h-0">
+                <VelocityCommandWidget class="h-full" />
+              </div>
+              <div class="col-span-4 row-span-5 min-h-0">
+                <PIDTuner class="h-full" />
+              </div>
+              <div class="col-span-8 row-span-5 min-h-0">
+                <VelocityDebug
+                  {robotState}
+                  lastSensorUpdateTime={lastSensorUpdate}
+                />
+              </div>
+            </div>
+          {/if}
+        </div>
+      </div>
+    </main>
   </div>
 </div>

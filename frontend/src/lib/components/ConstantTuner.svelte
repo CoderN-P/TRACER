@@ -26,9 +26,9 @@
     COMPLETION_THRESHOLD: 0.04,
     END_LOOKAHEAD_MULTIPLIER: 1.1,
     BETA: 3.2,
-    ZETA: 0.8,
-    MAX_LATERAL_ACCEL: 0.29,
-    MAX_LONG_ACCEL: 0.5,
+    ZETA: 0.7,
+    MAX_LATERAL_ACCEL: 0.3,
+    MAX_LONG_ACCEL: 0.8,
     K_OMEGA: 0.8,
     K_V: 5.0,
     K_D: 4.0,
@@ -142,8 +142,18 @@
       fields: [
         { key: "BETA", label: "BETA", step: "0.01", min: 0 },
         { key: "ZETA", label: "ZETA", step: "0.01", min: 0 },
-        { key: "MAX_LATERAL_ACCEL", label: "MAX_LATERAL_ACCEL", step: "0.01", min: 0 },
-        { key: "MAX_LONG_ACCEL", label: "MAX_LONG_ACCEL", step: "0.01", min: 0 },
+        {
+          key: "MAX_LATERAL_ACCEL",
+          label: "MAX_LATERAL_ACCEL",
+          step: "0.01",
+          min: 0,
+        },
+        {
+          key: "MAX_LONG_ACCEL",
+          label: "MAX_LONG_ACCEL",
+          step: "0.01",
+          min: 0,
+        },
       ],
     },
     {
@@ -158,6 +168,7 @@
   ];
 
   let { class: className = "" } = $props();
+  let activeSection = $state<number>(0);
 
   let constants = $state<Record<ConstantKey, number>>({ ...DEFAULT_CONSTANTS });
   let draftValues = $state<Record<ConstantKey, string>>(
@@ -214,7 +225,9 @@
   }
 </script>
 
-<Card.Root class="w-full border border-gray-100 bg-white {className}">
+<Card.Root
+  class="w-full h-full border border-gray-100 bg-white flex flex-col {className}"
+>
   <Card.Header class="space-y-2">
     <div
       class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"
@@ -241,50 +254,64 @@
     </div>
   </Card.Header>
 
-  <Card.Content class="space-y-4">
-    <div class="grid gap-4 xl:grid-cols-2">
-      {#each CONSTANT_SECTIONS as section}
-        <section class="rounded-lg border border-gray-200 bg-gray-50 p-4">
-          <div class="mb-4 space-y-1">
-            <h3 class="text-sm font-semibold text-gray-900">{section.title}</h3>
-            <p class="text-xs text-gray-500">{section.subtitle}</p>
-          </div>
-
-          <div class="grid gap-3 sm:grid-cols-2">
-            {#each section.fields as field}
-              <label class="space-y-1">
-                <div
-                  class="flex items-center justify-between gap-2 text-xs font-medium text-gray-700"
-                >
-                  <span class="font-mono">{field.label}</span>
-                  <button
-                    type="button"
-                    class="text-[11px] font-semibold text-gray-500 hover:text-gray-900"
-                    onclick={() => resetConstant(field.key)}
-                    title={`Reset ${field.label} to its default value`}
-                  >
-                    default
-                  </button>
-                </div>
-
-                <input
-                  type="number"
-                  step={field.step ?? "any"}
-                  min={field.min}
-                  value={draftValues[field.key]}
-                  oninput={(event) =>
-                    syncConstant(
-                      field.key,
-                      (event.currentTarget as HTMLInputElement).value,
-                    )}
-                  onblur={() => normalizeField(field.key)}
-                  class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 font-mono text-sm text-gray-900 outline-none transition-colors placeholder:text-gray-400 focus:border-gray-500 focus:ring-2 focus:ring-gray-200"
-                />
-              </label>
-            {/each}
-          </div>
-        </section>
+  <Card.Content class="min-h-0 flex-1 space-y-3 overflow-hidden">
+    <div class="flex flex-wrap gap-2">
+      {#each CONSTANT_SECTIONS as section, index}
+        <button
+          type="button"
+          onclick={() => (activeSection = index)}
+          class="rounded-full border px-3 py-1 text-xs font-semibold transition-colors {activeSection ===
+          index
+            ? 'border-gray-300 bg-gray-200 text-gray-900'
+            : 'border-gray-200 bg-gray-50 text-gray-600 hover:bg-gray-100'}"
+        >
+          {section.title}
+        </button>
       {/each}
     </div>
+
+    {@const section = CONSTANT_SECTIONS[activeSection]}
+    <section
+      class="h-[calc(100%-2.5rem)] rounded-lg border border-gray-200 bg-gray-50 p-4 overflow-hidden"
+    >
+      <div class="mb-4 space-y-1">
+        <h3 class="text-sm font-semibold text-gray-900">{section.title}</h3>
+        <p class="text-xs text-gray-500">{section.subtitle}</p>
+      </div>
+
+      <div class="grid gap-3 sm:grid-cols-2">
+        {#each section.fields as field}
+          <label class="space-y-1">
+            <div
+              class="flex items-center justify-between gap-2 text-xs font-medium text-gray-700"
+            >
+              <span class="font-mono">{field.label}</span>
+              <button
+                type="button"
+                class="text-[11px] font-semibold text-gray-500 hover:text-gray-900"
+                onclick={() => resetConstant(field.key)}
+                title={`Reset ${field.label} to its default value`}
+              >
+                default
+              </button>
+            </div>
+
+            <input
+              type="number"
+              step={field.step ?? "any"}
+              min={field.min}
+              value={draftValues[field.key]}
+              oninput={(event) =>
+                syncConstant(
+                  field.key,
+                  (event.currentTarget as HTMLInputElement).value,
+                )}
+              onblur={() => normalizeField(field.key)}
+              class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 font-mono text-sm text-gray-900 outline-none transition-colors placeholder:text-gray-400 focus:border-gray-500 focus:ring-2 focus:ring-gray-200"
+            />
+          </label>
+        {/each}
+      </div>
+    </section>
   </Card.Content>
 </Card.Root>

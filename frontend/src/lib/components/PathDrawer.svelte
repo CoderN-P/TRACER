@@ -47,8 +47,7 @@
   // Canvas dimensions — WIDTH tracks the container element width reactively.
   let containerEl = $state<HTMLDivElement | null>(null);
   let WIDTH = $state(800);
-  const ASPECT = 0.5; // height = WIDTH * ASPECT
-  let HEIGHT = $derived(Math.round(WIDTH * ASPECT));
+  let HEIGHT = $state(460);
   const GRID_SPACING = 100; // pixels between grid lines (in world pixels at zoom=1)
   const TICK_LENGTH = 10; // length of axis ticks
   const PATH_RENDER_INTERVAL = 0.01; // seconds (dt)
@@ -58,13 +57,15 @@
     if (!containerEl) return;
     const ro = new ResizeObserver(([entry]) => {
       const w = Math.floor(entry.contentRect.width);
-      if (w > 0 && w !== WIDTH) {
+      const h = Math.floor(entry.contentRect.height);
+      if (w > 0 && h > 0 && (w !== WIDTH || h !== HEIGHT)) {
         // Keep the camera origin centred after resize.
         const dx = (w - WIDTH) / 2;
-        const dh = (Math.round(w * ASPECT) - HEIGHT) / 2;
+        const dh = (h - HEIGHT) / 2;
         stageX += dx;
         stageY += dh;
         WIDTH = w;
+        HEIGHT = h;
       }
     });
     ro.observe(containerEl);
@@ -623,7 +624,7 @@
   <p>Loading...</p>
 {:else}
   <div
-    class="rounded-lg border border-gray-200 p-4 bg-white flex flex-col select-none"
+    class="h-full min-h-0 rounded-lg border border-gray-200 p-4 bg-white flex flex-col select-none"
   >
     <!-- Toolbar -->
     <div class="flex flex-row items-center gap-2 mb-4 flex-wrap">
@@ -871,6 +872,7 @@
 
     <div
       bind:this={containerEl}
+      class="min-h-0 flex-1 w-full"
       style="cursor: {mode === 'freehand'
         ? isDrawing
           ? 'crosshair'

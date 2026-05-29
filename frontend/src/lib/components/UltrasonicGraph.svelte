@@ -1,6 +1,5 @@
 <script lang="ts">
   import * as Card from "$lib/components/ui/card";
-  import { Skeleton } from "$lib/components/ui/skeleton";
   import * as Chart from "$lib/components/ui/chart/index.js";
   import { AlertTriangle, Activity, Waves } from "lucide-svelte";
   import { scaleUtc } from "d3-scale";
@@ -92,75 +91,86 @@
   );
 </script>
 
-{#if distanceHistory.length === 0}
-  <Skeleton class="w-full h-[400px] rounded-sm" />
-{:else}
-  <Card.Root
-    class="w-full h-full overflow-hidden border border-gray-100 bg-white shadow-sm"
+<Card.Root
+  class="w-full h-full min-h-0 overflow-hidden border border-gray-100 bg-white shadow-sm flex flex-col"
+>
+  <Card.Header
+    class="shrink-0 space-y-3 border-b border-gray-100 bg-gradient-to-r from-white to-gray-50/70"
   >
-    <Card.Header
-      class="space-y-3 border-b border-gray-100 bg-gradient-to-r from-white to-gray-50/70"
+    <div
+      class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between"
     >
-      <div
-        class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between"
-      >
-        <div class="space-y-1">
-          <Card.Title class="flex items-center gap-2">
-            <Waves class="h-5 w-5" />
-            Distance Sensors
-          </Card.Title>
-          <Card.Description>
-            Left ultrasonic, right ultrasonic, and front ToF readings. Invalid
-            samples such as -1 or -2 are treated as no-signal values.
-          </Card.Description>
-        </div>
-
-        <div
-          class="inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold {hasAnyValidData
-            ? 'border-green-200 bg-green-50 text-green-700'
-            : 'border-amber-200 bg-amber-50 text-amber-700'}"
-        >
-          {#if hasAnyValidData}
-            <Activity class="h-3.5 w-3.5" />
-            Live data present
-          {:else}
-            <AlertTriangle class="h-3.5 w-3.5" />
-            No valid sensor readings
-          {/if}
-        </div>
+      <div class="space-y-1">
+        <Card.Title class="flex items-center gap-2">
+          <Waves class="h-5 w-5" />
+          Distance Sensors
+        </Card.Title>
+        <Card.Description>
+          Left ultrasonic, right ultrasonic, and front ToF readings. Invalid
+          samples such as -1 or -2 are treated as no-signal values.
+        </Card.Description>
       </div>
 
-      <div class="grid gap-2 sm:grid-cols-3">
-        {#each chartSections as section (section.key)}
-          <div
-            class="rounded-lg border p-3 transition-colors {section.isStale
-              ? 'border-amber-200 bg-amber-50/80'
-              : 'border-gray-200 bg-white'}"
-          >
-            <div class="flex items-center justify-between gap-2">
-              <div>
-                <div class="text-xs font-semibold text-gray-700">
-                  {section.title}
-                </div>
-                <div class="text-[11px] text-gray-500">{section.subtitle}</div>
+      <div
+        class="inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold {hasAnyValidData
+          ? 'border-green-200 bg-green-50 text-green-700'
+          : 'border-amber-200 bg-amber-50 text-amber-700'}"
+      >
+        {#if hasAnyValidData}
+          <Activity class="h-3.5 w-3.5" />
+          Live data present
+        {:else}
+          <AlertTriangle class="h-3.5 w-3.5" />
+          No valid sensor readings
+        {/if}
+      </div>
+    </div>
+
+    <div class="grid gap-2 sm:grid-cols-3">
+      {#each chartSections as section (section.key)}
+        <div
+          class="rounded-lg border p-3 transition-colors {section.isStale
+            ? 'border-amber-200 bg-amber-50/80'
+            : 'border-gray-200 bg-white'}"
+        >
+          <div class="flex items-center justify-between gap-2">
+            <div>
+              <div class="text-xs font-semibold text-gray-700">
+                {section.title}
               </div>
-              <div
-                class="rounded-full px-2 py-0.5 text-[11px] font-semibold {section.isStale
-                  ? 'bg-amber-100 text-amber-700'
-                  : 'bg-green-100 text-green-700'}"
-              >
-                {section.isStale ? "stale" : "live"}
-              </div>
+              <div class="text-[11px] text-gray-500">{section.subtitle}</div>
             </div>
-            <div class="mt-2 font-mono text-sm text-gray-900">
-              {formatDistance(section.latestValue)}
+            <div
+              class="rounded-full px-2 py-0.5 text-[11px] font-semibold {section.isStale
+                ? 'bg-amber-100 text-amber-700'
+                : 'bg-green-100 text-green-700'}"
+            >
+              {section.isStale ? "stale" : "live"}
             </div>
           </div>
-        {/each}
-      </div>
-    </Card.Header>
+          <div class="mt-2 font-mono text-sm text-gray-900">
+            {formatDistance(section.latestValue)}
+          </div>
+        </div>
+      {/each}
+    </div>
+  </Card.Header>
 
-    <Card.Content class="space-y-4 p-4 sm:p-6">
+  <Card.Content class="min-h-0 flex-1 space-y-4 overflow-y-auto p-4 sm:p-6">
+    {#if distanceHistory.length === 0}
+      <div
+        class="flex h-[320px] items-center justify-center rounded-xl border border-dashed border-gray-200 bg-gray-50 text-center"
+      >
+        <div>
+          <p class="text-sm font-semibold text-gray-700">
+            No distance samples yet
+          </p>
+          <p class="text-xs text-gray-500 mt-1">
+            Waiting for ultrasonic/ToF packets from the robot.
+          </p>
+        </div>
+      </div>
+    {:else}
       {#each chartSections as section (section.key)}
         <div
           class="space-y-2 rounded-xl border border-gray-100 bg-gray-50/60 p-3 sm:p-4"
@@ -279,6 +289,6 @@
           {/if}
         </div>
       {/each}
-    </Card.Content>
-  </Card.Root>
-{/if}
+    {/if}
+  </Card.Content>
+</Card.Root>

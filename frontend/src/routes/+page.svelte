@@ -100,6 +100,8 @@
     right_x: 0,
   });
   let lastSensorUpdate = $state<number>(0);
+  let velocityProfileT = $state<number | null>(null);
+  let velocityCommand = $state<unknown | null>(null);
   let packetCount = $state<number>(0);
   let sensorRate = $state<number>(-1);
   let lastRateUpdate = $state<number>(0);
@@ -203,6 +205,8 @@
       try {
         sensorData = SensorDataSchema.parse(data.sensors);
         robotState = RobotStateSchema.parse(data.state);
+        velocityProfileT = data.velocity_profile_t ?? null;
+        velocityCommand = data.velocityCommand;
 
         packetCount++;
         const now = new Date().getTime();
@@ -502,7 +506,12 @@
           {:else}
             <div class="grid h-full min-h-0 grid-cols-12 grid-rows-12 gap-2">
               <div class="col-span-12 row-span-7 min-h-0">
-                <VelocityCommandWidget class="h-full" />
+                <VelocityCommandWidget
+                  class="h-full"
+                  {robotState}
+                  lastSensorUpdateTime={lastSensorUpdate}
+                  {velocityProfileT}
+                />
               </div>
               <div class="col-span-4 row-span-5 min-h-0">
                 <PIDTuner class="h-full" />

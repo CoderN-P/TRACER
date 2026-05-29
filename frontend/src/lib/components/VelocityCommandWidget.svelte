@@ -10,13 +10,30 @@
     Plus,
     RotateCcw,
   } from "lucide-svelte";
+  import type { RobotState } from "$lib/types";
 
-  let { class: className = "" }: { class?: string } = $props();
+  let {
+    class: className = "",
+    robotState = null,
+    lastSensorUpdateTime = 0,
+    velocityProfileT = null,
+  }: {
+    class?: string;
+    robotState?: RobotState | null;
+    lastSensorUpdateTime?: number;
+    velocityProfileT?: number | null;
+  } = $props();
 
   type CommandMode = "wheel" | "twist" | "PWM";
   type CurveKey = "a" | "b";
   type ProfilePoint = {
     id: number;
+    t: number;
+    a: number;
+    b: number;
+  };
+  type MeasuredSample = {
+    timestamp: number;
     t: number;
     a: number;
     b: number;
@@ -36,7 +53,6 @@
   const GRAPH_HEIGHT = 420;
   const PADDING = { top: 10, right: 52, bottom: 20, left: 52 };
   const TICK_COUNT = 5;
-  const SEND_INTERVAL_MS = 50;
   const MIN_POINT_SPACING = 0.02;
   const DEFAULT_POINTS: ProfilePoint[] = [
     { id: 1, t: 0, a: 0, b: 0 },
@@ -127,7 +143,8 @@
   let isRunning = $state(false);
   let progress = $state(0);
   let startedAt = $state(0);
-  let sendTimer: ReturnType<typeof setInterval> | null = null;
+  let measuredSamples = $state<MeasuredSample[]>([]);
+  let lastRecordedSensorUpdate = $state(0);
   let progressFrame = 0;
 
   const plotHeight = GRAPH_HEIGHT - PADDING.top - PADDING.bottom;
@@ -164,6 +181,26 @@
       };
     }),
   );
+
+  let measuredCurves = $derived(
+    curves.map((curve) => {
+      const svgPoints = measuredSamples.map((sample) => ({
+        timestamp: sample.timestamp,
+        t: sample.t,
+        value: sample[curve.key],
+        x: xForTime(sample.t),
+        y: yForValue(sample[curve.key], curve),
+      }));
+
+      return {
+        ...curve,
+        svgPoints,
+        path: linePath(svgPoints),
+      };
+    }),
+  );
+
+  let canShowMeasured = $derived(mode !== "PWM");
 
   let yTicks = $derived(
     Array.from({ length: TICK_COUNT }, (_, index) => {
@@ -219,6 +256,26 @@
     const prefix = value > 0 ? "+" : "";
     const digits = curve.unit === "rad/s" ? 2 : 3;
     return `${prefix}${value.toFixed(digits)}${curve.unit ? ` ${curve.unit}` : ""}`;
+  }
+
+  function measuredValuesFromRobotState(state: RobotState) {
+    if (mode === "wheel") {
+      const vLin = state.linear_velocity;
+      const omega = state.angular_velocity;
+      return {
+        a: vLin - (omega * 0.255) / 2,
+        b: vLin + (omega * 0.255) / 2,
+      };
+    }
+
+    if (mode === "twist") {
+      return {
+        a: state.linear_velocity,
+        b: state.angular_velocity,
+      };
+    }
+
+    return null;
   }
 
   function xForTime(t: number) {
@@ -400,41 +457,40 @@
     return { a: last.a, b: last.b };
   }
 
-  function payloadAt(t: number) {
-    const values = sampleProfile(t);
+  function commandPayload() {
     return {
       mode,
-      [curves[0].payloadKey]: clamp(values.a, curves[0].min, curves[0].max),
-      [curves[1].payloadKey]: clamp(values.b, curves[1].min, curves[1].max),
+      profile: displayPoints.map((point) => ({
+        t: point.t,
+        v1: clamp(point.a, curves[0].min, curves[0].max),
+        v2: clamp(point.b, curves[1].min, curves[1].max),
+      })),
     };
   }
 
   function neutralPayload() {
     return {
       mode,
-      [curves[0].payloadKey]: 0,
-      [curves[1].payloadKey]: 0,
+      profile: [{ t: 0, v1: 0, v2: 0 }],
     };
-  }
-
-  function emitCurrentCommand() {
-    const elapsed = performance.now() - startedAt;
-    const nextProgress = clamp(elapsed / (durationSeconds * 1000), 0, 1);
-    socket.emit("vel_command", payloadAt(nextProgress));
-
-    if (nextProgress >= 1) {
-      stopRun(true);
-    }
   }
 
   function updateProgress() {
     if (!isRunning) return;
 
-    progress = clamp(
+    const nextProgress = clamp(
       (performance.now() - startedAt) / (durationSeconds * 1000),
       0,
       1,
     );
+
+    progress = nextProgress;
+
+    if (nextProgress >= 1) {
+      stopRun(true);
+      return;
+    }
+
     progressFrame = requestAnimationFrame(updateProgress);
   }
 
@@ -443,18 +499,14 @@
     durationSeconds = clamp(durationSeconds, 0.5, 60);
     startedAt = performance.now();
     progress = 0;
+    measuredSamples = [];
+    lastRecordedSensorUpdate = 0;
     isRunning = true;
-    emitCurrentCommand();
-    sendTimer = setInterval(emitCurrentCommand, SEND_INTERVAL_MS);
+    socket.emit("vel_command", commandPayload());
     progressFrame = requestAnimationFrame(updateProgress);
   }
 
   function stopRun(finished = false) {
-    if (sendTimer) {
-      clearInterval(sendTimer);
-      sendTimer = null;
-    }
-
     if (progressFrame) {
       cancelAnimationFrame(progressFrame);
       progressFrame = 0;
@@ -491,6 +543,35 @@
     observer.observe(graphFrame);
 
     return () => observer.disconnect();
+  });
+
+  $effect(() => {
+    if (
+      !isRunning ||
+      !robotState ||
+      !canShowMeasured ||
+      velocityProfileT === null ||
+      lastSensorUpdateTime === 0 ||
+      lastSensorUpdateTime === lastRecordedSensorUpdate
+    ) {
+      return;
+    }
+
+    const values = measuredValuesFromRobotState(robotState);
+    if (!values) return;
+
+    lastRecordedSensorUpdate = lastSensorUpdateTime;
+    const t = clamp(velocityProfileT, 0, 1);
+
+    measuredSamples = [
+      ...measuredSamples,
+      {
+        timestamp: lastSensorUpdateTime,
+        t,
+        a: clamp(values.a, curves[0].min, curves[0].max),
+        b: clamp(values.b, curves[1].min, curves[1].max),
+      },
+    ].slice(-260);
   });
 
   $effect(() => {
@@ -635,6 +716,32 @@
           />
         {/each}
 
+        {#if canShowMeasured && measuredSamples.length > 1}
+          {#each measuredCurves as curve}
+            <path
+              d={curve.path}
+              fill="none"
+              stroke={curve.color}
+              stroke-width="2.5"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-opacity="0.85"
+              class="[stroke-dasharray:7,5]"
+            />
+            {@const lastPoint = curve.svgPoints.at(-1)}
+            {#if lastPoint}
+              <circle
+                cx={lastPoint.x}
+                cy={lastPoint.y}
+                r="4"
+                fill={curve.color}
+                stroke="white"
+                stroke-width="2"
+              />
+            {/if}
+          {/each}
+        {/if}
+
         {#if isRunning}
           <line
             x1={xForTime(progress)}
@@ -769,6 +876,18 @@
       </div>
 
       <div class="flex items-center gap-2">
+        {#if canShowMeasured}
+          <div
+            class="hidden items-center gap-2 pr-2 text-xs text-gray-500 lg:flex"
+          >
+            <span class="h-px w-5 bg-gray-900"></span>
+            profile
+            <span class="h-px w-5 border-t border-dashed border-gray-500"
+            ></span>
+            measured
+          </div>
+        {/if}
+
         <div
           class="hidden items-center gap-2 pr-2 text-xs text-gray-500 sm:flex"
         >

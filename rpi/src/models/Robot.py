@@ -6,6 +6,8 @@ import time
 import struct
 from collections import deque
 import asyncio
+from typing import List, Dict
+
 from . import SerialManager, SensorData,  StateEstimator, Mode, ROBOT_CONFIG, MagnetometerData, MetaMode, Path, PurePursuit, LidarData
 from .PathFollowing import GoToGoal, twist_to_wheel_speeds
 from .Command import PIDCommand, MotorCommand, MotorPWMCommand, Command, CommandType, LCDCommand
@@ -52,17 +54,19 @@ class Robot:
         self.last_command_id: str = ""
         self.freeze_after_cmd_window_s = 0.5
         
+        self.velocity_profile_start = None
+        self.pending_motor_command = None
+        
         self.obstacle_clear.set()
 
     async def send_safe_command(self, command: Command, wait_after: float = 0):
-        async with self.motor_lock:
-            now = asyncio.get_event_loop().time()
-            self.last_command_sent_at = now
-            self.last_command_type = command.command_type.name if hasattr(command.command_type, "name") else str(command.command_type)
-            self.last_command_id = command.ID
-            self.serial.send(command)
-            if wait_after > 0:
-                await asyncio.sleep(wait_after)
+        now = asyncio.get_event_loop().time()
+        self.last_command_sent_at = now
+        self.last_command_type = command.command_type.name if hasattr(command.command_type, "name") else str(command.command_type)
+        self.last_command_id = command.ID
+        self.serial.send(command)
+        if wait_after > 0:
+            await asyncio.sleep(wait_after)
 
     def _run_loop_thread(self):
         asyncio.set_event_loop(asyncio.new_event_loop())
@@ -304,9 +308,11 @@ class Robot:
                     "sensors": SensorData.clean(sensor_data.model_dump()), 
                     "state": SensorData.clean(self.state_estimator.state.model_dump()),
                     "mode": current_mode.name,
-                    "timestamp": datetime.datetime.now().isoformat()
+                    "timestamp": datetime.datetime.now().isoformat(),
+                    "velocity_profile_t": time.monotonic() - self.velocity_profile_start if self.velocity_profile_start else None
                 },
             )  
+            
     
     async def debug_stall(self, start):
         no_data_for = start - self.last_sensor_receive_time
@@ -410,6 +416,13 @@ class Robot:
                         await self.send_safe_command(Command.stop())
                         await self.socketio.emit('path_complete', {"status": "success"})
             
+            else:
+                # Now in manual mode we can process pending motor commands from joystick or velocity profile
+                async with self.motor_lock:
+                    if self.pending_motor_command:
+                        await self.send_safe_command(self.pending_motor_command)
+                        self.pending_motor_command = None
+                    
             obstacle_dt = 1 / ROBOT_CONFIG.CHECK_OBSTACLE_FREQ
             
             # Only handle obstacle stopping and detection if in manual mode, since path following uses potential field control.
@@ -479,9 +492,9 @@ class Robot:
 
         if self.obstacle_clear.is_set():
             if data.get("type"):
-                await self.send_safe_command(Command.from_joystick(left_y, right_x, data["type"]))
+                self.pending_motor_command = Command.from_joystick(left_y, right_x, data["type"])
             else:
-                await self.send_safe_command(Command.from_joystick(left_y, right_x))
+                self.pending_motor_command = Command.from_joystick(left_y, right_x)
             
 
     async def _run_command_sequence(self, commands):
@@ -525,16 +538,57 @@ class Robot:
         command_task = asyncio.create_task(self._run_command_sequence(commands))
         return command_task
     
+    async def execute_velocity_profile(self, profile: List[Dict], mode: str = 'wheel'):
+        if len(profile) < 2:
+            return 
+        
+        self.velocity_profile_start = time.monotonic()
+        
+        i = 0
+        t_start = asyncio.get_event_loop().time()
+        
+        while True:
+            t = asyncio.get_event_loop().time() - t_start
+            if t >= profile[-1]["t"]:
+                break
+                
+            starting_point = None
+            
+            for j in range(i, len(profile) - 1):
+                if profile[j]["t"] <= t <= profile[j+1]["t"]:
+                    starting_point = j
+                    break
+            
+            if starting_point is None:
+                # Only possible cause is that the first point in the profile is ahead of the current t, in that case just send 0
+                await self.execute_velocity_command(0, 0, mode=mode)
+            else:
+                i = starting_point
+                p0 = profile[i]
+                p1 = profile[i + 1]
+                
+                # Linear interpolation
+                v1 = (p1['v1'] - p0['v1']) / (p1['t'] - p0['t']) * (t - p0["t"]) + p0['v1']
+                v2 = (p1['v2'] - p0['v2']) / (p1['t'] - p0['t']) * (t - p0["t"]) + p0['v2']
+                await self.execute_velocity_command(v1, v2, mode=mode) # Sets vel command to pending
+                
+            await asyncio.sleep(0.02)
+            t += 0.02
+                
+        self.velocity_profile_start = None
+        self.pending_motor_command = Command.stop()
+        
+            
     async def execute_velocity_command(self, v1: float, v2: float, mode: str = 'wheel'):
         async with self.state_lock:
             if self.state in [Mode.STOPPED, Mode.PATH_FOLLOWING]:
                 return
-            
+        
         if mode == 'twist':
             vl, vr = twist_to_wheel_speeds(v1, v2)
             
-            await self.send_safe_command(
-                Command(
+            async with self.motor_lock:
+                self.pending_motor_command = Command(
                     ID="",
                     command_type=CommandType.MOTOR,
                     command=MotorCommand(
@@ -544,10 +598,10 @@ class Robot:
                     pause_duration=0,
                     duration=0,
                 )
-            )
+            
         elif mode == 'pwm':
-            await self.send_safe_command(
-                Command(
+            async with self.motor_lock:
+                self.pending_motor_command = Command(
                     ID="",
                     command_type=CommandType.MOTOR,
                     command=MotorPWMCommand(
@@ -557,10 +611,10 @@ class Robot:
                     pause_duration=0,
                     duration=0,
                 )
-            )
+
         else:
-            await self.send_safe_command(
-                Command(
+            async with self.motor_lock:
+                self.pending_motor_command = Command(
                     ID="",
                     command_type=CommandType.MOTOR,
                     command=MotorCommand(
@@ -570,9 +624,7 @@ class Robot:
                     pause_duration=0,
                     duration=0,
                 )
-            )
-            
-        
+
     async def set_pid(self, data):
         await self.send_safe_command(
             Command(

@@ -52,16 +52,8 @@ def setup_routes(robot):
         await on_robot_loop(robot.set_pid(data))
         
     @sio.on('vel_command')
-    async def vel_command(sid, data):
-        
-        if data["mode"] == "pwm":
-            v1, v2 = data["pwm_left"], data["pwm_right"]
-        elif data["mode"] == "twist":
-            v1, v2 = data["v_lin"], data["omega"]
-        else:
-            v1, v2 = data["v_left"], data["v_right"]
-            
-        await on_robot_loop(robot.execute_velocity_command(v1, v2, data["mode"]))
+    async def vel_command(sid, data):    
+        await on_robot_loop(robot.execute_velocity_profile(data["profile"], data["mode"]))
         
     @sio.event
     async def connect(sid, environ):

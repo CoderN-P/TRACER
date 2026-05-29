@@ -87,6 +87,10 @@ def setup_routes(controller: Controller):
         controller.rumble(0.5, 0.5, 500)
         sio_client.emit('update_pid', data)
         
+    @socket.on('vel_command')
+    def vel_command(data):
+        sio_client.emit('vel_command', data)
+        
     @socket.on('play_recording')
     def handle_play_recording(data):
         """

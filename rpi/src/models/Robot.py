@@ -1,4 +1,5 @@
 import logging
+import datetime
 import threading
 import math
 import time
@@ -302,7 +303,8 @@ class Robot:
                 {
                     "sensors": SensorData.clean(sensor_data.model_dump()), 
                     "state": SensorData.clean(self.state_estimator.state.model_dump()),
-                    "mode": current_mode.name
+                    "mode": current_mode.name,
+                    "timestamp": datetime.datetime.now().isoformat()
                 },
             )  
     
@@ -524,7 +526,7 @@ class Robot:
         return command_task
     
     async def execute_velocity_command(self, v1: float, v2: float, mode: str = 'wheel'):
-        with self.state_lock:
+        async with self.state_lock:
             if self.state in [Mode.STOPPED, Mode.PATH_FOLLOWING]:
                 return
             
@@ -534,7 +536,7 @@ class Robot:
             await self.send_safe_command(
                 Command(
                     ID="",
-                    type=CommandType.MOTOR,
+                    command_type=CommandType.MOTOR,
                     command=MotorCommand(
                         left_motor=vl,
                         right_motor=vr
@@ -547,7 +549,7 @@ class Robot:
             await self.send_safe_command(
                 Command(
                     ID="",
-                    type=CommandType.MOTOR,
+                    command_type=CommandType.MOTOR,
                     command=MotorPWMCommand(
                         left_motor=v1,
                         right_motor=v2
@@ -560,7 +562,7 @@ class Robot:
             await self.send_safe_command(
                 Command(
                     ID="",
-                    type=CommandType.MOTOR,
+                    command_type=CommandType.MOTOR,
                     command=MotorCommand(
                         left_motor=v1,
                         right_motor=v2
@@ -575,7 +577,7 @@ class Robot:
         await self.send_safe_command(
             Command(
                 id="",
-                type=CommandType.PID,
+                command_type=CommandType.PID,
                 command=PIDCommand(
                     p_left=data["kp_left"],
                     p_right=data["kp_right"],

@@ -623,6 +623,10 @@
     if (notifyParent) onStopRun();
   }
 
+  function clearTrajectory() {
+    robotTrajectory = [];
+  }
+
   // Exit run mode automatically when parent signals completion.
   $effect(() => {
     if (pathComplete && running) stopRun(false);
@@ -857,6 +861,15 @@
             <StopCircle class="w-3.5 h-3.5" /> Stop
           </button>
         {/if}
+        {#if robotTrajectory.length > 0}
+          <button
+            onclick={clearTrajectory}
+            class="flex items-center gap-1.5 px-3 py-2 text-xs rounded-md border border-gray-200 bg-gray-50 text-gray-700 transition-colors hover:bg-gray-100"
+            title="Clear recorded robot trajectory"
+          >
+            <X class="w-3.5 h-3.5" /> Clear Trail
+          </button>
+        {/if}
         <button
           onclick={() => {
             stageX = WIDTH / 2;
@@ -1085,7 +1098,7 @@
         {/if}
 
         <!-- Selected point (point mode) — hidden while running -->
-        {#if !running && mode === "point" && selectedPoint !== null}
+        {#if mode === "point" && selectedPoint !== null}
           {@const px = selectedPoint.x * SCALE}
           {@const py = -selectedPoint.y * SCALE}
           <Layer>

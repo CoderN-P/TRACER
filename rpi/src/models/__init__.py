@@ -1,6 +1,27 @@
+import json
+from pathlib import Path
+
 from .Config import RobotConfig
 
-ROBOT_CONFIG = RobotConfig() # Create a global instance of the config for easy access, Singleton pattern
+CONFIG_FILE = (
+	Path(__file__).resolve().parents[3]
+	/ "calibration_files"
+	/ "constants"
+	/ "constants.json"
+)
+
+
+def _load_robot_config() -> RobotConfig:
+	with CONFIG_FILE.open("r", encoding="utf-8") as fh:
+		data = json.load(fh)
+
+	if not isinstance(data, dict):
+		raise ValueError(f"Invalid constants file format: {CONFIG_FILE}")
+
+	return RobotConfig(**data)
+
+
+ROBOT_CONFIG = _load_robot_config()  # Singleton config instance loaded from constants.json
 
 from .Command import *
 from .SensorData import *

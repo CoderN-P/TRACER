@@ -1,4 +1,7 @@
 import logging
+import json
+from pathlib import Path
+from dataclasses import asdict
 
 import socketio
 from fastapi import FastAPI
@@ -11,7 +14,52 @@ app = FastAPI()
 app = socketio.ASGIApp(sio, other_asgi_app=app)
 logger = logging.getLogger("SocketServer")
 
+CONSTANTS_SAVE_FILE = (
+    Path(__file__).resolve().parents[2]
+    / "calibration_files"
+    / "constants"
+    / "constants.json"
+)
+
+
+def load_persisted_constants():
+    if not CONSTANTS_SAVE_FILE.exists():
+        return
+
+    try:
+        with CONSTANTS_SAVE_FILE.open("r", encoding="utf-8") as fh:
+            saved = json.load(fh)
+
+        if not isinstance(saved, dict):
+            logger.warning("Ignoring malformed constants file: expected object")
+            return
+
+        applied = 0
+        for attr, val in saved.items():
+            if hasattr(ROBOT_CONFIG, attr):
+                try:
+                    setattr(ROBOT_CONFIG, attr, val)
+                    applied += 1
+                except AttributeError:
+                    logger.warning(f"Skipped read-only constant '{attr}' from saved file")
+        logger.info(f"Loaded {applied} persisted constants from {CONSTANTS_SAVE_FILE}")
+    except Exception as exc:
+        logger.warning(f"Failed to load persisted constants: {exc}")
+
+
+def persist_constants():
+    try:
+        CONSTANTS_SAVE_FILE.parent.mkdir(parents=True, exist_ok=True)
+        constants = asdict(ROBOT_CONFIG)
+        with CONSTANTS_SAVE_FILE.open("w", encoding="utf-8") as fh:
+            json.dump(constants, fh, indent=2, sort_keys=True)
+        logger.info(f"Persisted constants to {CONSTANTS_SAVE_FILE}")
+    except Exception as exc:
+        logger.warning(f"Failed to persist constants: {exc}")
+
 def setup_routes(robot):
+    load_persisted_constants()
+
     async def on_robot_loop(coro):
         return await robot.run_on_robot_loop(coro)
 
@@ -43,9 +91,26 @@ def setup_routes(robot):
         
     @sio.on('update_constants')
     async def update_constants(sid, data):
-        for attr, val in data.items():
-            setattr(ROBOT_CONFIG, attr, val)
-        logger.info(f"Updated constants: {data}")
+        if not isinstance(data, dict):
+            logger.warning("Ignoring update_constants payload: expected object")
+            return
+
+        save_requested = bool(data.get("save", False))
+        constants_payload = {k: v for k, v in data.items() if k != "save"}
+
+        for attr, val in constants_payload.items():
+            if not hasattr(ROBOT_CONFIG, attr):
+                logger.warning(f"Ignoring unknown constant '{attr}'")
+                continue
+            try:
+                setattr(ROBOT_CONFIG, attr, val)
+            except AttributeError:
+                logger.warning(f"Ignoring read-only constant '{attr}'")
+
+        if save_requested:
+            persist_constants()
+
+        logger.info(f"Updated constants: {constants_payload} (save={save_requested})")
         
     @sio.on('update_pid')
     async def update_pid(sid, data):

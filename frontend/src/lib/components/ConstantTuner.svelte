@@ -1,7 +1,11 @@
 <script lang="ts">
+  import { browser } from "$app/environment";
   import { io as socket } from "$lib/api/socket";
   import * as Card from "$lib/components/ui/card";
-  import { SlidersHorizontal, RotateCcw } from "lucide-svelte";
+  import { onMount } from "svelte";
+  import { SlidersHorizontal, RotateCcw, Save } from "lucide-svelte";
+
+  const STORAGE_KEY = "tracer.constant-tuner.constants.v1";
 
   const DEFAULT_CONSTANTS = {
     MEASURED_WHEEL_BASE: 0.255,
@@ -76,6 +80,50 @@
     subtitle: string;
     fields: ConstantField[];
   };
+
+  function createDraftValues(source: Record<ConstantKey, number>) {
+    return Object.fromEntries(
+      Object.entries(source).map(([key, value]) => [key, String(value)]),
+    ) as Record<ConstantKey, string>;
+  }
+
+  function loadStoredConstants(): Partial<Record<ConstantKey, number>> {
+    if (!browser) {
+      return {};
+    }
+
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) {
+        return {};
+      }
+
+      const parsed = JSON.parse(raw) as Record<string, unknown>;
+      return Object.fromEntries(
+        Object.entries(parsed).filter(
+          ([key, value]) =>
+            key in DEFAULT_CONSTANTS && typeof value === "number",
+        ),
+      ) as Partial<Record<ConstantKey, number>>;
+    } catch {
+      return {};
+    }
+  }
+
+  function createInitialConstants() {
+    return {
+      ...DEFAULT_CONSTANTS,
+      ...loadStoredConstants(),
+    } satisfies Record<ConstantKey, number>;
+  }
+
+  function persistConstants(nextConstants: Record<ConstantKey, number>) {
+    if (!browser) {
+      return;
+    }
+
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(nextConstants));
+  }
 
   const CONSTANT_SECTIONS: ConstantSection[] = [
     {
@@ -326,18 +374,25 @@
   let { class: className = "" } = $props();
   let activeSection = $state<number>(0);
 
-  let constants = $state<Record<ConstantKey, number>>({ ...DEFAULT_CONSTANTS });
+  let constants = $state<Record<ConstantKey, number>>(createInitialConstants());
   let draftValues = $state<Record<ConstantKey, string>>(
-    Object.fromEntries(
-      Object.entries(DEFAULT_CONSTANTS).map(([key, value]) => [
-        key,
-        String(value),
-      ]),
-    ) as Record<ConstantKey, string>,
+    createDraftValues(constants),
   );
 
-  function emitConstants() {
-    socket.emit("update_constants", { ...constants });
+  onMount(() => {
+    emitConstants();
+  });
+
+  function emitConstants(options: { save?: boolean } = {}) {
+    const payload = options.save
+      ? { ...constants, save: true }
+      : { ...constants };
+    socket.emit("update_constants", payload);
+    persistConstants(constants);
+  }
+
+  function saveConstants() {
+    emitConstants({ save: true });
   }
 
   function syncConstant(key: ConstantKey, rawValue: string) {
@@ -365,12 +420,8 @@
 
   function resetAllConstants() {
     constants = { ...DEFAULT_CONSTANTS };
-    draftValues = Object.fromEntries(
-      Object.entries(DEFAULT_CONSTANTS).map(([key, value]) => [
-        key,
-        String(value),
-      ]),
-    ) as Record<ConstantKey, string>;
+    draftValues = createDraftValues(DEFAULT_CONSTANTS);
+    persistConstants(constants);
     emitConstants();
   }
 
@@ -399,14 +450,26 @@
         </Card.Description>
       </div>
 
-      <button
-        type="button"
-        onclick={resetAllConstants}
-        class="inline-flex items-center gap-2 rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-100 active:bg-gray-200"
-      >
-        <RotateCcw class="h-4 w-4" />
-        Reset all
-      </button>
+      <div class="inline-flex items-center gap-2">
+        <button
+          type="button"
+          onclick={saveConstants}
+          class="inline-flex items-center gap-2 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700 transition-colors hover:bg-emerald-100 active:bg-emerald-200"
+          title="Persist current constants"
+        >
+          <Save class="h-4 w-4" />
+          Save
+        </button>
+
+        <button
+          type="button"
+          onclick={resetAllConstants}
+          class="inline-flex items-center gap-2 rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-100 active:bg-gray-200"
+        >
+          <RotateCcw class="h-4 w-4" />
+          Reset all
+        </button>
+      </div>
     </div>
   </Card.Header>
 

@@ -291,8 +291,6 @@ class Robot:
         async with self.lidar_lock:
             self.lidar_data = lidar_data
         
-        print(lidar_data.get_repulsive_vector())
-        
     async def send_sensor_update(self, current_time, sensor_data: SensorData):
         dt = 1 / ROBOT_CONFIG.EMIT_SENSOR_FREQ
         if current_time - self.last_emit_time >= dt:
@@ -367,7 +365,11 @@ class Robot:
                 
             async with self.lidar_lock:
                 lidar_data = self.lidar_data
-                self.repulsive_vector = lidar_data.get_repulsive_vector() if lidar_data is not None else (0, 0)
+                if lidar_data:
+                    self.repulsive_vector = lidar_data.get_repulsive_vector(sensor_data) 
+                else:
+                    self.repulsive_vector = (0, 0)
+                    
                 self.lidar_data = None # Clear lidar data after reading it in the main loop, since it's only needed for obstacle detection and path following in the main loop, and we want to avoid processing stale lidar data in the next loop iteration
             
             if cur_state != Mode.STOPPED: # Only update state estimator if not stopped
@@ -391,7 +393,7 @@ class Robot:
                                 
                     elif isinstance(self.cur_path, PurePursuit):
                         # Run pure pursuit
-                        command = self.cur_path.calculate_control_command(self.state_estimator.state, self.repulsive_vector)
+                        command = self.cur_path.calculate_control_command(self.state_estimator.state, self.repulsive_vector, sensor_data)
                         
                         if not command:
                             exit_path = True
@@ -399,7 +401,7 @@ class Robot:
                             await self.send_safe_command(command)
                             
                     elif isinstance(self.cur_path, GoToGoal): # simple point goal (x, y)
-                        command = self.cur_path.calculate_control_command(self.state_estimator.state, self.repulsive_vector)
+                        command = self.cur_path.calculate_control_command(self.state_estimator.state, self.repulsive_vector, sensor_data)
                         if not command:
                             exit_path = True
                         else:

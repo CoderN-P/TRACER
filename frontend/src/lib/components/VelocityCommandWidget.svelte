@@ -461,7 +461,7 @@
     return {
       mode,
       profile: displayPoints.map((point) => ({
-        t: point.t,
+        t: point.t * durationSeconds,
         v1: clamp(point.a, curves[0].min, curves[0].max),
         v2: clamp(point.b, curves[1].min, curves[1].max),
       })),
@@ -511,11 +511,6 @@
       cancelAnimationFrame(progressFrame);
       progressFrame = 0;
     }
-
-    if (isRunning) {
-      socket.emit("vel_command", neutralPayload());
-    }
-
     isRunning = false;
     progress = finished ? 1 : progress;
   }
@@ -561,7 +556,8 @@
     if (!values) return;
 
     lastRecordedSensorUpdate = lastSensorUpdateTime;
-    const t = clamp(velocityProfileT, 0, 1);
+    const t =
+      durationSeconds > 0 ? clamp(velocityProfileT / durationSeconds, 0, 1) : 0;
 
     measuredSamples = [
       ...measuredSamples,

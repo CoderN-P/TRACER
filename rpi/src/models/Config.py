@@ -6,14 +6,11 @@ class RobotConfig:
     # Physical Dimensions (Meters)
     MEASURED_WHEEL_BASE: float = 0.255
     WHEEL_DIAMETER: float = 0.05411268
-    WHEEL_RADIUS: float = WHEEL_DIAMETER / 2.0
-    WHEEL_CIRCUMFERENCE: float = 0.17
 
     WHEEL_BASE_CORRECTION: float = 1.0 # Ratio between true distance and encoder distance, to be calibrated
     # Motor Limits
     MAX_RPM: int = 178 
-    # Max speed in m/s: (RPM * pi * D) / 60
-    MAX_LINEAR_VEL: float = 0.4 # (MAX_RPM * WHEEL_CIRCUMFERENCE) / 60.0
+    # Max speed in m/s: (RPM * pi * D) / 60 - exposed as property
     
     REDUCTION_RATIO: float = 56.0 
     
@@ -39,9 +36,13 @@ class RobotConfig:
     OBSTACLE_AVOID_THRESHOLD: float = 20.0 # cm
     K_REPULSIVE_SOFT: int = 40
     K_REPULSIVE_HARD: int = 100
-    K_ATTRACTIVE: int = 15
     REPULSIVE_THRESHOLD = 100 # Magnitude of repulsive vector before we begin backing up
-    REPULSIVE_WEIGHT = 0.5 # Weight given to repulsive vector in path following
+    SYMMETRY_THRESHOLD = 0.5 # Max magnitude of lateral force before we stop applying nudge
+    K_NUDGE = 0.5 # How much to nudge the lidar lateral force when we hit an obstacle head on
+    K_LIDAR_SHIFT = 0.001 # Convert from repulsive force to lateral shift
+    K_US_SHIFT = 0.5
+    OBSTACLE_ALPHA = 0.9
+    MAX_SHIFT = 0.003
     
     # IO
     EMIT_SENSOR_FREQ: float = 10.0 # Hz
@@ -52,22 +53,18 @@ class RobotConfig:
     
     # Encoders
     ENCODER_PPR: int = 11 # Pulses per revolution of the motor shaft
-    ENCODER_TICKS_PER_REV: int = ENCODER_PPR * REDUCTION_RATIO * 4 # Pulses per revolution of the wheel 
-    METERS_PER_TICK: float = WHEEL_CIRCUMFERENCE / ENCODER_TICKS_PER_REV
     MAX_ENCODER_MARGIN = 1.15  # 15% margin for acceleration transients when validating encoder readings
     
     # NOTE: Values calibrated for 3S LiPo (subject to change after testing)
     LEFT_CORRECTION = 0.951 # Ratio between true distance and left encoder dist
     RIGHT_CORRECTION = 1 # Ratio between true distance and right encoder dist
     
-    METERS_PER_TICK_LEFT: float = METERS_PER_TICK * LEFT_CORRECTION
-    METERS_PER_TICK_RIGHT: float = METERS_PER_TICK * RIGHT_CORRECTION
+    
     
     # Sensor Constants
     G = 9.81 # m/s^2
     LSB_G = 0.061 / 1000.0 # +2g for accelerometer
-    LSB_RAD = 8.75 / 1000.0 * math.pi / 180 # +250 dps (8.75 mdps per LSB converted to rad/s per LSB_
-    LSB_A = LSB_G * G # Acceleration in m/s^2 per LSB
+    
     LSB_uT = 1.0 / 120.0  # ±2G (gauss) full-scale for magnetometer
     LSB_C = 1.0 / 256.0 # Temperature in °C per LSB (from datasheet)
     TEMP_OFFSET = 25.0 # Temperature offset in °C (from datasheet, 0 LSB = 25°C)
@@ -93,6 +90,7 @@ class RobotConfig:
     COMPLETION_THRESHOLD: float = 0.04 # Meters
     MAX_SEARCH_POINTS: int = 50 # Only search 50 points ahead in pure pursuit. 
     END_LOOKAHEAD_MULTIPLIER: float = 1.1 # Increase lookahead distance near the end of the path
+    K_CURVE = 0.1
     
     # RAMSETE
     BETA: float = 3.2
@@ -110,3 +108,39 @@ class RobotConfig:
     @property
     def WHEEL_BASE(self) -> float:
         return self.MEASURED_WHEEL_BASE * self.WHEEL_BASE_CORRECTION
+
+    @property
+    def WHEEL_RADIUS(self) -> float:
+        return self.WHEEL_DIAMETER / 2.0
+
+    @property
+    def WHEEL_CIRCUMFERENCE(self) -> float:
+        return math.pi * self.WHEEL_DIAMETER
+
+    @property
+    def MAX_LINEAR_VEL(self) -> float:
+        return (self.MAX_RPM * self.WHEEL_CIRCUMFERENCE) / 60.0
+
+    @property
+    def ENCODER_TICKS_PER_REV(self) -> int:
+        return int(self.ENCODER_PPR * self.REDUCTION_RATIO * 4)
+
+    @property
+    def METERS_PER_TICK(self) -> float:
+        return self.WHEEL_CIRCUMFERENCE / self.ENCODER_TICKS_PER_REV
+
+    @property
+    def METERS_PER_TICK_LEFT(self) -> float:
+        return self.METERS_PER_TICK * self.LEFT_CORRECTION
+
+    @property
+    def METERS_PER_TICK_RIGHT(self) -> float:
+        return self.METERS_PER_TICK * self.RIGHT_CORRECTION
+
+    @property
+    def LSB_RAD(self) -> float:
+        return 8.75 / 1000.0 * math.pi / 180.0
+
+    @property
+    def LSB_A(self) -> float:
+        return self.LSB_G * self.G

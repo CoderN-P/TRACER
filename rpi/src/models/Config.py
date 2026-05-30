@@ -86,8 +86,8 @@ class RobotConfig:
     R_POSITION: float = 0.05 # Measurement noise from LIDAR VIO positioning (meters^2)
     
     # Pure Pursuit
-    LOOKAHEAD_DISTANCE: float = 0.4 # Meters
-    COMPLETION_THRESHOLD: float = 0.04 # Meters
+    LOOKAHEAD_DISTANCE: float = 0.2 # Meters
+    COMPLETION_THRESHOLD: float = 0.01 # Meters
     MAX_SEARCH_POINTS: int = 50 # Only search 50 points ahead in pure pursuit. 
     END_LOOKAHEAD_MULTIPLIER: float = 1.1 # Increase lookahead distance near the end of the path
     K_CURVE = 0.1
@@ -101,9 +101,9 @@ class RobotConfig:
     TRAJECTORY_DT = 0.01 # Time step for trajectory generation (seconds)
 
     # Go to Goal
-    K_OMEGA = 0.8
-    K_V = 5.0
-    K_D = 4.0
+    K_OMEGA = 3.14
+    K_V = 6.0
+    K_D = 7.0
     
     @property
     def WHEEL_BASE(self) -> float:

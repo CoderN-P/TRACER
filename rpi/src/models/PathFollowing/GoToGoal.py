@@ -46,8 +46,8 @@ class GoToGoal:
         
         heading_error = math.atan2(shifted_target[1], shifted_target[0])
 
-        v = ROBOT_CONFIG.MAX_LINEAR_VEL * (1 - np.exp(-ROBOT_CONFIG.K_V * distance_to_goal))
-        omega = ROBOT_CONFIG.K_OMEGA * heading_error * (1 - np.exp(-ROBOT_CONFIG.K_D * distance_to_goal))
+        v = ROBOT_CONFIG.MAX_LINEAR_VEL * (1 - np.exp(-ROBOT_CONFIG.K_V * (distance_to_goal ** 1.25)))
+        omega = ROBOT_CONFIG.K_OMEGA * heading_error * (1 - np.exp(-ROBOT_CONFIG.K_D * (distance_to_goal ** 1.25)))
 
         """
         # causes too much oscillation while going backwards

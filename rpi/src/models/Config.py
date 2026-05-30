@@ -119,7 +119,7 @@ class RobotConfig:
 
     @property
     def MAX_LINEAR_VEL(self) -> float:
-        return (self.MAX_RPM * self.WHEEL_CIRCUMFERENCE) / 60.0
+        return 0.4 # (self.MAX_RPM * self.WHEEL_CIRCUMFERENCE) / 60.0
 
     @property
     def ENCODER_TICKS_PER_REV(self) -> int:

@@ -167,6 +167,7 @@
   );
   let lerpFrom = $state<{ x: number; y: number; theta: number } | null>(null);
   let lerpTo = $state<{ x: number; y: number; theta: number } | null>(null);
+  let robotTrajectory = $state<{ x: number; y: number }[]>([]);
   let lerpStart = 0;
   let rafId: number | null = null;
 
@@ -211,6 +212,21 @@
     return () => {
       if (rafId !== null) cancelAnimationFrame(rafId);
     };
+  });
+
+  $effect(() => {
+    if (!running || robotPos === null) return;
+
+    const sample = { x: robotPos.x, y: robotPos.y };
+    const lastSample = robotTrajectory[robotTrajectory.length - 1];
+    if (
+      lastSample &&
+      Math.hypot(sample.x - lastSample.x, sample.y - lastSample.y) < 0.005
+    ) {
+      return;
+    }
+
+    robotTrajectory = [...robotTrajectory, sample];
   });
 
   // ── Mode ──────────────────────────────────────────────────────────────────
@@ -461,6 +477,11 @@
     svgPath.flatMap((p) => [p.x * SCALE, -p.y * SCALE]),
   );
 
+  /** Flat array of world-pixel coords for the recorded robot trajectory. */
+  let robotTrajectoryPoints = $derived(
+    robotTrajectory.flatMap((p) => [p.x * SCALE, -p.y * SCALE]),
+  );
+
   // ── Run mode ──────────────────────────────────────────────────────────────
   // When running, we record which type of path is active and a UI offset so
   // spline/freehand-style paths appear to start at the robot's current position.
@@ -525,6 +546,9 @@
     runSource = mode;
     runOffsetX = 0;
     runOffsetY = 0;
+    robotTrajectory = displayRobotPos
+      ? [{ x: displayRobotPos.x, y: displayRobotPos.y }]
+      : [];
 
     // Shift the path so its first point coincides with the robot's current pos.
     if (runSource === "freehand" && freehandPath.length > 0) {
@@ -1079,6 +1103,22 @@
               text={`(${selectedPoint.x.toFixed(2)}, ${selectedPoint.y.toFixed(2)})`}
               fontSize={10 / zoom}
               fill="#a855f7"
+            />
+          </Layer>
+        {/if}
+
+        <!-- Recorded robot trajectory during the active run -->
+        {#if robotTrajectoryPoints.length >= 4}
+          <Layer>
+            <Line
+              points={robotTrajectoryPoints}
+              stroke="#ef4444"
+              strokeWidth={2.5 / zoom}
+              closed={false}
+              lineCap="round"
+              lineJoin="round"
+              dash={[8 / zoom, 6 / zoom]}
+              opacity={0.9}
             />
           </Layer>
         {/if}

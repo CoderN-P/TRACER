@@ -1,5 +1,6 @@
 <script lang="ts">
   import { browser } from "$app/environment";
+  import { onMount } from "svelte";
   import {
     PlusIcon,
     Trash,
@@ -659,7 +660,56 @@
     segmentIndex: number;
   };
 
-  const PURE_PURSUIT_LOOKAHEAD_METERS = 0.35;
+  const CONSTANTS_STORAGE_KEY = "tracer.constant-tuner.constants.v1";
+  const DEFAULT_LOOKAHEAD_DISTANCE = 0.4;
+
+  let lookaheadDistance = $state(DEFAULT_LOOKAHEAD_DISTANCE);
+
+  function readStoredLookaheadDistance() {
+    if (!browser) return DEFAULT_LOOKAHEAD_DISTANCE;
+
+    try {
+      const raw = localStorage.getItem(CONSTANTS_STORAGE_KEY);
+      if (!raw) return DEFAULT_LOOKAHEAD_DISTANCE;
+
+      const parsed = JSON.parse(raw) as { LOOKAHEAD_DISTANCE?: unknown };
+      return typeof parsed.LOOKAHEAD_DISTANCE === "number" &&
+        Number.isFinite(parsed.LOOKAHEAD_DISTANCE) &&
+        parsed.LOOKAHEAD_DISTANCE > 0
+        ? parsed.LOOKAHEAD_DISTANCE
+        : DEFAULT_LOOKAHEAD_DISTANCE;
+    } catch {
+      return DEFAULT_LOOKAHEAD_DISTANCE;
+    }
+  }
+
+  function syncLookaheadFromConstants(constants: unknown) {
+    const value =
+      constants &&
+      typeof constants === "object" &&
+      "LOOKAHEAD_DISTANCE" in constants
+        ? (constants as { LOOKAHEAD_DISTANCE?: unknown }).LOOKAHEAD_DISTANCE
+        : null;
+
+    if (typeof value === "number" && Number.isFinite(value) && value > 0) {
+      lookaheadDistance = value;
+    }
+  }
+
+  onMount(() => {
+    lookaheadDistance = readStoredLookaheadDistance();
+
+    function handleConstantsUpdated(event: Event) {
+      syncLookaheadFromConstants((event as CustomEvent).detail);
+    }
+
+    window.addEventListener("tracer:constants-updated", handleConstantsUpdated);
+    return () =>
+      window.removeEventListener(
+        "tracer:constants-updated",
+        handleConstantsUpdated,
+      );
+  });
 
   function normalizeRadians(angle: number) {
     let normalized = ((angle + Math.PI) % (2 * Math.PI)) - Math.PI;
@@ -821,10 +871,11 @@
             lookaheadIndex(
               points,
               curvatureIndex,
-              PURE_PURSUIT_LOOKAHEAD_METERS,
+              lookaheadDistance,
             ),
           )
         : null,
+      lookaheadDistance,
       purePursuitActive,
       sampleCount: errors.length,
     };

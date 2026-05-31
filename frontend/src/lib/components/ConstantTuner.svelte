@@ -28,12 +28,12 @@
     K_REPULSIVE_SOFT: 40,
     K_REPULSIVE_HARD: 100,
     REPULSIVE_THRESHOLD: 100,
-    LOOKAHEAD_DISTANCE: 0.4,
-    COMPLETION_THRESHOLD: 0.04,
+    LOOKAHEAD_DISTANCE: 0.2,
+    COMPLETION_THRESHOLD: 0.01,
     END_LOOKAHEAD_MULTIPLIER: 1.1,
     BETA: 3.2,
     ZETA: 0.7,
-    MAX_LATERAL_ACCEL: 0.3,
+    MAX_LATERAL_ACCEL: 0.125,
     MAX_LONG_ACCEL: 0.8,
     K_OMEGA: 0.8,
     K_V: 5.0,
@@ -52,6 +52,8 @@
     EMIT_SENSOR_FREQ: 10.0,
     SENSOR_TIMEOUT: 0.05,
     MAIN_LOOP_FREQ: 100.0,
+    PATH_FOLLOWING_FREQ: 100.0,
+    MANUAL_FREQ: 50.0,
     MAX_ENCODER_MARGIN: 1.15,
     LEFT_CORRECTION: 0.951,
     RIGHT_CORRECTION: 1.0,
@@ -123,6 +125,18 @@
     }
 
     localStorage.setItem(STORAGE_KEY, JSON.stringify(nextConstants));
+  }
+
+  function publishConstants(nextConstants: Record<ConstantKey, number>) {
+    if (!browser) {
+      return;
+    }
+
+    window.dispatchEvent(
+      new CustomEvent("tracer:constants-updated", {
+        detail: { ...nextConstants },
+      }),
+    );
   }
 
   const CONSTANT_SECTIONS: ConstantSection[] = [
@@ -294,6 +308,13 @@
           min: 0,
         },
         { key: "MAIN_LOOP_FREQ", label: "MAIN_LOOP_FREQ", step: "1", min: 1 },
+        {
+          key: "PATH_FOLLOWING_FREQ",
+          label: "PATH_FOLLOWING_FREQ",
+          step: "1",
+          min: 1,
+        },
+        { key: "MANUAL_FREQ", label: "MANUAL_FREQ", step: "1", min: 1 },
         { key: "G", label: "G", step: "0.01", min: 0 },
         { key: "LSB_G", label: "LSB_G", step: "1e-6", min: 0 },
         { key: "LSB_uT", label: "LSB_uT", step: "1e-6", min: 0 },
@@ -389,6 +410,7 @@
       : { ...constants };
     socket.emit("update_constants", payload);
     persistConstants(constants);
+    publishConstants(constants);
   }
 
   function saveConstants() {

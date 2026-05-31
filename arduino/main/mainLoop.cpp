@@ -49,7 +49,7 @@ void mainLoop(void *pvParameters)
         int8_t pcntRight = (-1 * (int8_t) (pcntRightRaw)); // Invert right encoder count to match physical direction
 
         getLSMData(ax, ay, az, gx, gy, gz, tempC);
-        bool newMagData = loopCounter % 2 == 0; // Magnetometer updates at 50 Hz, so new data is available every 2 loops of the main loop
+        bool newMagData = loopCounter % 4 == 0; // Magnetometer updates at 50 Hz, so new data is available every 4 loops of the main loop
 
         if (newMagData)
         { // Read magnetometer at 50 Hz

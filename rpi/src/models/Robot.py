@@ -19,6 +19,8 @@ class Robot:
     def __init__(self, serial_manager: SerialManager, socketio):
         self.serial: SerialManager = serial_manager
         self.last_emit_time: float = 0.0
+        self.last_path_time: float = 0.0
+        self.last_manual_time: float = 0.0
         self.last_obstacle_detect_time: float = 0.0  # Last time ultrasonic data was processed for obstacle detection
  
         self.socketio: Socket = socketio
@@ -250,7 +252,7 @@ class Robot:
             
         obstacle_detected = sensor_data.ultrasonic.obstacle_detected(ROBOT_CONFIG.OBSTACLE_DETECTED_THRESHOLD)
             
-        if obstacle_detected == 0 or not self.obstacle_clear.is_set() or cur_state == Mode.STOPPED:
+        if obstacle_detected == 0 or not self.obstacle_clear.is_set() or cur_state != Mode.MANUAL: # Only proceed to stop if in MANUAL
             return distance_left, distance_right
     
         # await self.socketio.emit('obstacle_detected', {"distance_left": distance_left, "distance_right": distance_right})
@@ -334,13 +336,18 @@ class Robot:
     async def main_loop(self):
         """Main loop to continuously read sensor data and update state estimator."""
         dt = 1/ROBOT_CONFIG.MAIN_LOOP_FREQ
-        self._logger.info("Running main loop: " + str(self.running))        
+        path_following_dt = 1 / ROBOT_CONFIG.PATH_FOLLOWING_FREQ
+        manual_dt = 1 / ROBOT_CONFIG.MANUAL_FREQ
+        obstacle_dt = 1 / ROBOT_CONFIG.CHECK_OBSTACLE_FREQ
+        
+        self._logger.info("Running main loop: " + str(self.running))   
+        
         while self.running:
-            start = time.monotonic()
+            start = asyncio.get_event_loop().time()
             
             if (start - self.last_sensor_receive_time) > ROBOT_CONFIG.SENSOR_TIMEOUT and self.state != Mode.STOPPED:
                 await self.debug_stall(start)
-                elapsed = time.monotonic() - start
+                elapsed = asyncio.get_event_loop().time() - start
                 await asyncio.sleep(max(0.0001, dt - elapsed))
                 continue
                     
@@ -356,7 +363,6 @@ class Robot:
 
             if not sensor_data:
                 elapsed = asyncio.get_event_loop().time() - start
-                # self._logger.warning("Skipping loop as no sensor data was recieve")
                 await asyncio.sleep(max(0.0001, dt - elapsed)) # 100Hz loop
                 continue
 
@@ -366,20 +372,31 @@ class Robot:
                     self._logger.warning("Motors manually disabled via ESTOP button, switching to STOPPED mode")
                     self.state = Mode.STOPPED
                 cur_state = self.state
-                
-            async with self.lidar_lock:
-                lidar_data = self.lidar_data
-                if lidar_data:
-                    self.repulsive_vector = lidar_data.get_repulsive_vector(sensor_data) 
-                else:
-                    self.repulsive_vector = (0, 0)
+
+            # Only handle obstacle stopping and detection if in manual mode, since path following uses potential field control.
+            if (asyncio.get_event_loop().time() - self.last_obstacle_detect_time) >= obstacle_dt:
+                async with self.lidar_lock:
+                    lidar_data = self.lidar_data
+                    if lidar_data:
+                        self.repulsive_vector = lidar_data.get_repulsive_vector(sensor_data)
+                    else:
+                        self.repulsive_vector = (0, 0)
                     
-                self.lidar_data = None # Clear lidar data after reading it in the main loop, since it's only needed for obstacle detection and path following in the main loop, and we want to avoid processing stale lidar data in the next loop iteration
+                # Will not backup if in STOPPED mode or PATH_FOLLOWING. Only during MANUAL
+                filtered_left, filtered_right = await self.handle_obstacle(sensor_data) ## Run simple smoothing via moving average and handle obstacle detection/backup
+                self.latest_sensor_data.ultrasonic.distance_left = filtered_left
+                self.latest_sensor_data.ultrasonic.distance_right = filtered_right
+                self.left_distance_history.append(sensor_data.ultrasonic.distance_left) # Store the ultrasonic distance for history for smoothing
+                self.right_distance_history.append(sensor_data.ultrasonic.distance_right)
+                
+                self.last_obstacle_detect_time = asyncio.get_event_loop().time()
+                
             
             if cur_state != Mode.STOPPED: # Only update state estimator if not stopped
-                self.state_estimator.update(sensor_data, prev_data, lidar_data)
+                self.state_estimator.update(sensor_data, prev_data, self.lidar_data)
+                self.lidar_data = None
 
-            if cur_state == Mode.PATH_FOLLOWING:
+            if cur_state == Mode.PATH_FOLLOWING and asyncio.get_event_loop().time() - self.last_path_time >= path_following_dt:
                 if self.cur_path is None:
                     async with self.state_lock:
                         self.state = Mode.MANUAL
@@ -421,36 +438,26 @@ class Robot:
                         self.cur_path = None
                         await self.send_safe_command(Command.stop())
                         await self.socketio.emit('path_complete', {"status": "success"})
-            
-            else:
+                        
+                self.last_path_time = asyncio.get_event_loop().time()
+                
+            elif cur_state == Mode.MANUAL and asyncio.get_event_loop().time() - self.last_manual_time >= manual_dt:
                 # Now in manual mode we can process pending motor commands from joystick or velocity profile
                 async with self.motor_lock:
                     if self.pending_motor_command:
                         await self.send_safe_command(self.pending_motor_command)
                         self.pending_motor_command = None
-                    
-            obstacle_dt = 1 / ROBOT_CONFIG.CHECK_OBSTACLE_FREQ
+                self.last_manual_time = asyncio.get_event_loop().time()
             
-            # Only handle obstacle stopping and detection if in manual mode, since path following uses potential field control.
-            if (start - self.last_obstacle_detect_time) >= obstacle_dt and self.state == Mode.MANUAL: 
-                self.last_obstacle_detect_time = start
-                # Will not backup if in STOPPED mode
-                filtered_left, filtered_right = await self.handle_obstacle(sensor_data) ## Run simple smoothing via moving average and handle obstacle detection/backup
-                self.latest_sensor_data.ultrasonic.distance_left = filtered_left
-                self.latest_sensor_data.ultrasonic.distance_right = filtered_right
-                self.left_distance_history.append(sensor_data.ultrasonic.distance_left) # Store the ultrasonic distance for history for smoothing
-                self.right_distance_history.append(sensor_data.ultrasonic.distance_right)
-            
-            end = asyncio.get_event_loop().time()
-            duration_ms = 1000*(end - start)
+            duration_ms = 1000*(asyncio.get_event_loop().time() - start)
             
             if duration_ms > self.max_loop_time:
                 self.max_loop_time = duration_ms
                 
-            await self.send_sensor_update(start, sensor_data)
+            await self.send_sensor_update(asyncio.get_event_loop().time(), sensor_data)
             elapsed = asyncio.get_event_loop().time() - start
-           
             await asyncio.sleep(max(0.0001, dt - elapsed)) # 100Hz loop
+            
         self._logger.info("Exited main loop")
 
     async def set_state(self, data):

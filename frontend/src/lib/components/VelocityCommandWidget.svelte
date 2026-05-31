@@ -24,7 +24,7 @@
     velocityProfileT?: number | null;
   } = $props();
 
-  type CommandMode = "wheel" | "twist" | "PWM";
+  type CommandMode = "wheel" | "twist" | "pwm";
   type CurveKey = "a" | "b";
   type ProfilePoint = {
     id: number;
@@ -107,10 +107,10 @@
         fill: "rgba(220, 38, 38, 0.08)",
       },
     ],
-    PWM: [
+    pwm: [
       {
         key: "a",
-        label: "Left PWM",
+        label: "Left pwm",
         payloadKey: "pwm_left",
         unit: "",
         min: -1,
@@ -120,7 +120,7 @@
       },
       {
         key: "b",
-        label: "Right PWM",
+        label: "Right pwm",
         payloadKey: "pwm_right",
         unit: "",
         min: -1,
@@ -200,7 +200,7 @@
     }),
   );
 
-  let canShowMeasured = $derived(mode !== "PWM");
+  let canShowMeasured = $derived(mode !== "pwm");
 
   let yTicks = $derived(
     Array.from({ length: TICK_COUNT }, (_, index) => {
@@ -814,7 +814,7 @@
         <div
           class="inline-flex rounded-md border border-gray-200 bg-gray-50 p-0.5"
         >
-          {#each ["wheel", "twist", "PWM"] as option}
+          {#each ["wheel", "twist", "pwm"] as option}
             <button
               class="rounded px-3 py-1.5 text-xs font-semibold transition {mode ===
               option

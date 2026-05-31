@@ -1,7 +1,7 @@
 #ifndef PID_H
 #define PID_H
 
-#define PID_FREQ 100                      // PID loop frequency in Hz
+#define PID_FREQ 200                      // PID loop frequency in Hz
 #define PID_INTERVAL (1000.0f / PID_FREQ) // PID loop interval in milliseconds
 
 #include <atomic>

@@ -35,19 +35,19 @@ bool setup_lsm6dos()
     Wire.endTransmission();
     
     // CTRL2_G: Gyroscope control register
-    // 01000000 = 0x40 
-    // (ODR: 104 Hz | Range: +- 250 dps)
+    // 01010000 = 0x50 
+    // (ODR: 208 Hz | Range: +- 250 dps)
     Wire.beginTransmission(LSM_ADDRESS);
     Wire.write(LSM_GYRO_CTRL);
-    Wire.write(0x40);      
+    Wire.write(0x50);      
     Wire.endTransmission(); 
     
     // CTRL1_XL: Accelerometer control register
-    // 01000010 = 0x42
-    // (ODR: 104 Hz | Range: +- 2g | 2 stage filtering enabled)
+    // 01010010 = 0x52
+    // (ODR: 208 Hz | Range: +- 2g | 2 stage filtering enabled)
     Wire.beginTransmission(LSM_ADDRESS);
     Wire.write(LSM_ACCEL_CTRL);
-    Wire.write(0x42);
+    Wire.write(0x52);
     Wire.endTransmission();
     
     // CTRL8_XL: Secondary accelerometer control register
@@ -117,7 +117,7 @@ uint8_t getBatteryPercent()
 
 void getLSMData(int16_t &ax, int16_t &ay, int16_t &az, int16_t &gx, int16_t &gy, int16_t &gz, int16_t &tempC)
 {
-    if (!takeI2CMutex(pdMS_TO_TICKS(3.5)))
+    if (!takeI2CMutex(pdMS_TO_TICKS(2)))
     {
         return;
     }
@@ -151,7 +151,7 @@ void getLSMData(int16_t &ax, int16_t &ay, int16_t &az, int16_t &gx, int16_t &gy,
 
 void getMagnetometerData(int16_t &magX, int16_t &magY, int16_t &magZ)
 {
-    if (!takeI2CMutex(pdMS_TO_TICKS(3.5)))
+    if (!takeI2CMutex(pdMS_TO_TICKS(2)))
     {
         return;
     }

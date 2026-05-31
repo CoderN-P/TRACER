@@ -8,6 +8,7 @@
     distanceToGoal: number | null;
     currentCurvature: number | null;
     targetCurvature: number | null;
+    lookaheadDistance: number;
     purePursuitActive: boolean;
     sampleCount: number;
   };
@@ -114,7 +115,10 @@
           {formatCurvature(stats.currentCurvature)}
         </div>
         <div class="mt-1 text-[11px] text-orange-700">
-          target {formatCurvature(stats.targetCurvature)}
+          target {formatCurvature(stats.targetCurvature)} @ {formatMeters(
+            stats.lookaheadDistance,
+            2,
+          )}
         </div>
       </div>
     {:else}

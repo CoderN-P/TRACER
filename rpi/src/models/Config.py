@@ -29,6 +29,8 @@ class RobotConfig:
     EMIT_SENSOR_FREQ: float
     SENSOR_TIMEOUT: float
     MAIN_LOOP_FREQ: float
+    PATH_FOLLOWING_FREQ: float
+    MANUAL_FREQ: float
     ENCODER_PPR: int
     MAX_ENCODER_MARGIN: float
     LEFT_CORRECTION: float

@@ -44,7 +44,8 @@
       1.0
     ]
   ],
-  "MAIN_LOOP_FREQ": 100,
+  "MAIN_LOOP_FREQ": 200,
+  "MANUAL_FREQ": 50,
   "MAX_ENCODER_MARGIN": 1.15,
   "MAX_LATERAL_ACCEL": 0.125,
   "MAX_LONG_ACCEL": 0.8,
@@ -59,6 +60,7 @@
   "P_POSITION": 0.01,
   "P_THETA": 0.1,
   "P_THETA_BIAS": 0,
+  "PATH_FOLLOWING_FREQ": 100,
   "Q_BIAS": 1e-06,
   "Q_THETA": 0.0001,
   "Q_X": 0.01,

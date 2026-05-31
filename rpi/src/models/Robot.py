@@ -441,7 +441,7 @@ class Robot:
                 self.left_distance_history.append(sensor_data.ultrasonic.distance_left) # Store the ultrasonic distance for history for smoothing
                 self.right_distance_history.append(sensor_data.ultrasonic.distance_right)
             
-            end = time.monotonic()
+            end = asyncio.get_event_loop().time()
             duration_ms = 1000*(end - start)
             
             if duration_ms > self.max_loop_time:

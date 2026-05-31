@@ -57,6 +57,8 @@ class Robot:
         self.velocity_profile_start = None
         self.pending_motor_command = None
         
+        self.max_loop_time = 0.0
+        
         self.obstacle_clear.set()
 
     async def send_safe_command(self, command: Command, wait_after: float = 0):
@@ -295,7 +297,6 @@ class Robot:
         dt = 1 / ROBOT_CONFIG.EMIT_SENSOR_FREQ
         if current_time - self.last_emit_time >= dt:
             self.last_emit_time = current_time
-            
                      
             async with self.state_lock:
                 current_mode = self.state
@@ -307,9 +308,12 @@ class Robot:
                     "state": SensorData.clean(self.state_estimator.state.model_dump()),
                     "mode": current_mode.name,
                     "timestamp": datetime.datetime.now().isoformat(),
+                    "max_loop_time": self.max_loop_time,
                     "velocity_profile_t": time.monotonic() - self.velocity_profile_start if self.velocity_profile_start else None
                 },
             )  
+            
+            self.max_loop_time = 0.0
             
     
     async def debug_stall(self, start):
@@ -437,6 +441,12 @@ class Robot:
                 self.left_distance_history.append(sensor_data.ultrasonic.distance_left) # Store the ultrasonic distance for history for smoothing
                 self.right_distance_history.append(sensor_data.ultrasonic.distance_right)
             
+            end = time.monotonic()
+            duration_ms = 1000*(end - start)
+            
+            if duration_ms > self.max_loop_time:
+                self.max_loop_time = duration_ms
+                
             await self.send_sensor_update(start, sensor_data)
             elapsed = asyncio.get_event_loop().time() - start
            

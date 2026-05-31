@@ -468,13 +468,6 @@
     };
   }
 
-  function neutralPayload() {
-    return {
-      mode,
-      profile: [{ t: 0, v1: 0, v2: 0 }],
-    };
-  }
-
   function updateProgress() {
     if (!isRunning) return;
 

@@ -166,7 +166,7 @@ if __name__ == "__main__":
     try:
         while True:
             controller.send_update()
-            time.sleep(0.1)  # 20 Hz
+            time.sleep(0.05)  # 20 Hz
     except KeyboardInterrupt:
         print("Shutting down.")
     

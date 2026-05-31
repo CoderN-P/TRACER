@@ -26,6 +26,7 @@
   import JoystickStatus from "$lib/components/JoystickStatus.svelte";
   import UltrasonicGraph from "$lib/components/UltrasonicGraph.svelte";
   import SensorRate from "$lib/components/SensorRate.svelte";
+  import LoopTimeDisplay from "$lib/components/LoopTimeDisplay.svelte";
   import KeyboardHandler from "$lib/components/KeyboardHandler.svelte";
   import TemperatureDisplay from "$lib/components/TemperatureDisplay.svelte";
   import BatteryPercentage from "$lib/components/BatteryPercentage.svelte";
@@ -104,6 +105,7 @@
   let velocityCommand = $state<unknown | null>(null);
   let packetCount = $state<number>(0);
   let sensorRate = $state<number>(-1);
+  let maxLoopTime = $state<number | null>(null);
   let lastRateUpdate = $state<number>(0);
   let distanceHistory = $state<DistanceEntry[]>([]);
   let input = $state<string>("");
@@ -207,6 +209,7 @@
         robotState = RobotStateSchema.parse(data.state);
         velocityProfileT = data.velocity_profile_t ?? null;
         velocityCommand = data.velocityCommand;
+        maxLoopTime = data.sensors.max_loop_time ?? null;
 
         packetCount++;
         const now = new Date().getTime();
@@ -380,13 +383,48 @@
               lastSensorUpdateTime={lastSensorUpdate}
             />
           </div>
-          <div class="flex flex-row gap-2 justify-between lg:justify-end">
+          <div class="flex flex-row justify-between gap-2 lg:justify-end">
             <Uptime {lastSensorUpdate} />
             <SensorRate rate={sensorRate} />
+            <LoopTimeDisplay value={maxLoopTime} />
           </div>
         </div>
 
         <div class="min-h-0 flex-1 overflow-hidden">
+          <div
+            class="grid h-full grid-cols-12 grid-rows-12 gap-2"
+            class:hidden={activePage !== "navigation"}
+          >
+            <div class="col-span-7 row-span-12 min-h-0">
+              <PathDrawer
+                robotPos={robotState
+                  ? {
+                      x: robotState.x,
+                      y: robotState.y,
+                      theta: robotState.yaw,
+                    }
+                  : null}
+                {pathComplete}
+                bind:freehandPath
+                onRunPath={runPath}
+                onStopRun={stopPathRun}
+              />
+            </div>
+            <div class="col-span-5 row-span-8 min-h-0">
+              <VelocityDebug
+                {robotState}
+                lastSensorUpdateTime={lastSensorUpdate}
+              />
+            </div>
+            <div class="col-span-5 row-span-4 min-h-0">
+              <ObstructionStatus
+                {sensorData}
+                {lastSensorUpdate}
+                class="h-full"
+              />
+            </div>
+          </div>
+
           {#if activePage === "overview"}
             <div class="grid h-full grid-cols-12 grid-rows-12 gap-2">
               <div class="col-span-8 row-span-8 min-h-0 overflow-hidden">
@@ -421,37 +459,6 @@
 
               <div class="col-span-7 row-span-4 min-h-0">
                 <Logs {logs} class="h-full" />
-              </div>
-            </div>
-          {:else if activePage === "navigation"}
-            <div class="grid h-full grid-cols-12 grid-rows-12 gap-2">
-              <div class="col-span-7 row-span-12 min-h-0">
-                <PathDrawer
-                  robotPos={robotState
-                    ? {
-                        x: robotState.x,
-                        y: robotState.y,
-                        theta: robotState.yaw,
-                      }
-                    : null}
-                  {pathComplete}
-                  bind:freehandPath
-                  onRunPath={runPath}
-                  onStopRun={stopPathRun}
-                />
-              </div>
-              <div class="col-span-5 row-span-8 min-h-0">
-                <VelocityDebug
-                  {robotState}
-                  lastSensorUpdateTime={lastSensorUpdate}
-                />
-              </div>
-              <div class="col-span-5 row-span-4 min-h-0">
-                <ObstructionStatus
-                  {sensorData}
-                  {lastSensorUpdate}
-                  class="h-full"
-                />
               </div>
             </div>
           {:else if activePage === "diagnostics"}

@@ -409,8 +409,8 @@ class Robot:
                             if self.cur_path.complete():
                                 exit_path = True
                             else:
-                                sensor_dt = StateEstimator.calculate_dt(sensor_data.timestamp, prev_data.timestamp)
-                                await self.send_safe_command(self.cur_path.get_command(self.state_estimator.state, sensor_dt))
+                                
+                                await self.send_safe_command(self.cur_path.get_command(self.state_estimator.state, asyncio.get_event_loop().time() - self.last_path_time))
                                 
                     elif isinstance(self.cur_path, PurePursuit):
                         # Run pure pursuit
@@ -448,6 +448,7 @@ class Robot:
                         await self.send_safe_command(self.pending_motor_command)
                         self.pending_motor_command = None
                 self.last_manual_time = asyncio.get_event_loop().time()
+                self.last_path_time = 0
             
             duration_ms = 1000*(asyncio.get_event_loop().time() - start)
             

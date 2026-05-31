@@ -15,6 +15,9 @@
     QuinticHermiteSplineSvelte,
     SplinePathSvelte,
   } from "$lib/types/index.js";
+  import RouteStats, {
+    type RouteStatsSnapshot,
+  } from "$lib/components/RouteStats.svelte";
 
   export type RunPathPayload =
     | { type: "freehand"; path: { x: number; y: number }[] }
@@ -646,6 +649,190 @@
     let angle = degrees % 360;
     return angle < 0 ? angle + 360 : angle;
   }
+
+  type PointMeters = { x: number; y: number };
+
+  type NearestPathResult = {
+    distance: number;
+    signedDistance: number;
+    heading: number | null;
+    segmentIndex: number;
+  };
+
+  const PURE_PURSUIT_LOOKAHEAD_METERS = 0.35;
+
+  function normalizeRadians(angle: number) {
+    let normalized = ((angle + Math.PI) % (2 * Math.PI)) - Math.PI;
+    if (normalized < -Math.PI) normalized += 2 * Math.PI;
+    return normalized;
+  }
+
+  function plannedSplinePoints(): PointMeters[] {
+    return path.QuinticHermiteSplines.flatMap((spline) => {
+      const points: PointMeters[] = [];
+      for (let t = 0; t <= 1.000001; t += PATH_RENDER_INTERVAL) {
+        const p = spline.evaluate(Math.min(t, 1));
+        points.push(translatePathPoint(p));
+      }
+      return points;
+    });
+  }
+
+  function activePathPoints(): PointMeters[] {
+    if (running) {
+      if (runSource === "freehand") return freehandPath.map(translatePathPoint);
+      if (runSource === "svg") return svgPath.map(translatePathPoint);
+      if (runSource === "spline") return plannedSplinePoints();
+      return selectedPoint ? [selectedPoint] : [];
+    }
+
+    if (mode === "freehand") return freehandPath;
+    if (mode === "svg") return svgPath;
+    if (mode === "point") return selectedPoint ? [selectedPoint] : [];
+    return plannedSplinePoints();
+  }
+
+  function findNearestPathSegment(
+    point: PointMeters,
+    points: PointMeters[],
+  ): NearestPathResult | null {
+    if (points.length === 0) return null;
+    if (points.length === 1) {
+      return {
+        distance: Math.hypot(point.x - points[0].x, point.y - points[0].y),
+        signedDistance: Math.hypot(point.x - points[0].x, point.y - points[0].y),
+        heading: null,
+        segmentIndex: 0,
+      };
+    }
+
+    let best: NearestPathResult | null = null;
+    for (let i = 0; i < points.length - 1; i++) {
+      const start = points[i];
+      const end = points[i + 1];
+      const dx = end.x - start.x;
+      const dy = end.y - start.y;
+      const lenSq = dx * dx + dy * dy;
+      if (lenSq === 0) continue;
+
+      const projection = Math.max(
+        0,
+        Math.min(1, ((point.x - start.x) * dx + (point.y - start.y) * dy) / lenSq),
+      );
+      const nearest = {
+        x: start.x + projection * dx,
+        y: start.y + projection * dy,
+      };
+      const cross = dx * (point.y - start.y) - dy * (point.x - start.x);
+      const distance = Math.hypot(point.x - nearest.x, point.y - nearest.y);
+      const candidate = {
+        distance,
+        signedDistance: Math.sign(cross || 1) * distance,
+        heading: Math.atan2(dy, dx),
+        segmentIndex: i,
+      };
+
+      if (best === null || candidate.distance < best.distance) {
+        best = candidate;
+      }
+    }
+
+    return best;
+  }
+
+  function percentile(values: number[], percentileValue: number) {
+    if (values.length === 0) return null;
+    const sorted = [...values].sort((a, b) => a - b);
+    const index = Math.min(
+      sorted.length - 1,
+      Math.ceil((percentileValue / 100) * sorted.length) - 1,
+    );
+    return sorted[Math.max(0, index)];
+  }
+
+  function curvatureAt(points: PointMeters[], index: number) {
+    if (points.length < 3) return null;
+    const i = Math.max(1, Math.min(points.length - 2, index));
+    const a = points[i - 1];
+    const b = points[i];
+    const c = points[i + 1];
+    const ab = Math.hypot(b.x - a.x, b.y - a.y);
+    const bc = Math.hypot(c.x - b.x, c.y - b.y);
+    const ca = Math.hypot(a.x - c.x, a.y - c.y);
+    const denominator = ab * bc * ca;
+    if (denominator < 1e-9) return null;
+
+    const twiceArea =
+      (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
+    return (2 * twiceArea) / denominator;
+  }
+
+  function lookaheadIndex(
+    points: PointMeters[],
+    startIndex: number,
+    lookaheadDistance: number,
+  ) {
+    let accumulated = 0;
+    for (let i = startIndex; i < points.length - 1; i++) {
+      accumulated += Math.hypot(
+        points[i + 1].x - points[i].x,
+        points[i + 1].y - points[i].y,
+      );
+      if (accumulated >= lookaheadDistance) return i + 1;
+    }
+    return Math.max(0, points.length - 1);
+  }
+
+  function buildRouteStats(
+    points: PointMeters[],
+    pose: { x: number; y: number; theta: number } | null,
+    trajectory: PointMeters[],
+  ): RouteStatsSnapshot {
+    const nearest = pose ? findNearestPathSegment(pose, points) : null;
+    const samples = trajectory.length > 0 ? trajectory : pose ? [pose] : [];
+    const errors = samples
+      .map((sample) => findNearestPathSegment(sample, points)?.distance ?? null)
+      .filter((value): value is number => value !== null);
+    const goal = points[points.length - 1] ?? null;
+    const purePursuitActive =
+      running && (runSource === "freehand" || runSource === "svg");
+    const curvatureIndex = nearest?.segmentIndex ?? 0;
+
+    return {
+      currentCrossTrackError: nearest?.signedDistance ?? null,
+      averageCrossTrackError:
+        errors.length > 0
+          ? errors.reduce((sum, value) => sum + value, 0) / errors.length
+          : null,
+      headingError:
+        pose && nearest?.heading !== null && nearest?.heading !== undefined
+          ? (normalizeRadians(pose.theta - nearest.heading) * 180) / Math.PI
+          : null,
+      maxCrossTrackError: errors.length > 0 ? Math.max(...errors) : null,
+      percentile95CrossTrackError: percentile(errors, 95),
+      distanceToGoal:
+        pose && goal ? Math.hypot(pose.x - goal.x, pose.y - goal.y) : null,
+      currentCurvature: purePursuitActive
+        ? curvatureAt(points, curvatureIndex)
+        : null,
+      targetCurvature: purePursuitActive
+        ? curvatureAt(
+            points,
+            lookaheadIndex(
+              points,
+              curvatureIndex,
+              PURE_PURSUIT_LOOKAHEAD_METERS,
+            ),
+          )
+        : null,
+      purePursuitActive,
+      sampleCount: errors.length,
+    };
+  }
+
+  let routeStats = $derived(
+    buildRouteStats(activePathPoints(), displayRobotPos, robotTrajectory),
+  );
 </script>
 
 {#if !browser}
@@ -1175,5 +1362,6 @@
         {/if}
       </Stage>
     </div>
+    <RouteStats stats={routeStats} {running} />
   </div>
 {/if}

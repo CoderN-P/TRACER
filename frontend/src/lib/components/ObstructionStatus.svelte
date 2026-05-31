@@ -1,41 +1,106 @@
 <script lang="ts">
   import * as Card from "$lib/components/ui/card";
-  import {
-    Construction,
-    Check,
-    AlertTriangle,
-    Car,
-    Gauge,
-  } from "lucide-svelte";
+  import { Car } from "lucide-svelte";
   import type { SensorData } from "$lib/types";
-  import { fade, fly, scale } from "svelte/transition";
-  import { quintOut, elasticOut } from "svelte/easing";
+  import { fly } from "svelte/transition";
 
-  type ObstacleIcon = typeof Check;
+  type BeamSeverity = "critical" | "warning" | "caution" | "safe";
+  type BeamKey = "left" | "front" | "right";
 
-  type ObstacleStatus = {
-    text: string;
-    color: string;
-    bgColor: string;
-    icon: ObstacleIcon | null;
+  type Point = {
+    x: number;
+    y: number;
+  };
+
+  type Rgb = [number, number, number];
+
+  type SensorBeam = {
+    key: BeamKey;
+    label: string;
+    shortLabel: string;
+    angle: number;
+    spread: number;
+    origin: Point;
+    fallbackDistance: number;
+    readDistance: (data: SensorData) => number;
+  };
+
+  type BeamReading = SensorBeam & {
     distance: number;
-    severity: "critical" | "warning" | "caution" | "safe";
+    radius: number;
+    path: string;
+    endpoint: Point;
+    labelPoint: Point;
+    severity: BeamSeverity;
+    color: string;
+    softColor: string;
   };
 
-  type ObstructionStatus = {
-    obstacle: ObstacleStatus;
+  type RadarState = {
+    beams: BeamReading[];
+    closest: BeamReading;
+    live: boolean;
   };
 
-  const DEFAULT_STATUS: ObstructionStatus = {
-    obstacle: {
-      text: "No obstacle data yet",
-      color: "text-gray-500",
-      bgColor: "bg-gray-50",
-      icon: Gauge,
-      distance: 0,
-      severity: "safe",
+  const VIEWBOX_WIDTH = 360;
+  const VIEWBOX_HEIGHT = 260;
+  const MAX_DISTANCE_CM = 100;
+  const MAX_RADIUS = 174;
+  const CRITICAL_DISTANCE = 10;
+  const WARNING_DISTANCE = 20;
+  const CAUTION_DISTANCE = 35;
+
+  const DISTANCE_COLOR_STOPS: { distance: number; color: Rgb }[] = [
+    { distance: 0, color: [220, 38, 38] },
+    { distance: CRITICAL_DISTANCE, color: [220, 38, 38] },
+    { distance: WARNING_DISTANCE, color: [234, 88, 12] },
+    { distance: CAUTION_DISTANCE, color: [202, 138, 4] },
+    { distance: 60, color: [101, 163, 13] },
+    { distance: MAX_DISTANCE_CM, color: [22, 163, 74] },
+  ];
+
+  const ROBOT = {
+    cx: 180,
+    cy: 214,
+    width: 58,
+    noseY: 172,
+    leftSensor: { x: 148, y: 186 },
+    frontSensor: { x: 180, y: 172 },
+    rightSensor: { x: 212, y: 186 },
+  };
+
+  const SENSOR_BEAMS: SensorBeam[] = [
+    {
+      key: "left",
+      label: "Left ultrasonic",
+      shortLabel: "L US",
+      angle: -45,
+      spread: 30,
+      origin: ROBOT.leftSensor,
+      fallbackDistance: 20,
+      readDistance: (data) => data.ultrasonic.distance_left,
     },
-  };
+    {
+      key: "front",
+      label: "Front ToF",
+      shortLabel: "ToF",
+      angle: 0,
+      spread: 16,
+      origin: ROBOT.frontSensor,
+      fallbackDistance: 18,
+      readDistance: (data) => data.tof.distance_front,
+    },
+    {
+      key: "right",
+      label: "Right ultrasonic",
+      shortLabel: "R US",
+      angle: 45,
+      spread: 30,
+      origin: ROBOT.rightSensor,
+      fallbackDistance: 32,
+      readDistance: (data) => data.ultrasonic.distance_right,
+    },
+  ];
 
   let {
     sensorData,
@@ -47,128 +112,295 @@
     class?: string;
   } = $props();
 
-  // Distance thresholds
-  const CRITICAL_DISTANCE = 10;
-  const WARNING_DISTANCE = 20;
-  const SAFE_DISTANCE = 30;
+  function clamp(value: number, min: number, max: number) {
+    return Math.min(max, Math.max(min, value));
+  }
 
-  function getObstructionStatus(data: SensorData): ObstructionStatus {
-    let status: ObstructionStatus = {
-      obstacle: {
-        text: "",
-        color: "",
-        bgColor: "",
-        icon: null,
-        distance: data.ultrasonic.distance,
-        severity: "safe",
-      },
+  function formatDistance(distance: number) {
+    return `${Math.round(distance)} cm`;
+  }
+
+  function getSeverity(distance: number): BeamSeverity {
+    if (distance < CRITICAL_DISTANCE) return "critical";
+    if (distance < WARNING_DISTANCE) return "warning";
+    if (distance < CAUTION_DISTANCE) return "caution";
+    return "safe";
+  }
+
+  function mixColor(start: Rgb, end: Rgb, amount: number): Rgb {
+    return start.map((channel, index) =>
+      Math.round(channel + (end[index] - channel) * amount),
+    ) as Rgb;
+  }
+
+  function getDistanceColor(distance: number, alpha = 1) {
+    const value = clamp(distance, 0, MAX_DISTANCE_CM);
+    const upperStop =
+      DISTANCE_COLOR_STOPS.find((stop) => value <= stop.distance) ??
+      DISTANCE_COLOR_STOPS[DISTANCE_COLOR_STOPS.length - 1];
+    const upperIndex = DISTANCE_COLOR_STOPS.indexOf(upperStop);
+    const lowerStop = DISTANCE_COLOR_STOPS[Math.max(0, upperIndex - 1)];
+    const span = Math.max(1, upperStop.distance - lowerStop.distance);
+    const amount = clamp((value - lowerStop.distance) / span, 0, 1);
+    const [red, green, blue] = mixColor(
+      lowerStop.color,
+      upperStop.color,
+      amount,
+    );
+
+    return `rgba(${red}, ${green}, ${blue}, ${alpha})`;
+  }
+
+  function polarToCartesian(
+    origin: Point,
+    angle: number,
+    radius: number,
+  ): Point {
+    const radians = ((angle - 90) * Math.PI) / 180;
+
+    return {
+      x: origin.x + radius * Math.cos(radians),
+      y: origin.y + radius * Math.sin(radians),
     };
-
-    // Obstacle detection logic with severity levels
-    if (data.ultrasonic.distance < CRITICAL_DISTANCE) {
-      status.obstacle.text = "Critical! Obstacle very close";
-      status.obstacle.color = "text-red-600";
-      status.obstacle.bgColor = "bg-red-100";
-      status.obstacle.icon = AlertTriangle;
-      status.obstacle.severity = "critical";
-    } else if (data.ultrasonic.distance < WARNING_DISTANCE) {
-      status.obstacle.text = "Warning! Obstacle detected";
-      status.obstacle.color = "text-orange-500";
-      status.obstacle.bgColor = "bg-orange-100";
-      status.obstacle.icon = Construction;
-      status.obstacle.severity = "warning";
-    } else if (data.ultrasonic.distance < SAFE_DISTANCE) {
-      status.obstacle.text = "Caution: Object ahead";
-      status.obstacle.color = "text-amber-500";
-      status.obstacle.bgColor = "bg-amber-50";
-      status.obstacle.icon = Gauge;
-      status.obstacle.severity = "caution";
-    } else {
-      status.obstacle.text = "Path clear";
-      status.obstacle.color = "text-green-500";
-      status.obstacle.bgColor = "bg-green-50";
-      status.obstacle.icon = Check;
-      status.obstacle.severity = "safe";
-    }
-
-    return status;
   }
 
-  // Calculate progress percentage for visual bar based on distance
-  function getProgressPercentage() {
-    if (!sensorData) return 100;
-    const distance = sensorData.ultrasonic.distance;
+  function beamPath(
+    origin: Point,
+    angle: number,
+    spread: number,
+    radius: number,
+  ) {
+    const visibleRadius = Math.max(radius, 3);
+    const start = polarToCartesian(origin, angle - spread / 2, visibleRadius);
+    const end = polarToCartesian(origin, angle + spread / 2, visibleRadius);
 
-    if (distance >= SAFE_DISTANCE) return 100;
-    if (distance <= 0) return 0;
-
-    return (distance / SAFE_DISTANCE) * 100;
+    return [
+      `M ${origin.x} ${origin.y}`,
+      `L ${start.x} ${start.y}`,
+      `A ${visibleRadius} ${visibleRadius} 0 0 1 ${end.x} ${end.y}`,
+      "Z",
+    ].join(" ");
   }
 
-  // Keep track of previous status for animations
-  let status = $derived.by(() =>
-    sensorData ? getObstructionStatus(sensorData) : DEFAULT_STATUS,
-  );
+  function buildRadarState(data: SensorData | null): RadarState {
+    const beams = SENSOR_BEAMS.map((beam) => {
+      const rawDistance = data
+        ? beam.readDistance(data)
+        : beam.fallbackDistance;
+      const distance = Math.max(
+        0,
+        Number.isFinite(rawDistance) ? rawDistance : 0,
+      );
+      const radius =
+        (clamp(distance, 0, MAX_DISTANCE_CM) / MAX_DISTANCE_CM) * MAX_RADIUS;
+      const severity = getSeverity(distance);
+      const endpoint = polarToCartesian(beam.origin, beam.angle, radius);
+      const rawLabelPoint = polarToCartesian(
+        beam.origin,
+        beam.angle,
+        clamp(radius + 18, 34, MAX_RADIUS + 4),
+      );
+      const labelPoint = {
+        x: clamp(rawLabelPoint.x, 28, VIEWBOX_WIDTH - 28),
+        y: clamp(rawLabelPoint.y, 20, VIEWBOX_HEIGHT - 18),
+      };
+      const color = getDistanceColor(distance);
+      const softColor = getDistanceColor(distance, 0.22);
 
-  let ObstacleIcon = $derived.by(() => status.obstacle.icon);
-  let progressPercentage = $derived.by(() => getProgressPercentage());
+      return {
+        ...beam,
+        distance,
+        radius,
+        path: beamPath(beam.origin, beam.angle, beam.spread, radius),
+        endpoint,
+        labelPoint,
+        severity,
+        color,
+        softColor,
+      } satisfies BeamReading;
+    });
+
+    const closest = beams.reduce((current, candidate) =>
+      candidate.distance < current.distance ? candidate : current,
+    );
+
+    return {
+      beams,
+      closest,
+      live: data !== null && lastSensorUpdate !== 0,
+    };
+  }
+
+  let radarState = $derived.by(() => buildRadarState(sensorData));
+  let beamOpacity = $derived.by(() => (radarState.live ? 1 : 0.78));
 </script>
 
-<Card.Root class="w-full h-full min-h-0 {className} flex flex-col">
-  <Card.Header>
-    <Card.Title class="flex items-center gap-2">
-      <Car class="w-5 h-5" />
-      <span>Obstruction Status</span>
-    </Card.Title>
-    <Card.Description>
-      {lastSensorUpdate === 0
-        ? "No live obstacle data yet"
-        : "Real-time obstacle distance detection"}
-    </Card.Description>
-  </Card.Header>
-  <Card.Content class="px-3 sm:px-6 pb-4 min-h-0 flex-1">
-    <!-- Progress bar indicating distance to obstacle -->
-    <div class="mb-3 bg-gray-100 rounded-full h-2 overflow-hidden">
-      <div
-        class="h-full rounded-full transition-all duration-500 ease-out"
-        class:bg-red-500={status.obstacle.severity === "critical"}
-        class:bg-orange-400={status.obstacle.severity === "warning"}
-        class:bg-amber-300={status.obstacle.severity === "caution"}
-        class:bg-green-500={status.obstacle.severity === "safe"}
-        style="width: {progressPercentage}%"
-      ></div>
-    </div>
-
-    <div class="grid grid-cols-1 gap-3">
-      <!-- Obstacle Status Card -->
-      <div
-        class="rounded-lg {status.obstacle
-          .bgColor} p-3 border border-gray-100 transition-all duration-300"
-        in:fly={{ y: 10, duration: 300, easing: quintOut }}
+<Card.Root
+  class="w-full h-full min-h-0 overflow-hidden border p-1! border-gray-100 bg-white shadow-sm flex flex-col {className}"
+>
+  <Card.Content class="min-h-0 flex-1 p-2 sm:p-3">
+    <div
+      class="relative h-full min-h-[240px] w-full overflow-hidden p-0"
+      in:fly={{ y: 8, duration: 220 }}
+    >
+      <svg
+        viewBox="0 0 {VIEWBOX_WIDTH} {VIEWBOX_HEIGHT}"
+        class="absolute inset-0 h-full w-full"
+        role="img"
+        aria-label="Radar beam visualization of ultrasonic and time-of-flight distances"
       >
-        <div class="flex items-center gap-2 mb-1">
-          <div class="p-1.5 bg-white bg-opacity-60 rounded-full">
-            {#key status.obstacle.severity}
-              <div in:scale={{ start: 0.8, duration: 300, easing: elasticOut }}>
-                <ObstacleIcon
-                  class="w-5 h-5 sm:w-6 sm:h-6 {status.obstacle.color}"
-                />
-              </div>
-            {/key}
-          </div>
-          <div class="flex-grow">
-            <h3
-              class="font-medium text-sm sm:text-base {status.obstacle.color}"
+        <rect width={VIEWBOX_WIDTH} height={VIEWBOX_HEIGHT} fill="#ffffff" />
+
+        <g>
+          {#each [25, 50, 75, 100] as distance}
+            {@const radius = (distance / MAX_DISTANCE_CM) * MAX_RADIUS}
+            <path
+              d={`M ${ROBOT.cx - radius} ${ROBOT.noseY} A ${radius} ${radius} 0 0 1 ${ROBOT.cx + radius} ${ROBOT.noseY}`}
+              fill="none"
+              stroke="rgba(100, 116, 139, 0.16)"
+              stroke-width="1"
+            />
+            <text
+              x={ROBOT.cx + radius - 18}
+              y={ROBOT.noseY - 3}
+              text-anchor="end"
+              class="fill-slate-400 text-[9px] font-medium"
             >
-              {status.obstacle.text}
-            </h3>
-            <p class="text-xs sm:text-sm text-gray-600">
-              Distance: <span class="font-semibold"
-                >{status.obstacle.distance.toFixed(1)}cm</span
-              >
-            </p>
+              {distance}
+            </text>
+          {/each}
+
+          {#each [-60, -45, -20, 0, 20, 45, 60] as angle}
+            {@const endpoint = polarToCartesian(
+              ROBOT.frontSensor,
+              angle,
+              MAX_RADIUS,
+            )}
+            <line
+              x1={ROBOT.frontSensor.x}
+              y1={ROBOT.frontSensor.y}
+              x2={endpoint.x}
+              y2={endpoint.y}
+              stroke="rgba(100, 116, 139, 0.13)"
+              stroke-width="1"
+              stroke-dasharray="4 6"
+            />
+          {/each}
+        </g>
+
+        <g opacity={beamOpacity}>
+          {#each radarState.beams as beam (beam.key)}
+            <path
+              d={beam.path}
+              fill={beam.softColor}
+              stroke={beam.color}
+              stroke-width="2"
+              stroke-linejoin="round"
+            />
+            <line
+              x1={beam.origin.x}
+              y1={beam.origin.y}
+              x2={beam.endpoint.x}
+              y2={beam.endpoint.y}
+              stroke={beam.color}
+              stroke-width="2.5"
+              stroke-linecap="round"
+            />
+            <circle
+              cx={beam.endpoint.x}
+              cy={beam.endpoint.y}
+              r="4.5"
+              fill={beam.color}
+              stroke="#ffffff"
+              stroke-width="2"
+            />
+          {/each}
+        </g>
+
+        <g>
+          <path
+            d={`M ${ROBOT.cx} ${ROBOT.noseY - 12} L ${ROBOT.cx - ROBOT.width / 2} ${ROBOT.cy - 8} Q ${ROBOT.cx - ROBOT.width / 2} ${ROBOT.cy + 18} ${ROBOT.cx - 16} ${ROBOT.cy + 22} L ${ROBOT.cx + 16} ${ROBOT.cy + 22} Q ${ROBOT.cx + ROBOT.width / 2} ${ROBOT.cy + 18} ${ROBOT.cx + ROBOT.width / 2} ${ROBOT.cy - 8} Z`}
+            fill="#ffffff"
+            stroke="#334155"
+            stroke-width="2"
+          />
+          <line
+            x1={ROBOT.cx}
+            y1={ROBOT.cy + 15}
+            x2={ROBOT.cx}
+            y2={ROBOT.noseY + 6}
+            stroke="#cbd5e1"
+            stroke-width="1.5"
+          />
+          <circle
+            cx={ROBOT.leftSensor.x}
+            cy={ROBOT.leftSensor.y}
+            r="4"
+            fill="#2563eb"
+          />
+          <circle
+            cx={ROBOT.frontSensor.x}
+            cy={ROBOT.frontSensor.y}
+            r="4"
+            fill="#7c3aed"
+          />
+          <circle
+            cx={ROBOT.rightSensor.x}
+            cy={ROBOT.rightSensor.y}
+            r="4"
+            fill="#2563eb"
+          />
+        </g>
+
+        {#each radarState.beams as beam (beam.key)}
+          <g>
+            <text
+              x={beam.labelPoint.x}
+              y={beam.labelPoint.y - 5}
+              text-anchor="middle"
+              class="fill-slate-700 text-[10px] font-semibold"
+            >
+              {beam.shortLabel}
+            </text>
+            <text
+              x={beam.labelPoint.x}
+              y={beam.labelPoint.y + 8}
+              text-anchor="middle"
+              class="fill-slate-500 text-[10px] font-medium"
+            >
+              {formatDistance(beam.distance)}
+            </text>
+          </g>
+        {/each}
+      </svg>
+
+      <div class="pointer-events-none absolute left-3 top-3">
+        <div
+          class="rounded-md border border-slate-200 bg-white/90 px-2 py-1 shadow-sm"
+        >
+          <div
+            class="text-[10px] font-semibold uppercase tracking-wide text-slate-500"
+          >
+            Closest
+          </div>
+          <div
+            class="flex items-center gap-1.5 text-xs font-semibold text-slate-800"
+          >
+            <span
+              class="h-2 w-2 rounded-full"
+              style:background-color={radarState.closest.color}
+            ></span>
+            {radarState.closest.label}
+            {formatDistance(radarState.closest.distance)}
           </div>
         </div>
+      </div>
+
+      <div
+        class="pointer-events-none absolute bottom-3 left-1/2 flex -translate-x-1/2 items-center gap-2 rounded-md border border-slate-200 bg-white/95 px-2.5 py-1.5 text-xs font-semibold text-slate-800 shadow-sm"
+      >
+        <Car class="h-4 w-4" />
+        <span>{radarState.live ? "Live radar" : "Preview radar"}</span>
       </div>
     </div>
   </Card.Content>

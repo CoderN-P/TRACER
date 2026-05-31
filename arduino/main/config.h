@@ -126,7 +126,7 @@ const int NUM_TYPES = 6; // Number of command types (MOVE, OLED_UPDATE, ENABLE, 
 const int ULTRASONIC_INTERVAL = 50;            // Sample ultrasonic sensor every 50 ms (20 hz)
 const int TOF_INTERVAL = 100;                  // Sample time-of-flight sensor every 100 ms (10 Hz)
 const int OLED_UPDATE_INTERVAL = 500;          // Update OLED every 500 ms
-const int MAIN_INTERVAL = 10;                  // Run main loop every 10 ms (100 Hz)
+const int MAIN_INTERVAL = 5;                  // Run main loop every 5 ms (200 Hz)
 const uint32_t MOTOR_COMMAND_TIMEOUT_MS = 250; // Stop motors if no motor command arrives within this window
 
 // OLED

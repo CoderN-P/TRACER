@@ -615,7 +615,7 @@ class Robot:
             async with self.motor_lock:
                 self.pending_motor_command = Command(
                     ID="",
-                    command_type=CommandType.MOTOR,
+                    command_type=CommandType.PWM,
                     command=MotorPWMCommand(
                         left_motor=v1,
                         right_motor=v2

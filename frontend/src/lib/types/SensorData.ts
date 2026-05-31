@@ -10,7 +10,6 @@ export const SensorDataSchema = z.object({
     tof: TOFSchema,
     magnetometer: MagnetometerSchema,
     battery: z.number().min(0).max(100),
-    max_loop_time: z.number().describe("Maximum core loop time in milliseconds"),
     timestamp: z.number().describe("Timestamp of the sensor data in microseconds since epoch"),
     left_encoder: z.number().describe("Left wheel encoder count"),
     right_encoder: z.number().describe("Right wheel encoder count"),

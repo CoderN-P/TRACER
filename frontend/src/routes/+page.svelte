@@ -209,7 +209,7 @@
         robotState = RobotStateSchema.parse(data.state);
         velocityProfileT = data.velocity_profile_t ?? null;
         velocityCommand = data.velocityCommand;
-        maxLoopTime = data.sensors.max_loop_time ?? null;
+        maxLoopTime = data.max_loop_time ?? null;
 
         packetCount++;
         const now = new Date().getTime();

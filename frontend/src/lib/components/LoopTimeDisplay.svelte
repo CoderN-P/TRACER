@@ -9,6 +9,6 @@
 >
   <Gauge class="h-5 w-5 text-black" />
   <p class="font-mono text-lg font-semibold">
-    {value === null ? "-- ms" : `${value.toFixed(0)} ms`}
+    {value === null ? "-- ms" : `${value.toFixed(3)} ms`}
   </p>
 </div>

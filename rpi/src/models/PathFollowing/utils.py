@@ -3,9 +3,11 @@ import math
 from typing import List
 
 def scale_to_max(left, right) -> tuple:
+    
+    
     scale = min(
-        ROBOT_CONFIG.MAX_LINEAR_VEL / abs(left),
-        ROBOT_CONFIG.MAX_LINEAR_VEL / abs(right),
+        ROBOT_CONFIG.MAX_LINEAR_VEL / abs(left) if left > 1e-04 else 1,
+        ROBOT_CONFIG.MAX_LINEAR_VEL / abs(right) if right > 1e-04 else 1,
         1
     )
 

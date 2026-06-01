@@ -648,13 +648,13 @@ class Robot:
     async def set_pid(self, data):
         await self.send_safe_command(
             Command(
-                id="",
+                ID="",
                 command_type=CommandType.PID,
                 command=PIDCommand(
                     p_left=data["kp_left"],
                     p_right=data["kp_right"],
                     i_left=data["ki_left"],
-                    i_right=data["i_right"],
+                    i_right=data["ki_right"],
                     d_left=data["kd_left"],
                     d_right=data["kd_right"],
                 ),

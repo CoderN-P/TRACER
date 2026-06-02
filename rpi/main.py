@@ -26,6 +26,7 @@ parser.add_argument('--calibrate-max-speed', action='store_true', help="Run the 
 parser.add_argument('--calibrate-mag', action='store_true', help="Calibrate the magnetometer using hard and soft iron calibration.")
 parser.add_argument('--interactive-test', action='store_true', help="Run interactive velocity / PID / PWM test CLI")
 parser.add_argument("--timeout", type=float, default=1.0, help="No-data timeout before mag calibration (seconds)")
+parser.add_argument('--backwards', action='store_true', help="Calibrate maximum speed in the reverse direction")
 parser.add_argument('--output-json', type=str, default=None, help="Optional output dir for averaged LUT JSON or output filename for normal LUT JSON.")
 parser.add_argument('--show-plots', action='store_true', help="Display plot windows in addition to saving PNG files.")
 
@@ -69,7 +70,7 @@ if __name__ == "__main__":
             show_plots=args.show_plots,
         )
     elif args.calibrate_max_speed:
-        calibrate_max_speed(args.port)
+        calibrate_max_speed(args.backwards, args.port)
     elif args.interactive_test:
         interactive_test(args.port)
     elif args.calibrate_mag:

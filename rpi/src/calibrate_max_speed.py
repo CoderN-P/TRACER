@@ -5,7 +5,7 @@ from . import ROBOT_CONFIG
 from .models import SerialManager, Robot, Command, CommandType, MotorPWMCommand, StateEstimator
 
 
-def calibrate_max_speed(port=None):
+def calibrate_max_speed(backwards, port=None):
     port = port if port else SerialManager.find_port()
 
     logging.basicConfig(level=logging.INFO, format='%(levelname)s:%(name)s:%(message)s')
@@ -42,8 +42,8 @@ def calibrate_max_speed(port=None):
         ID="",
         command_type=CommandType.PWM,
         command=MotorPWMCommand(
-            left_motor=1.0,
-            right_motor=1.0,
+            left_motor=-1.0 if backwards else 1.0,
+            right_motor=-1.0 if backwards else 1.0,
         ),
         duration=0,
         pause_duration=0,

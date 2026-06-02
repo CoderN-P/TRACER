@@ -136,7 +136,7 @@ void mainLoop(void *pvParameters)
 
         static uint8_t curBatteryPercent = 0;
 
-        if (loopCounter % 10 == 0)
+        if (loopCounter % 20 == 0)
         { // Read battery voltage at 10 Hz
             curBatteryPercent = getBatteryPercent();
         }

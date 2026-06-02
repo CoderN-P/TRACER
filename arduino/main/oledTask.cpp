@@ -25,7 +25,7 @@ void oledUpdateTask(void *pvParameters) {
                     send_oled_page(page, chunk);
                     xSemaphoreGive(i2c_mutex);
                 }
-                vTaskDelay(pdMS_TO_TICKS(4)); // Small delay between page updates to avoid I2C congestion
+                vTaskDelay(pdMS_TO_TICKS(6)); // Small delay between page updates to avoid I2C congestion
             }
         }
         

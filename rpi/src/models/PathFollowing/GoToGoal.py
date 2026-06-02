@@ -16,7 +16,7 @@ class GoToGoal:
    
     
     def shift_target_apf(self, repulsive_vector: tuple[float, float], target: list[float], sensor_data: SensorData):
-        raw_shift = repulsive_vector[0] * ROBOT_CONFIG.K_LIDAR_SHIFT
+        raw_shift = -repulsive_vector[0] * ROBOT_CONFIG.K_LIDAR_SHIFT
         raw_shift += (1 / sensor_data.ultrasonic.distance_left) * ROBOT_CONFIG.K_US_SHIFT if 1e-4 < sensor_data.ultrasonic.distance_left <= ROBOT_CONFIG.OBSTACLE_AVOID_THRESHOLD else 0
         raw_shift -= (1 / sensor_data.ultrasonic.distance_right) * ROBOT_CONFIG.K_US_SHIFT if 1e-4 < sensor_data.ultrasonic.distance_right <= ROBOT_CONFIG.OBSTACLE_AVOID_THRESHOLD else 0
 

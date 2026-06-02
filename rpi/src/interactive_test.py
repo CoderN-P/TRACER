@@ -91,8 +91,16 @@ class InteractiveTesterState:
         self.session_total_ticks_right += sensor_data.right_encoder
         
         # Calculate distance traveled
-        delta_left = sensor_data.left_encoder * ROBOT_CONFIG.METERS_PER_TICK_LEFT
-        delta_right = sensor_data.right_encoder * ROBOT_CONFIG.METERS_PER_TICK_RIGHT
+        delta_left = sensor_data.left_encoder * (
+            ROBOT_CONFIG.METERS_PER_TICK_LEFT_POS
+            if sensor_data.left_encoder >= 0
+            else ROBOT_CONFIG.METERS_PER_TICK_LEFT_NEG
+        )
+        delta_right = sensor_data.right_encoder * (
+            ROBOT_CONFIG.METERS_PER_TICK_RIGHT_POS
+            if sensor_data.right_encoder >= 0
+            else ROBOT_CONFIG.METERS_PER_TICK_RIGHT_NEG
+        )
         
         # Calculate velocity (m/s)
         vel_left = delta_left / dt
@@ -227,8 +235,16 @@ class InteractiveTesterState:
     def report_session_stats(self, duration):
         """Print session statistics at the end of a command."""
         # Calculate distances
-        distance_left = self.session_total_ticks_left * ROBOT_CONFIG.METERS_PER_TICK_LEFT
-        distance_right = self.session_total_ticks_right * ROBOT_CONFIG.METERS_PER_TICK_RIGHT
+        distance_left = self.session_total_ticks_left * (
+            ROBOT_CONFIG.METERS_PER_TICK_LEFT_POS
+            if self.session_total_ticks_left >= 0
+            else ROBOT_CONFIG.METERS_PER_TICK_LEFT_NEG
+        )
+        distance_right = self.session_total_ticks_right * (
+            ROBOT_CONFIG.METERS_PER_TICK_RIGHT_POS
+            if self.session_total_ticks_right >= 0
+            else ROBOT_CONFIG.METERS_PER_TICK_RIGHT_NEG
+        )
         avg_distance = (distance_left + distance_right) / 2.0
         
         print(f"\n{'='*80}")

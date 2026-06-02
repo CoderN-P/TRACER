@@ -3,7 +3,7 @@ from .. import ROBOT_CONFIG
 from ..SensorData import LidarData
 
 class PoseFilter:
-    def __init__(self):
+    def __init__(self, p: np.ndarray | None = None):
         self.Q = np.array([
             [ROBOT_CONFIG.Q_X, 0],
             [0, ROBOT_CONFIG.Q_Y],
@@ -11,7 +11,11 @@ class PoseFilter:
         
         self.state = np.array([0.0, 0.0])  # [x, y]
         self.process_jacobian = np.eye(2)
-        self.P = np.eye(2) * ROBOT_CONFIG.P_POSITION
+        
+        if p:
+            self.P = p
+        else:
+            self.P = np.eye(2) * ROBOT_CONFIG.P_POSITION
 
     def reset(self):
         self.state = np.array([0.0, 0.0])

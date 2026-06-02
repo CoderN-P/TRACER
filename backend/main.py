@@ -81,6 +81,14 @@ def setup_routes(controller: Controller):
     @socket.on('update_constants')
     def update_constants(data):
         sio_client.emit('update_constants', data)
+
+    @socket.on('update_virtual_obstacles')
+    def update_virtual_obstacles(data):
+        sio_client.emit('update_virtual_obstacles', data)
+
+    @socket.on('update_obstacle_mode')
+    def update_obstacle_mode(data):
+        sio_client.emit('update_obstacle_mode', data)
         
     @socket.on('update_pid')
     def update_pid(data):

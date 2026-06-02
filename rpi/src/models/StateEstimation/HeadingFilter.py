@@ -4,11 +4,14 @@ from .. import ROBOT_CONFIG
 
 
 class HeadingFilter:
-    def __init__(self):
-        self.P = np.array(
-            [[ROBOT_CONFIG.P_THETA, ROBOT_CONFIG.P_THETA_BIAS],
-             [ROBOT_CONFIG.P_THETA_BIAS, ROBOT_CONFIG.P_GYRO_BIAS]]
-        )
+    def __init__(self, p: np.ndarray | None = None):
+        if p:
+            self.P = p
+        else:
+            self.P = np.array(
+                [[ROBOT_CONFIG.P_THETA, ROBOT_CONFIG.P_THETA_BIAS],
+                 [ROBOT_CONFIG.P_THETA_BIAS, ROBOT_CONFIG.P_GYRO_BIAS]]
+            )
         # Process noise covariance matrix Q, representing the uncertainty in the process model
         self.Q = np.array( 
             [[ROBOT_CONFIG.Q_THETA, 0], 

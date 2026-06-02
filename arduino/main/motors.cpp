@@ -12,13 +12,23 @@ std::atomic<uint8_t> pendingPIDMode{0}; // 0 = PID control mode, 1 = open-loop P
 
 float getLeftMotorSpeed(int32_t deltaLeftTicks)
 {
-    float deltaLeft = deltaLeftTicks * METERS_PER_TICK_LEFT;
+    float deltaLeft;
+    if (deltaLeftTicks <= 0){
+        deltaLeft = deltaLeftTicks * METERS_PER_TICK_LEFT_NEG;
+    } else {
+        deltaLeft = deltaLeftTicks * METERS_PER_TICK_LEFT_POS;
+    }
     return deltaLeft / (MAIN_INTERVAL / 1000.0); // Convert to m/s
 }
 
 float getRightMotorSpeed(int32_t deltaRightTicks)
 {
-    float deltaRight = deltaRightTicks * METERS_PER_TICK_RIGHT;
+    float deltaRight;
+    if (deltaRightTicks <= 0){
+        deltaRight = deltaRightTicks * METERS_PER_TICK_RIGHT_NEG;
+    } else {
+        deltaRight = deltaRightTicks * METERS_PER_TICK_RIGHT_POS;
+    }
     return deltaRight / (MAIN_INTERVAL / 1000.0); // Convert to m/s
 }
 
@@ -113,8 +123,12 @@ void handleMovement(float left, float right)
 
 void IRAM_ATTR estopISR()
 {
-    motorsEnabled = false;
-    GPIO.out_w1tc = (1ULL << STBY);
+    motorsEnabled = !motorsEnabled;
+    if (motorsEnabled){
+        GPIO.out_w1ts = (1ULL << STBY);
+    } else {
+        GPIO.out_w1tc = (1ULL << STBY);
+    }
 }
 
 float interpolate(CalibrationPoint_t a, CalibrationPoint_t b, float t){

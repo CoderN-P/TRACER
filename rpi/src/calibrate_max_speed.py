@@ -69,8 +69,16 @@ def calibrate_max_speed(port=None):
     with lock:
         logger.info(f"Total encoder ticks: Left = {left_encoder}, Right = {right_encoder}")
         logger.info(f"Total time elapsed: {time.time() - cur_time:.2f} seconds")
-        left_speed = (left_encoder * ROBOT_CONFIG.METERS_PER_TICK_LEFT) / (time.time() - cur_time)
-        right_speed = (right_encoder * ROBOT_CONFIG.METERS_PER_TICK_RIGHT) / (time.time() - cur_time)
+        left_speed = (left_encoder * (
+            ROBOT_CONFIG.METERS_PER_TICK_LEFT_POS
+            if left_encoder >= 0
+            else ROBOT_CONFIG.METERS_PER_TICK_LEFT_NEG
+        )) / (time.time() - cur_time)
+        right_speed = (right_encoder * (
+            ROBOT_CONFIG.METERS_PER_TICK_RIGHT_POS
+            if right_encoder >= 0
+            else ROBOT_CONFIG.METERS_PER_TICK_RIGHT_NEG
+        )) / (time.time() - cur_time)
 
         logger.info(f"Max speed: Left = {left_speed:.2f} m/s, Right = {right_speed:.2f} m/s")
         logger.info(f"Global MAX_LINEAR_VEL: {min(left_speed, right_speed):.2f} m/s")

@@ -50,7 +50,7 @@ def linear_interpolate(speed, lookup_table):
     return None
 
 
-def calibrate_feedforward(resolution, duration_sec, port=None):
+def calibrate_feedforward(resolution, duration_sec, file = 'feedforward_lookup_table.json', port=None):
     """
     Calibrate motor velocity feedforward using lookup table method.
     
@@ -61,6 +61,7 @@ def calibrate_feedforward(resolution, duration_sec, port=None):
     Args:
         resolution: PWM step size (e.g., 0.05 for 5% increments)
         duration_sec: How long to measure at each PWM level
+        file: File to save the calibration 
         port: Serial port (auto-detected if None)
     """
     port = port if port else SerialManager.find_port()
@@ -149,8 +150,16 @@ def calibrate_feedforward(resolution, duration_sec, port=None):
                 left_encoder = 0
                 right_encoder = 0
 
-                left_speed = left_ticks / measurement_elapsed * ROBOT_CONFIG.METERS_PER_TICK_LEFT
-                right_speed = right_ticks / measurement_elapsed * ROBOT_CONFIG.METERS_PER_TICK_RIGHT
+                left_speed = left_ticks / measurement_elapsed * (
+                    ROBOT_CONFIG.METERS_PER_TICK_LEFT_POS
+                    if left_ticks >= 0
+                    else ROBOT_CONFIG.METERS_PER_TICK_LEFT_NEG
+                )
+                right_speed = right_ticks / measurement_elapsed * (
+                    ROBOT_CONFIG.METERS_PER_TICK_RIGHT_POS
+                    if right_ticks >= 0
+                    else ROBOT_CONFIG.METERS_PER_TICK_RIGHT_NEG
+                )
 
                 logger.info(f"  PWM L={pwm_left_val:.3f} → speed={left_speed:.4f} m/s")
                 logger.info(f"  PWM R={pwm_right_val:.3f} → speed={right_speed:.4f} m/s")
@@ -239,7 +248,7 @@ def calibrate_feedforward(resolution, duration_sec, port=None):
     calibration_dir = Path(__file__).parent.parent.parent / "calibration_files" / "feedforward"
     calibration_dir.mkdir(parents=True, exist_ok=True)
 
-    output_file = calibration_dir / "feedforward_lookup_table.json"
+    output_file = calibration_dir / file
     try:
         with open(output_file, 'w') as f:
             json.dump(feedforward_data, f, indent=2)

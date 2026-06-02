@@ -30,6 +30,9 @@ from .StateEstimation import *
 from .PathFollowing import *
 from .SerialManager import SerialManager
 from .Command import Command
+from .VirtualObstacleType import VirtualObstacleType
+from .VirtualObstacle import VirtualObstacle
+from .ObstacleMode import ObstacleMode
 from .MetaMode import MetaMode
 from .Mode import Mode
 from .Robot import Robot

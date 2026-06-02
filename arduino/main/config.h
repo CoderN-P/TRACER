@@ -14,10 +14,14 @@ const int ENCODER_PPR = 11;
 const int ENCODER_TICKS_PER_REV = ENCODER_PPR * REDUCTION_RATIO * 4;          // Total ticks per wheel revolution with 4x quadrature decoding
 const float MAX_OUTPUT_SPEED = (MAX_OUTPUT_RPM / 60.0) * WHEEL_CIRCUMFERENCE; // in m/s
 const float METERS_PER_TICK = WHEEL_CIRCUMFERENCE / ENCODER_TICKS_PER_REV;    // Distance traveled per encoder tick
-const float LEFT_CORRECTION = 0.951f;                                         // Correction factor for left motor speed (accounts for slight differences in motors/wheels)
-const float RIGHT_CORRECTION = 1.0f;                                          // Correction factor for right motor speed (accounts for slight differences in motors/wheels)
-const float METERS_PER_TICK_LEFT = METERS_PER_TICK * LEFT_CORRECTION;
-const float METERS_PER_TICK_RIGHT = METERS_PER_TICK * RIGHT_CORRECTION;
+const float LEFT_CORRECTION_POS = 0.951f;                                         // Correction factor for left motor positive speed (accounts for slight differences in motors/wheels)
+const float RIGHT_CORRECTION_POS = 1.0f;                                          // Correction factor for right motor postive speed (accounts for slight differences in motors/wheels)
+const float LEFT_CORRECTION_NEG = 1.0f;
+const float RIGHT_CORRECTION_NEG = 1.0f;
+const float METERS_PER_TICK_LEFT_POS = METERS_PER_TICK * LEFT_CORRECTION_POS;
+const float METERS_PER_TICK_RIGHT_POS = METERS_PER_TICK * RIGHT_CORRECTION_POS;
+const float METERS_PER_TICK_LEFT_NEG = METERS_PER_TICK * LEFT_CORRECTION_NEG;
+const float METERS_PER_TICK_RIGHT_NEG = METERS_PER_TICK * RIGHT_CORRECTION_NEG;
 
 // Pin definitions
 const int EN1 = 44;             // Enable pin for motor 1

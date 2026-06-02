@@ -1,14 +1,13 @@
 import logging
 import datetime
 import threading
-import math
 import time
 import struct
 from collections import deque
 import asyncio
 from typing import List, Dict
 
-from . import SerialManager, SensorData,  StateEstimator, Mode, ROBOT_CONFIG, MagnetometerData, MetaMode, Path, PurePursuit, LidarData
+from . import SerialManager, SensorData,  StateEstimator, Mode, ROBOT_CONFIG, MagnetometerData, MetaMode, Path, PurePursuit, LidarData, ObstacleMode, VirtualObstacle
 from .PathFollowing import GoToGoal, twist_to_wheel_speeds
 from .Command import PIDCommand, MotorCommand, MotorPWMCommand, Command, CommandType, LCDCommand
 from ..ai.get_commands import text_to_command
@@ -29,13 +28,14 @@ class Robot:
         self.right_distance_history: deque = deque(maxlen=10)
         
         self.obstacle_clear: asyncio.Event = asyncio.Event()
-        self.backup_time = 2
+        self.backup_time: float = 2.0
         self._logger: logging.Logger = logging.getLogger("RobotManager")
         self.motor_lock: asyncio.Lock = asyncio.Lock()
         self.state_estimator: StateEstimator = StateEstimator(self._logger)
         
         self.state: Mode = Mode.MANUAL
         self.meta_state: MetaMode = MetaMode.USER 
+        self.obstacle_mode: ObstacleMode = ObstacleMode.NORMAL
         self.state_lock: asyncio.Lock = asyncio.Lock()  # Lock to protect access to the robot's state (manual, autonomous, stopped)
         self.lidar_lock: asyncio.Lock = asyncio.Lock()   # Lock to protect access to lidar data (written and read by both socketio server and main loop)
 
@@ -44,9 +44,9 @@ class Robot:
         self.latest_sensor_data: SensorData | None = None               # written by serial thread, read by pose loop
         self.lidar_data: LidarData | None = None
         self.repulsive_vector: tuple[float, float] = (0, 0) # repulsive vector calculated from lidar data for obstacle avoidance, updated in main loop after processing new lidar data, and used in path following to modify the target point for obstacle avoidance
-        self.main_loop_task: asyncio.Task = None
+        self.main_loop_task: asyncio.Task | None = None
         self.main_loop_thread: threading.Thread | None = None
-        self.loop = None
+        self.loop: asyncio.AbstractEventLoop | None = None
         self._loop_ready: threading.Event = threading.Event()
      
         self.cur_path: Path | PurePursuit | GoToGoal | None = None 
@@ -54,12 +54,13 @@ class Robot:
         self.last_command_sent_at: float = 0.0
         self.last_command_type: CommandType | None = None
         self.last_command_id: str = ""
-        self.freeze_after_cmd_window_s = 0.5
+        self.freeze_after_cmd_window_s: float = 0.5
         
-        self.velocity_profile_start = None
-        self.pending_motor_command = None
+        self.velocity_profile_start: float | None = None
+        self.pending_motor_command: Command | None = None
         
-        self.max_loop_time = 0.0
+        self.max_loop_time: float = 0.0
+        self.virtual_obstacles: List[VirtualObstacle] = []
         
         self.obstacle_clear.set()
 
@@ -125,9 +126,8 @@ class Robot:
         self._logger.info("Stopping robot")
         async with self.state_lock:
             self.state = Mode.STOPPED
-            
+        self.state_estimator.reset()  # Reset state estimator to clear any erroneous state from before the stop
         await self.socketio.emit('emergency_stop', {"status": "success"})
-        
         
     async def resume(self):
         """Resume normal operation after an emergency stop."""
@@ -136,14 +136,28 @@ class Robot:
             self.state = Mode.MANUAL
         await self.send_safe_command(Command.stop())   # clear any stale setpoint
         await self.send_safe_command(Command.enable())
-        self.state_estimator.reset()  # Reset state estimator to clear any erroneous state from before the stop
         await self.socketio.emit('resume', {"status": "success"})
             
 
     async def obstacle_stop(self):
         """Stop the robot for a short duration when an obstacle is detected."""
-        await self.send_safe_command(Command.stop())  # Stop
-    
+        await self.send_safe_command(Command.from_joystic(-1, 0), wait_after=self.backup_time)  # Stop
+        await asyncio.sleep(self.backup_time)
+        await self.send_safe_command(Command.stop())
+        
+    async def update_virtual_obstacles(self, data: List[VirtualObstacle]):
+        self.virtual_obstacles = data
+
+    async def update_obstacle_mode(self, data):
+        raw_mode = data.get("mode") if isinstance(data, dict) else data
+        try:
+            self.obstacle_mode = ObstacleMode(raw_mode)
+        except ValueError:
+            self._logger.warning(f"Ignoring unknown obstacle mode: {raw_mode}")
+            return
+
+        self._logger.info(f"Updated obstacle mode: {self.obstacle_mode.value}")
+        
     @staticmethod
     def bytes_to_sensor_data(data: bytes) -> SensorData:
         """Convert bytes to SensorData model."""
@@ -268,10 +282,12 @@ class Robot:
         '''
         
         # Try lidar for obstacle avoidance
+        
         if abs(self.repulsive_vector[1]) >= ROBOT_CONFIG.REPULSIVE_THRESHOLD:
             asyncio.create_task(self.obstacle_stop())
             self.obstacle_clear.clear()
             asyncio.create_task(self._reset_obstacle_clear())
+    
             
         return distance_left, distance_right
         
@@ -375,20 +391,44 @@ class Robot:
 
             # Only handle obstacle stopping and detection if in manual mode, since path following uses potential field control.
             if (asyncio.get_event_loop().time() - self.last_obstacle_detect_time) >= obstacle_dt:
-                async with self.lidar_lock:
-                    lidar_data = self.lidar_data
-                    if lidar_data:
-                        self.repulsive_vector = lidar_data.get_repulsive_vector(sensor_data)
-                    else:
-                        self.repulsive_vector = (0, 0)
+                if self.obstacle_mode == ObstacleMode.NORMAL:
+                    async with self.lidar_lock:
+                        lidar_data = self.lidar_data
+                        if lidar_data:
+                            self.repulsive_vector = lidar_data.get_repulsive_vector(sensor_data)
+                        else:
+                            self.repulsive_vector = (0, 0)
+                        
+                    # Will not backup if in STOPPED mode or PATH_FOLLOWING. Only during MANUAL
+                    filtered_left, filtered_right = await self.handle_obstacle(sensor_data) ## Run simple smoothing via moving average and handle obstacle detection/backup
+                    self.latest_sensor_data.ultrasonic.distance_left = filtered_left
+                    self.latest_sensor_data.ultrasonic.distance_right = filtered_right
+                    self.left_distance_history.append(sensor_data.ultrasonic.distance_left) # Store the ultrasonic distance for history for smoothing
+                    self.right_distance_history.append(sensor_data.ultrasonic.distance_right)
+                else:
+                    repulsive_vector = [0, 0]
+                    min_ultrasonic_right = 300
+                    min_ultrasonic_left = 300
                     
-                # Will not backup if in STOPPED mode or PATH_FOLLOWING. Only during MANUAL
-                filtered_left, filtered_right = await self.handle_obstacle(sensor_data) ## Run simple smoothing via moving average and handle obstacle detection/backup
-                self.latest_sensor_data.ultrasonic.distance_left = filtered_left
-                self.latest_sensor_data.ultrasonic.distance_right = filtered_right
-                self.left_distance_history.append(sensor_data.ultrasonic.distance_left) # Store the ultrasonic distance for history for smoothing
-                self.right_distance_history.append(sensor_data.ultrasonic.distance_right)
-                
+                    for obstacle in self.virtual_obstacles:
+                        repulsive_x, repulsive_y = obstacle.get_repulsive_vector(self.state_estimator.state)
+                        repulsive_vector[0] += repulsive_x
+                        repulsive_vector[1] += repulsive_y
+                        
+                        ultrasonic_left, ultrasonic_right = obstacle.get_ultrasonic_distance(self.state_estimator.state)
+                        ultrasonic_left *= 10
+                        ultrasonic_right *= 10
+                        
+                        if ultrasonic_left < min_ultrasonic_left:
+                            min_ultrasonic_left = ultrasonic_left
+                            
+                        if ultrasonic_right < min_ultrasonic_right:
+                            min_ultrasonic_right = ultrasonic_right
+                        
+                    self.repulsive_vector = tuple(repulsive_vector)
+                    self.latest_sensor_data.ultrasonic.distance_left = min_ultrasonic_left
+                    self.latest_sensor_data.ultrasonic.distance_right = min_ultrasonic_right
+
                 self.last_obstacle_detect_time = asyncio.get_event_loop().time()
                 
             
@@ -663,4 +703,3 @@ class Robot:
             )
         )
     
-

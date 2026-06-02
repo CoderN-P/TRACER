@@ -1,5 +1,8 @@
 import math
-from . import RobotState, HeadingFilter, PoseFilter
+import numpy as np
+import time
+from collections import deque
+from . import RobotState, HeadingFilter, PoseFilter, EKFSnapshot
 from .. import SensorData, LidarData, ROBOT_CONFIG
 
 
@@ -16,8 +19,7 @@ class StateEstimator:
             angular_velocity=0.0
         )
         
-        self.prev_state: RobotState = self.state.model_copy()
-        
+        self.history: deque[EKFSnapshot] = deque(maxlen=ROBOT_CONFIG.STATE_HISTORY_SIZE)
         # Pre state estimations
         self.initial_mag_heading = None
         self.theta_encoders = 0.0 # Cumulative heading change from encoders, in radians
@@ -65,8 +67,16 @@ class StateEstimator:
 
     @staticmethod
     def estimate_linear_velocity(left_ticks, right_ticks, dt):
-        delta_left = left_ticks * ROBOT_CONFIG.METERS_PER_TICK_LEFT
-        delta_right = right_ticks * ROBOT_CONFIG.METERS_PER_TICK_RIGHT
+        delta_left = left_ticks * (
+            ROBOT_CONFIG.METERS_PER_TICK_LEFT_POS
+            if left_ticks >= 0
+            else ROBOT_CONFIG.METERS_PER_TICK_LEFT_NEG
+        )
+        delta_right = right_ticks * (
+            ROBOT_CONFIG.METERS_PER_TICK_RIGHT_POS
+            if right_ticks >= 0
+            else ROBOT_CONFIG.METERS_PER_TICK_RIGHT_NEG
+        )
         linear_velocity = (delta_left + delta_right) / (2 * dt)
         return linear_velocity
 
@@ -74,13 +84,19 @@ class StateEstimator:
     def _wrap_to_pi(angle: float) -> float:
         return (angle + math.pi) % (2 * math.pi) - math.pi
 
-    import math
-
     @staticmethod
     def get_position_delta(left_ticks, right_ticks, heading, prev_heading):
         # 1. Distances of each wheel
-        delta_l = left_ticks * ROBOT_CONFIG.METERS_PER_TICK_LEFT
-        delta_r = right_ticks * ROBOT_CONFIG.METERS_PER_TICK_RIGHT
+        delta_l = left_ticks * (
+            ROBOT_CONFIG.METERS_PER_TICK_LEFT_POS
+            if left_ticks >= 0
+            else ROBOT_CONFIG.METERS_PER_TICK_LEFT_NEG
+        )
+        delta_r = right_ticks * (
+            ROBOT_CONFIG.METERS_PER_TICK_RIGHT_POS
+            if right_ticks >= 0
+            else ROBOT_CONFIG.METERS_PER_TICK_RIGHT_NEG
+        )
     
         # 2. Wrap-safe heading and angular delta
         d_heading = StateEstimator._wrap_to_pi(heading - prev_heading)
@@ -107,7 +123,17 @@ class StateEstimator:
         # Previous sensor data is needed to determine dt
         if not previous_sensor_data: return
         
-        self.prev_state = self.state.model_copy()
+        if len(self.history) == 0:
+            self.history.append(EKFSnapshot(
+                timestamp=time.time_ns() // 1000,
+                robot_state=self.state.model_copy(),
+                sensor_data=previous_sensor_data.model_copy(),
+                heading_covariance=self.heading_filter.P,
+                pose_covariance=self.pose_filter.P,
+                gyro_bias=self.heading_filter.state[1],
+                theta_encoders=self.theta_encoders
+            ))
+            
         dt = self.calculate_dt(sensor_data.timestamp, previous_sensor_data.timestamp)
         
         if dt < 1e-6: return
@@ -139,14 +165,81 @@ class StateEstimator:
         self.state.linear_velocity = self.estimate_linear_velocity(delta_left_ticks, delta_right_ticks, dt)
         self.state.angular_velocity = sensor_data.imu.gyroscope_z - self.heading_filter.state[1]
 
-        position_delta_x, position_delta_y = self.get_position_delta(delta_left_ticks, delta_right_ticks, self.state.yaw, self.prev_state.yaw)
+        position_delta_x, position_delta_y = self.get_position_delta(delta_left_ticks, delta_right_ticks, self.state.yaw, self.history[-1].robot_state.yaw)
         
-        self.state.x, self.state.y = self.pose_filter.step(position_delta_x, position_delta_y, lidar_data)
+        # If lidar data is not none, go through history to find the timstamp that most closely matches lidar timestamp and replay from there
+        
+        if lidar_data:
+            closest_idx = 0
+            closest_error = float("inf")
+            
+            for i in range(len(self.history)):
+                error = abs(
+                    self.history[i].timestamp -
+                    lidar_data.timestamp
+                )
+            
+                if error < closest_error:
+                    closest_error = error
+                    closest_idx = i
+                    
+            if closest_idx < 1:
+                self.state.x, self.state.y = self.pose_filter.step(position_delta_x, position_delta_y, None)
+            else:
+                # Repeat all the steps from closest_idx to the end of history, but with the lidar update at closest_idx
+                # Run once with injected lidar measurement then call update for the following snapshots
+                closest = self.history[closest_idx]
+                self.heading_filter.P = closest.heading_covariance
+                self.heading_filter.state = np.array([closest.robot_state.yaw, closest.gyro_bias])
+                self.pose_filter.P = closest.pose_covariance
+                self.pose_filter.state = np.array([closest.robot_state.x, closest.robot_state.y])
+                self.theta_encoders = closest.theta_encoders
+                self.state = closest.robot_state
+                
+                # Clear outdated snapshots 
+                removed = 0
+                sensor_data_history = []
+                while len(self.history) > closest_idx + 1:
+                    removed += 1
+                    sensor_data_history.append(self.history.pop().sensor_data)
+                    
+                # update the closest snapshot with VIO measurement 
+                self.pose_filter.update(lidar_data.camera.x, lidar_data.camera.y, self.pose_filter.state, self.pose_filter.P)
+                    
+                # re run by calling update for the number of snapshots we removed
+                for i in range(0, removed):
+                    if i == 0:
+                        self.update(sensor_data_history[removed - 1 - i], self.history[-1].sensor_data, None)
+                    else:
+                        self.update(sensor_data_history[removed - 1 - i], sensor_data_history[removed - i], None)
+                
+                
+        else:
+            self.state.x, self.state.y = self.pose_filter.step(position_delta_x, position_delta_y, None)
+
+        self.history.append(EKFSnapshot(
+            timestamp=time.time_ns() // 1000,
+            robot_state=self.state.model_copy(),
+            sensor_data=sensor_data.model_copy(),
+            pose_covariance=self.pose_filter.P,
+            heading_covariance=self.heading_filter.P,
+            gyro_bias=self.heading_filter.state[1],
+            theta_encoders=self.theta_encoders
+        ))
+        
         return
         
         
     @staticmethod
     def heading_delta_from_encoders(left_ticks, right_ticks):
-        delta_left = left_ticks * ROBOT_CONFIG.METERS_PER_TICK_LEFT
-        delta_right = right_ticks * ROBOT_CONFIG.METERS_PER_TICK_RIGHT
+        delta_left = left_ticks * (
+            ROBOT_CONFIG.METERS_PER_TICK_LEFT_POS
+            if left_ticks >= 0
+            else ROBOT_CONFIG.METERS_PER_TICK_LEFT_NEG
+        )
+        delta_right = right_ticks * (
+            ROBOT_CONFIG.METERS_PER_TICK_RIGHT_POS
+            if right_ticks >= 0
+            else ROBOT_CONFIG.METERS_PER_TICK_RIGHT_NEG
+        )
         return (delta_right - delta_left) / ROBOT_CONFIG.WHEEL_BASE

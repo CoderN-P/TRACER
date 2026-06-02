@@ -1,6 +1,7 @@
 <script lang="ts">
   import { browser } from "$app/environment";
   import { onMount } from "svelte";
+  import { io as socket } from "$lib/api/socket";
   import {
     PlusIcon,
     Trash,
@@ -10,8 +11,10 @@
     X,
     Play,
     StopCircle,
+    CircleIcon,
+    Square,
   } from "lucide-svelte";
-  import { Stage, Layer, Line, Circle, Text } from "svelte-konva";
+  import { Stage, Layer, Line, Circle, Rect, Text } from "svelte-konva";
   import {
     QuinticHermiteSplineSvelte,
     SplinePathSvelte,
@@ -234,7 +237,7 @@
   });
 
   // ── Mode ──────────────────────────────────────────────────────────────────
-  type Mode = "spline" | "freehand" | "point" | "svg";
+  type Mode = "spline" | "freehand" | "point" | "svg" | "obstacle";
   let mode = $state<Mode>("spline");
 
   // ── Point mode ────────────────────────────────────────────────────────────
@@ -243,6 +246,169 @@
   // ── SVG mode ──────────────────────────────────────────────────────────────
   let svgPath = $state<{ x: number; y: number }[]>([]);
   let svgFileName = $state<string | null>(null);
+
+  // ── Virtual obstacles ────────────────────────────────────────────────────
+  type ObstacleShape = "circle" | "rectangle";
+  type ObstacleAvoidanceMode = "normal" | "virtual";
+  type VirtualObstaclePayload = {
+    obstacle_type: ObstacleShape;
+    position: [number, number];
+    width: number | null;
+    height: number | null;
+    radius: number | null;
+    rotation: number | null;
+  };
+
+  type VirtualObstacle =
+    | {
+        id: string;
+        shape: "circle";
+        x: number;
+        y: number;
+        radius: number;
+      }
+    | {
+        id: string;
+        shape: "rectangle";
+        x: number;
+        y: number;
+        width: number;
+        height: number;
+        rotation: number;
+      };
+
+  let obstacleShape = $state<ObstacleShape>("circle");
+  let obstacleAvoidanceMode = $state<ObstacleAvoidanceMode>("normal");
+  let virtualObstacles = $state<VirtualObstacle[]>([]);
+  let selectedObstacleId = $state<string | null>(null);
+  let obstacleIdCounter = 0;
+
+  function serializeVirtualObstacles(
+    obstacles: VirtualObstacle[],
+  ): VirtualObstaclePayload[] {
+    return obstacles.map((obstacle) =>
+      obstacle.shape === "circle"
+        ? {
+            obstacle_type: "circle",
+            position: [obstacle.x, obstacle.y],
+            width: null,
+            height: null,
+            radius: obstacle.radius,
+            rotation: null,
+          }
+        : {
+            obstacle_type: "rectangle",
+            position: [obstacle.x, obstacle.y],
+            width: obstacle.width,
+            height: obstacle.height,
+            radius: null,
+            rotation: (obstacle.rotation * Math.PI) / 180,
+          },
+    );
+  }
+
+  function emitVirtualObstacles(obstacles: VirtualObstacle[]) {
+    socket.emit(
+      "update_virtual_obstacles",
+      serializeVirtualObstacles(obstacles),
+    );
+  }
+
+  function setVirtualObstacles(nextObstacles: VirtualObstacle[]) {
+    virtualObstacles = nextObstacles;
+    emitVirtualObstacles(nextObstacles);
+  }
+
+  function setObstacleAvoidanceMode(nextMode: ObstacleAvoidanceMode) {
+    obstacleAvoidanceMode = nextMode;
+    socket.emit("update_obstacle_mode", { mode: nextMode });
+
+    if (nextMode === "virtual") {
+      emitVirtualObstacles(virtualObstacles);
+    }
+  }
+
+  function updateObstacle(
+    id: string,
+    update: (obstacle: VirtualObstacle) => VirtualObstacle,
+  ) {
+    setVirtualObstacles(
+      virtualObstacles.map((obstacle) =>
+        obstacle.id === id ? update(obstacle) : obstacle,
+      ),
+    );
+  }
+
+  function addVirtualObstacle(center: { x: number; y: number }) {
+    const id = `virtual-obstacle-${++obstacleIdCounter}`;
+    const obstacle: VirtualObstacle =
+      obstacleShape === "circle"
+        ? {
+            id,
+            shape: "circle",
+            x: center.x,
+            y: center.y,
+            radius: 0.2,
+          }
+        : {
+            id,
+            shape: "rectangle",
+            x: center.x,
+            y: center.y,
+            width: 0.4,
+            height: 0.3,
+            rotation: 0,
+          };
+
+    setVirtualObstacles([...virtualObstacles, obstacle]);
+    selectedObstacleId = id;
+  }
+
+  function obstacleModeClick(e) {
+    if (mode !== "obstacle" || running) return;
+    if (e.evt.button !== 0) return;
+    if (e.target !== e.target.getStage()) return;
+
+    const world = pointerToWorld(e.target.getStage());
+    addVirtualObstacle({ x: world.x / SCALE, y: -world.y / SCALE });
+  }
+
+  function deleteSelectedObstacle() {
+    if (selectedObstacleId === null) return;
+    setVirtualObstacles(
+      virtualObstacles.filter((obstacle) => obstacle.id !== selectedObstacleId),
+    );
+    selectedObstacleId = null;
+  }
+
+  function clearVirtualObstacles() {
+    setVirtualObstacles([]);
+    selectedObstacleId = null;
+  }
+
+  function rotatePoint(
+    point: { x: number; y: number },
+    center: { x: number; y: number },
+    degrees: number,
+  ) {
+    const radians = (degrees * Math.PI) / 180;
+    const cos = Math.cos(radians);
+    const sin = Math.sin(radians);
+    const dx = point.x - center.x;
+    const dy = point.y - center.y;
+
+    return {
+      x: center.x + dx * cos - dy * sin,
+      y: center.y + dx * sin + dy * cos,
+    };
+  }
+
+  function screenToWorldMeters(position: { x: number; y: number }) {
+    return {
+      x: position.x / SCALE,
+      y: -position.y / SCALE,
+    };
+  }
 
   // ── Freehand drawing ──────────────────────────────────────────────────────
   // Raw canvas-pixel points captured during a stroke (in world pixels).
@@ -944,6 +1110,18 @@
         >
           <Image class="w-3.5 h-3.5" /> SVG
         </button>
+        <button
+          onclick={() => {
+            mode = "obstacle";
+          }}
+          disabled={running}
+          class="flex items-center gap-1 px-3 py-2 text-xs transition-colors border-l border-gray-200 {mode ===
+          'obstacle'
+            ? 'bg-red-600 text-white'
+            : 'bg-gray-50 text-black hover:bg-gray-100'} disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          <Square class="w-3.5 h-3.5" /> Obstacles
+        </button>
       </div>
 
       <!-- Spline-mode controls -->
@@ -1079,6 +1257,80 @@
         </span>
       {/if}
 
+      <!-- Obstacle-mode controls -->
+      {#if mode === "obstacle"}
+        <div class="flex overflow-hidden rounded-md border border-gray-200">
+          <button
+            onclick={() => setObstacleAvoidanceMode("normal")}
+            class="px-3 py-2 text-xs font-semibold transition-colors {obstacleAvoidanceMode ===
+            'normal'
+              ? 'bg-gray-900 text-white'
+              : 'bg-gray-50 text-gray-700 hover:bg-gray-100'}"
+            title="Use physical sensors for obstacle handling"
+          >
+            Normal
+          </button>
+          <button
+            onclick={() => setObstacleAvoidanceMode("virtual")}
+            class="border-l border-gray-200 px-3 py-2 text-xs font-semibold transition-colors {obstacleAvoidanceMode ===
+            'virtual'
+              ? 'bg-red-600 text-white'
+              : 'bg-gray-50 text-gray-700 hover:bg-gray-100'}"
+            title="Use virtual map obstacles for obstacle handling"
+          >
+            Virtual
+          </button>
+        </div>
+        <div class="flex overflow-hidden rounded-md border border-gray-200">
+          <button
+            onclick={() => {
+              obstacleShape = "circle";
+            }}
+            class="flex items-center gap-1 px-3 py-2 text-xs transition-colors {obstacleShape ===
+            'circle'
+              ? 'bg-red-600 text-white'
+              : 'bg-gray-50 text-black hover:bg-gray-100'}"
+            title="Place circular obstacles"
+          >
+            <CircleIcon class="w-3.5 h-3.5" /> Circle
+          </button>
+          <button
+            onclick={() => {
+              obstacleShape = "rectangle";
+            }}
+            class="flex items-center gap-1 border-l border-gray-200 px-3 py-2 text-xs transition-colors {obstacleShape ===
+            'rectangle'
+              ? 'bg-red-600 text-white'
+              : 'bg-gray-50 text-black hover:bg-gray-100'}"
+            title="Place rectangular obstacles"
+          >
+            <Square class="w-3.5 h-3.5" /> Rect
+          </button>
+        </div>
+        <button
+          onclick={deleteSelectedObstacle}
+          disabled={selectedObstacleId === null}
+          class="flex items-center gap-1 px-3 py-2 text-xs bg-gray-50 text-black border border-gray-200 rounded-md hover:bg-gray-100 transition-colors disabled:cursor-not-allowed disabled:opacity-40"
+          title="Delete selected obstacle"
+        >
+          <Trash class="w-3.5 h-3.5" /> Delete
+        </button>
+        <button
+          onclick={clearVirtualObstacles}
+          disabled={virtualObstacles.length === 0}
+          class="flex items-center gap-1 px-3 py-2 text-xs bg-gray-50 text-black border border-gray-200 rounded-md hover:bg-gray-100 transition-colors disabled:cursor-not-allowed disabled:opacity-40"
+          title="Clear virtual obstacles"
+        >
+          <X class="w-3.5 h-3.5" /> Clear
+        </button>
+        <span class="text-xs text-gray-400">
+          {virtualObstacles.length} obstacle{virtualObstacles.length === 1
+            ? ""
+            : "s"} · click map to place, drag to move, drag red/orange handles
+          to scale/rotate
+        </span>
+      {/if}
+
       <div class="ml-auto flex items-center gap-2">
         {#if !running}
           <button
@@ -1152,7 +1404,7 @@
         ? isDrawing
           ? 'crosshair'
           : 'crosshair'
-        : mode === 'point'
+        : mode === 'point' || mode === 'obstacle'
           ? 'crosshair'
           : 'default'}"
     >
@@ -1169,6 +1421,8 @@
         onmousedown={(e) => {
           if (mode === "point") {
             pointModeClick(e);
+          } else if (mode === "obstacle") {
+            obstacleModeClick(e);
           } else {
             freehandMouseDown(e);
           }
@@ -1209,6 +1463,205 @@
             />
           {/each}
         </Layer>
+
+        <!-- Virtual obstacles -->
+        {#if virtualObstacles.length > 0}
+          <Layer>
+            {#each virtualObstacles as obstacle (obstacle.id)}
+              {@const selected = selectedObstacleId === obstacle.id}
+              {#if obstacle.shape === "circle"}
+                <Circle
+                  x={obstacle.x * SCALE}
+                  y={-obstacle.y * SCALE}
+                  radius={obstacle.radius * SCALE}
+                  fill="rgba(239, 68, 68, 0.18)"
+                  stroke={selected ? "#dc2626" : "#f97316"}
+                  strokeWidth={(selected ? 2.5 : 1.5) / zoom}
+                  dash={selected ? [] : [8 / zoom, 6 / zoom]}
+                  draggable={!running}
+                  onclick={() => {
+                    selectedObstacleId = obstacle.id;
+                  }}
+                  ondragmove={(e) => {
+                    const pos = e.target.position();
+                    updateObstacle(obstacle.id, (current) =>
+                      current.shape === "circle"
+                        ? {
+                            ...current,
+                            x: pos.x / SCALE,
+                            y: -pos.y / SCALE,
+                          }
+                        : current,
+                    );
+                  }}
+                />
+                {#if selected && !running}
+                  <Circle
+                    x={(obstacle.x + obstacle.radius) * SCALE}
+                    y={-obstacle.y * SCALE}
+                    radius={6 / zoom}
+                    fill="#dc2626"
+                    stroke="white"
+                    strokeWidth={1.5 / zoom}
+                    draggable
+                    ondragmove={(e) => {
+                      const pos = e.target.position();
+                      const world = { x: pos.x / SCALE, y: -pos.y / SCALE };
+                      updateObstacle(obstacle.id, (current) =>
+                        current.shape === "circle"
+                          ? {
+                              ...current,
+                              radius: Math.max(
+                                0.05,
+                                Math.hypot(
+                                  world.x - current.x,
+                                  world.y - current.y,
+                                ),
+                              ),
+                            }
+                          : current,
+                      );
+                    }}
+                  />
+                {/if}
+              {:else}
+                {@const rectWidthPx = obstacle.width * SCALE}
+                {@const rectHeightPx = obstacle.height * SCALE}
+                {@const resizeHandle = rotatePoint(
+                  {
+                    x: obstacle.x + obstacle.width / 2,
+                    y: obstacle.y - obstacle.height / 2,
+                  },
+                  obstacle,
+                  obstacle.rotation,
+                )}
+                {@const rotationHandle = rotatePoint(
+                  {
+                    x: obstacle.x,
+                    y: obstacle.y + obstacle.height / 2 + 0.18,
+                  },
+                  obstacle,
+                  obstacle.rotation,
+                )}
+                {@const rotationStem = rotatePoint(
+                  {
+                    x: obstacle.x,
+                    y: obstacle.y + obstacle.height / 2,
+                  },
+                  obstacle,
+                  obstacle.rotation,
+                )}
+                <Rect
+                  x={obstacle.x * SCALE}
+                  y={-obstacle.y * SCALE}
+                  width={rectWidthPx}
+                  height={rectHeightPx}
+                  offsetX={rectWidthPx / 2}
+                  offsetY={rectHeightPx / 2}
+                  rotation={-obstacle.rotation}
+                  fill="rgba(239, 68, 68, 0.16)"
+                  stroke={selected ? "#dc2626" : "#f97316"}
+                  strokeWidth={(selected ? 2.5 : 1.5) / zoom}
+                  dash={selected ? [] : [8 / zoom, 6 / zoom]}
+                  draggable={!running}
+                  onclick={() => {
+                    selectedObstacleId = obstacle.id;
+                  }}
+                  ondragmove={(e) => {
+                    const pos = e.target.position();
+                    updateObstacle(obstacle.id, (current) =>
+                      current.shape === "rectangle"
+                        ? {
+                            ...current,
+                            x: pos.x / SCALE,
+                            y: -pos.y / SCALE,
+                          }
+                        : current,
+                    );
+                  }}
+                />
+                {#if selected && !running}
+                  <Line
+                    points={[
+                      rotationStem.x * SCALE,
+                      -rotationStem.y * SCALE,
+                      rotationHandle.x * SCALE,
+                      -rotationHandle.y * SCALE,
+                    ]}
+                    stroke="#dc2626"
+                    strokeWidth={1.5 / zoom}
+                  />
+                  <Circle
+                    x={rotationHandle.x * SCALE}
+                    y={-rotationHandle.y * SCALE}
+                    radius={5.5 / zoom}
+                    fill="#f97316"
+                    stroke="white"
+                    strokeWidth={1.5 / zoom}
+                    draggable
+                    ondragmove={(e) => {
+                      const world = screenToWorldMeters(e.target.position());
+                      updateObstacle(obstacle.id, (current) => {
+                        if (current.shape !== "rectangle") return current;
+                        const angle =
+                          (Math.atan2(
+                            world.y - current.y,
+                            world.x - current.x,
+                          ) *
+                            180) /
+                            Math.PI -
+                          90;
+                        return {
+                          ...current,
+                          rotation: angle,
+                        };
+                      });
+                    }}
+                  />
+                  <Circle
+                    x={resizeHandle.x * SCALE}
+                    y={-resizeHandle.y * SCALE}
+                    radius={6 / zoom}
+                    fill="#dc2626"
+                    stroke="white"
+                    strokeWidth={1.5 / zoom}
+                    draggable
+                    ondragmove={(e) => {
+                      const world = screenToWorldMeters(e.target.position());
+                      updateObstacle(obstacle.id, (current) => {
+                        if (current.shape !== "rectangle") return current;
+                        const local = rotatePoint(
+                          world,
+                          current,
+                          -current.rotation,
+                        );
+                        const left = current.x - current.width / 2;
+                        const top = current.y + current.height / 2;
+                        const width = Math.max(0.05, local.x - left);
+                        const height = Math.max(0.05, top - local.y);
+                        const center = rotatePoint(
+                          {
+                            x: left + width / 2,
+                            y: top - height / 2,
+                          },
+                          current,
+                          current.rotation,
+                        );
+                        return {
+                          ...current,
+                          width,
+                          height,
+                          x: center.x,
+                          y: center.y,
+                        };
+                      });
+                    }}
+                  />
+                {/if}
+              {/if}
+            {/each}
+          </Layer>
+        {/if}
 
         <!-- Spline path — hidden during freehand run -->
         {#if !running || runSource === "spline"}

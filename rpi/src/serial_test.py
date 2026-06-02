@@ -1,4 +1,4 @@
-# Prints out sensor pckets every second from the esp32, to test the serial connection and packet parsing logic. Run this while the esp32 is sending packets, and you should see the sensor data printed out every second.
+# Prints out sensor packets every second from the esp32, to test the serial connection and packet parsing logic. Run this while the esp32 is sending packets, and you should see the sensor data printed out every second.
 import logging
 import time
 import threading

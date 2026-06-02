@@ -3,9 +3,8 @@ from dataclasses import dataclass
 
 @dataclass
 class RobotConfig:
-    MEASURED_WHEEL_BASE: float
+    WHEEL_BASE: float
     WHEEL_DIAMETER: float
-    WHEEL_BASE_CORRECTION: float
     MAX_RPM: int
     REDUCTION_RATIO: float
     JOYSTICK_DEADZONE: float
@@ -33,8 +32,10 @@ class RobotConfig:
     MANUAL_FREQ: float
     ENCODER_PPR: int
     MAX_ENCODER_MARGIN: float
-    LEFT_CORRECTION: float
-    RIGHT_CORRECTION: float
+    LEFT_CORRECTION_POS: float
+    RIGHT_CORRECTION_POS: float
+    LEFT_CORRECTION_NEG: float
+    RIGHT_CORRECTION_NEG: float
     G: float
     LSB_G: float
     LSB_uT: float
@@ -51,6 +52,7 @@ class RobotConfig:
     R_THETA_ENCODER: float
     R_THETA_MAGNETOMETER: float
     R_POSITION: float
+    STATE_HISTORY_SIZE: int
     LOOKAHEAD_DISTANCE: float
     COMPLETION_THRESHOLD: float
     MAX_SEARCH_POINTS: int
@@ -63,10 +65,6 @@ class RobotConfig:
     K_OMEGA: float
     K_V: float
     K_D: float
-    
-    @property
-    def WHEEL_BASE(self) -> float:
-        return self.MEASURED_WHEEL_BASE * self.WHEEL_BASE_CORRECTION
 
     @property
     def WHEEL_RADIUS(self) -> float:
@@ -78,7 +76,7 @@ class RobotConfig:
 
     @property
     def MAX_LINEAR_VEL(self) -> float:
-        return 0.46 # (self.MAX_RPM * self.WHEEL_CIRCUMFERENCE) / 60.0
+        return 0.43 # (self.MAX_RPM * self.WHEEL_CIRCUMFERENCE) / 60.0
 
     @property
     def ENCODER_TICKS_PER_REV(self) -> int:
@@ -89,12 +87,20 @@ class RobotConfig:
         return self.WHEEL_CIRCUMFERENCE / self.ENCODER_TICKS_PER_REV
 
     @property
-    def METERS_PER_TICK_LEFT(self) -> float:
-        return self.METERS_PER_TICK * self.LEFT_CORRECTION
+    def METERS_PER_TICK_LEFT_POS(self) -> float:
+        return self.METERS_PER_TICK * self.LEFT_CORRECTION_POS
 
     @property
-    def METERS_PER_TICK_RIGHT(self) -> float:
-        return self.METERS_PER_TICK * self.RIGHT_CORRECTION
+    def METERS_PER_TICK_RIGHT_POS(self) -> float:
+        return self.METERS_PER_TICK * self.RIGHT_CORRECTION_POS
+
+    @property
+    def METERS_PER_TICK_LEFT_NEG(self) -> float:
+        return self.METERS_PER_TICK * self.LEFT_CORRECTION_NEG
+
+    @property
+    def METERS_PER_TICK_RIGHT_NEG(self) -> float:
+        return self.METERS_PER_TICK * self.RIGHT_CORRECTION_NEG
 
     @property
     def LSB_RAD(self) -> float:

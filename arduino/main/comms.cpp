@@ -91,8 +91,6 @@ void handleCommand(byte *buffer, size_t length)
         // Command 0x02: Update OLED with two lines of text
         memcpy(line1, &buffer[2], 16);
         memcpy(line2, &buffer[18], 16);
-        line1[16] = '\0';
-        line2[16] = '\0';
     }
     else if (cmd == CMD_ENABLE && length == 3)
     {
@@ -152,8 +150,10 @@ void handleCommand(byte *buffer, size_t length)
     }
 
     // Update OLED lines in robot state
-    if (xSemaphoreTake(state_mutex, pdMS_TO_TICKS(5)) == pdTRUE)
+    if (xSemaphoreTake(state_mutex, pdMS_TO_TICKS(0)) == pdTRUE)
     {
+        line1[16] = '\0';
+        line2[16] = '\0';
         strncpy(robot_state.oledLine1, line1, 16);
         strncpy(robot_state.oledLine2, line2, 16);
         xSemaphoreGive(state_mutex);

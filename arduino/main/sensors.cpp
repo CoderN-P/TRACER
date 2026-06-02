@@ -117,7 +117,7 @@ uint8_t getBatteryPercent()
 
 void getLSMData(int16_t &ax, int16_t &ay, int16_t &az, int16_t &gx, int16_t &gy, int16_t &gz, int16_t &tempC)
 {
-    if (!takeI2CMutex(pdMS_TO_TICKS(2)))
+    if (!takeI2CMutex(pdMS_TO_TICKS(1.5)))
     {
         return;
     }
@@ -151,7 +151,7 @@ void getLSMData(int16_t &ax, int16_t &ay, int16_t &az, int16_t &gx, int16_t &gy,
 
 void getMagnetometerData(int16_t &magX, int16_t &magY, int16_t &magZ)
 {
-    if (!takeI2CMutex(pdMS_TO_TICKS(2)))
+    if (!takeI2CMutex(pdMS_TO_TICKS(1.5)))
     {
         return;
     }

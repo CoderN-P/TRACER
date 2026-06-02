@@ -120,6 +120,14 @@ def setup_routes(robot):
     async def vel_command(sid, data):    
         await on_robot_loop(robot.execute_velocity_profile(data["profile"], data["mode"]))
         
+    @sio.on('update_virtual_obstacles')
+    async def update_virtual_obstacles(sid, data):
+        await on_robot_loop(robot.update_virtual_obstacles(data))
+
+    @sio.on('update_obstacle_mode')
+    async def update_obstacle_mode(sid, data):
+        await on_robot_loop(robot.update_obstacle_mode(data))
+        
     @sio.event
     async def connect(sid, environ):
         logger.info(f"Client connected: {sid}")

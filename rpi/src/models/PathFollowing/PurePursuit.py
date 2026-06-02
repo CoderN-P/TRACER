@@ -109,7 +109,7 @@ class PurePursuit:
         return None # no goal point found
 
     def shift_target_apf(self, repulsive_vector: tuple[float, float], target: list[float], sensor_data: SensorData):
-        raw_shift = repulsive_vector[0] * ROBOT_CONFIG.K_LIDAR_SHIFT
+        raw_shift = -repulsive_vector[0] * ROBOT_CONFIG.K_LIDAR_SHIFT
         raw_shift += (1 / sensor_data.ultrasonic.distance_left) * ROBOT_CONFIG.K_US_SHIFT if 1e-4 < sensor_data.ultrasonic.distance_left <= ROBOT_CONFIG.OBSTACLE_AVOID_THRESHOLD else 0
         raw_shift -= (1 / sensor_data.ultrasonic.distance_right) * ROBOT_CONFIG.K_US_SHIFT if 1e-4 < sensor_data.ultrasonic.distance_right <= ROBOT_CONFIG.OBSTACLE_AVOID_THRESHOLD else 0
 
@@ -118,7 +118,6 @@ class PurePursuit:
         self.lateral_shift = ROBOT_CONFIG.OBSTACLE_ALPHA * self.lateral_shift + (1 - ROBOT_CONFIG.OBSTACLE_ALPHA) * raw_shift
 
         return target[0], target[1] + self.lateral_shift # y is lateral relative to robot, so it corresponds to x of repulsive vector
-
 
     def calculate_control_command(self, robot_state: RobotState, repulsive_vector: tuple[float, float], sensor_data: SensorData) -> Command | None:
         """
@@ -133,14 +132,18 @@ class PurePursuit:
         goal_point = self.find_goal_point(current_pos)
         
         if not goal_point:
-            logger = logging.getLogger("RobotManager")
-            logger.warning("PurePursuit lost the path")
-            
             if not self.go_to_goal:
+                logger = logging.getLogger("RobotManager")
+                logger.warning("PurePursuit lost the path")
                 self.go_to_goal = GoToGoal(self.path[self.last_found_index +  1])
 
             return self.go_to_goal.calculate_control_command(robot_state, repulsive_vector, sensor_data)
-        
+        else:
+            if self.go_to_goal:
+                logger = logging.getLogger("RobotManager")
+                logger.warning("PurePursuit found the path again")
+                self.go_to_goal = None
+                
         local_target = get_local_target(robot_state, goal_point)
         # Repulsive vector is already in the robot's local frame
         # Only apply lateral force to avoid pushing waypoints behind us

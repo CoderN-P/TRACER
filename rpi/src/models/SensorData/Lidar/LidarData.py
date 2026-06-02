@@ -10,7 +10,7 @@ class LidarData(BaseModel):
     """
     Represents the data from iPhone LIDAR sensor.
     """
-    timestamp: float = Field(..., description="Timestamp of the LIDAR reading in seconds since epoch")
+    timestamp: int = Field(..., description="Timestamp of the LIDAR reading in microseconds since epoch")
     camera: LidarCamera = Field(..., description="Position and orientation of the LIDAR camera")
     grid: LidarGrid = Field(..., description="Grid of distance measurements from the LIDAR sensor")
 

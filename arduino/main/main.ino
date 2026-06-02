@@ -96,10 +96,10 @@ void setup()
     // Create the command queue (10 commands deep, each command can be up to MAX_BUFFER_SIZE bytes)
     commandQueue = xQueueCreate(10, sizeof(byte) * MAX_BUFFER_SIZE);
 
-    setup_magnetometer();
+    // setup_magnetometer(); // Not currently used
     setup_pwm();
     setupOLED();
-    setup_tof();
+    // setup_tof(); // Not currently used, so skip initialization to save time and I2C bandwidth
     
     if (setup_lsm6dos())
     {
@@ -137,8 +137,8 @@ void setup()
     // Medium priority task for processing commands from the command queue
     xTaskCreatePinnedToCore(commandProcessorTask, "Command Processor Task", 4096, NULL, 3, &commandProcessorHandle, 0);
 
-    // Medium priority task for reading time-of-flight sensor at 20 Hz
-    xTaskCreate(tofTask, "ToF Task", 2048, NULL, 3, &tofTaskHandle);
+    // Medium priority task for reading time-of-flight sensor at 20 Hz (Not needed currently)
+    // xTaskCreate(tofTask, "ToF Task", 2048, NULL, 3, &tofTaskHandle);
 
     // Low priority task for updating the OLED at 2 Hz
     xTaskCreate(oledUpdateTask, "OLED Update Task", 2048, NULL, 2, &oledUpdateHandle);

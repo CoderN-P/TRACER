@@ -16,7 +16,7 @@ void mainLoop(void *pvParameters)
     uint8_t packetSeq = 0;
     uint8_t lastPIDMode = 0;      // 0 = PID control mode, 1 = open-loop PWM control mode
     uint32_t windowStartTime = 0; // Start time of the rolling window for max loop time calculation
-
+    
     float maxLoopTimeMs = 0.0f; // Max loop time in the rolling window
     static portMUX_TYPE spinlock = portMUX_INITIALIZER_UNLOCKED;
 
@@ -49,7 +49,7 @@ void mainLoop(void *pvParameters)
         int8_t pcntRight = (-1 * (int8_t) (pcntRightRaw)); // Invert right encoder count to match physical direction
 
         getLSMData(ax, ay, az, gx, gy, gz, tempC);
-        bool newMagData = loopCounter % 4 == 0; // Magnetometer updates at 50 Hz, so new data is available every 4 loops of the main loop
+        bool newMagData = false; // Not used currently // loopCounter % 4 == 0; // Magnetometer updates at 50 Hz, so new data is available every 4 loops of the main loop
 
         if (newMagData)
         { // Read magnetometer at 50 Hz

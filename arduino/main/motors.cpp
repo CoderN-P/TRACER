@@ -74,18 +74,9 @@ void handleMovement(float left, float right)
     }
     else
     {
-        if (enabled)
-        {
-            // Allow motors to coast by setting both IN pins low but keeping PWM enabled at 0 duty cycle}
-            digitalWrite(IN1, LOW);
-            digitalWrite(IN2, LOW);
-        }
-        else
-        {
-            // If motors are disabled, actively brake by setting both IN pins high
-            digitalWrite(IN1, HIGH);
-            digitalWrite(IN2, HIGH);
-        }
+        digitalWrite(IN1, HIGH);
+        digitalWrite(IN2, HIGH);
+        
         mcpwm_set_duty(MCPWM_UNIT_0, MCPWM_TIMER_0, MCPWM_OPR_A, 0.0);
     }
 
@@ -104,18 +95,8 @@ void handleMovement(float left, float right)
     }
     else
     {
-        if (enabled)
-        {
-            // Allow motors to coast by setting both IN pins low but keeping PWM enabled at 0 duty cycle
-            digitalWrite(IN3, LOW);
-            digitalWrite(IN4, LOW);
-        }
-        else
-        {
-            // If motors are disabled, actively brake by setting both IN pins high
-            digitalWrite(IN3, HIGH);
-            digitalWrite(IN4, HIGH);
-        }
+        digitalWrite(IN3, HIGH);
+        digitalWrite(IN4, HIGH);
 
         mcpwm_set_duty(MCPWM_UNIT_0, MCPWM_TIMER_1, MCPWM_OPR_A, 0.0);
     }

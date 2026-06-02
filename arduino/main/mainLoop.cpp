@@ -32,11 +32,15 @@ void mainLoop(void *pvParameters)
 
         int16_t pcntLeftRaw, pcntRightRaw;
         
+        pcnt_counter_pause(pcnt_unit_left);
         pcnt_get_counter_value(pcnt_unit_left, &pcntLeftRaw);
         pcnt_counter_clear(pcnt_unit_left);
+        pcnt_counter_resume(pcnt_unit_left);
         
+        pcnt_counter_pause(pcnt_unit_right);
         pcnt_get_counter_value(pcnt_unit_right, &pcntRightRaw);
         pcnt_counter_clear(pcnt_unit_right);
+        pcnt_counter_resume(pcnt_unit_right);
 
         taskENTER_CRITICAL(&spinlock);
         {

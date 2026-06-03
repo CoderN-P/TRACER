@@ -135,7 +135,7 @@ class Robot:
         async with self.state_lock:
             self.state = Mode.MANUAL
         await self.send_safe_command(Command.stop())   # clear any stale setpoint
-        self.state_es
+        self.state_estimator.reset()
         await self.send_safe_command(Command.enable())
         await self.socketio.emit('resume', {"status": "success"})
             

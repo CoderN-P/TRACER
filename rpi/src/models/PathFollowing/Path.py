@@ -1,6 +1,7 @@
 from .QuinticHermiteSpline import QuinticHermiteSpline
 from typing import List
 import multiprocessing as mp
+from multiprocessing.resource_tracker import unregister
 import numpy as np
 from multiprocessing import shared_memory
 
@@ -99,6 +100,7 @@ class Path:
             self.ramsete = RAMSETE(self.trajectory)
             self._shm.close()
             self._shm.unlink()
+            unregister(self._shm._name, 'shared_memory')
             return True
         
         return False

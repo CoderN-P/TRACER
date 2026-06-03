@@ -20,7 +20,7 @@ class PurePursuit:
         self.path = path
         self.last_found_index = 0 # to prevent the robot from going backwards along the path
         self.go_to_goal = None
-        self.lateral_shift = 0
+        self.omega_shift = 0
 
 
     @classmethod
@@ -108,20 +108,17 @@ class PurePursuit:
         
         return None # no goal point found
 
-    def shift_target_apf(self, repulsive_vector: tuple[float, float], target: list[float], sensor_data: SensorData):
-        raw_shift = -repulsive_vector[0] * ROBOT_CONFIG.K_LIDAR_SHIFT
-        raw_shift += (1 / sensor_data.ultrasonic.distance_left) * ROBOT_CONFIG.K_US_SHIFT if 1e-4 < sensor_data.ultrasonic.distance_left <= ROBOT_CONFIG.OBSTACLE_AVOID_THRESHOLD else 0
-        raw_shift -= (1 / sensor_data.ultrasonic.distance_right) * ROBOT_CONFIG.K_US_SHIFT if 1e-4 < sensor_data.ultrasonic.distance_right <= ROBOT_CONFIG.OBSTACLE_AVOID_THRESHOLD else 0
+    def shift_omega_apf(self, repulsive_vector: tuple[float, float], target: list[float], sensor_data: SensorData):
+        omega_shift = -repulsive_vector[0] * ROBOT_CONFIG.K_LIDAR_SHIFT
+        omega_shift += (1 / sensor_data.ultrasonic.distance_left) * ROBOT_CONFIG.K_US_SHIFT if 1e-4 < sensor_data.ultrasonic.distance_left <= ROBOT_CONFIG.OBSTACLE_AVOID_THRESHOLD else 0
+        omega_shift -= (1 / sensor_data.ultrasonic.distance_right) * ROBOT_CONFIG.K_US_SHIFT if 1e-4 < sensor_data.ultrasonic.distance_right <= ROBOT_CONFIG.OBSTACLE_AVOID_THRESHOLD else 0
 
-        raw_shift = ROBOT_CONFIG.MAX_SHIFT * np.tanh(raw_shift)
+        omega_shift = ROBOT_CONFIG.MAX_SHIFT * np.tanh(omega_shift)
 
-        if abs(raw_shift) > abs(self.lateral_shift):
-            self.lateral_shift = ROBOT_CONFIG.OBSTACLE_ALPHA * self.lateral_shift + (1 - ROBOT_CONFIG.OBSTACLE_ALPHA) * raw_shift
+        if abs(omega_shift) > abs(self.omega_shift):
+            self.omega_shift = ROBOT_CONFIG.OBSTACLE_ALPHA * self.omega_shift + (1 - ROBOT_CONFIG.OBSTACLE_ALPHA) * omega_shift
         else:
-            self.lateral_shift = 0.95 * self.lateral_shift + (1 - ROBOT_CONFIG.OBSTACLE_ALPHA) * raw_shift
-
-
-        return target[0], target[1] + self.lateral_shift # y is lateral relative to robot, so it corresponds to x of repulsive vector
+            self.omega_shift = 0.95 * self.omega_shift + (1 - ROBOT_CONFIG.OBSTACLE_ALPHA) * omega_shift
 
     def calculate_control_command(self, robot_state: RobotState, repulsive_vector: tuple[float, float], sensor_data: SensorData) -> Command | None:
         """
@@ -151,14 +148,12 @@ class PurePursuit:
         local_target = get_local_target(robot_state, goal_point)
         # Repulsive vector is already in the robot's local frame
         # Only apply lateral force to avoid pushing waypoints behind us
-        local_target = self.shift_target_apf(repulsive_vector, local_target, sensor_data)
-        
         lateral_y = local_target[1]
         
         curvature = 2*lateral_y / (math.hypot(*local_target) ** 2)
 
         linear_velocity = ROBOT_CONFIG.MAX_LINEAR_VEL / (1 + ROBOT_CONFIG.K_CURVE * abs(curvature))
-        angular_velocity = curvature * linear_velocity
+        angular_velocity = curvature * linear_velocity + self.omega_shift
         
         motor_speeds = twist_to_wheel_speeds(linear_velocity, angular_velocity)
         

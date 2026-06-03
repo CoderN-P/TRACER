@@ -2,7 +2,7 @@
   import { browser } from "$app/environment";
   import { io as socket } from "$lib/api/socket";
   import * as Card from "$lib/components/ui/card";
-  import DEFAULT_CONSTANTS from "../../../calibration_files/constants/constants.json"
+  import DEFAULT_CONSTANTS from "$calibration/constants/constants.json"
   import { onMount } from "svelte";
   import { SlidersHorizontal, RotateCcw, Save } from "lucide-svelte";
 

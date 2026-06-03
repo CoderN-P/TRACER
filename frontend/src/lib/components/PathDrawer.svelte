@@ -966,22 +966,7 @@
     return sorted[Math.max(0, index)];
   }
 
-  function curvatureAt(points: PointMeters[], index: number) {
-    if (points.length < 3) return null;
-    const i = Math.max(1, Math.min(points.length - 2, index));
-    const a = points[i - 1];
-    const b = points[i];
-    const c = points[i + 1];
-    const ab = Math.hypot(b.x - a.x, b.y - a.y);
-    const bc = Math.hypot(c.x - b.x, c.y - b.y);
-    const ca = Math.hypot(a.x - c.x, a.y - c.y);
-    const denominator = ab * bc * ca;
-    if (denominator < 1e-9) return null;
-
-    const twiceArea =
-      (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
-    return (2 * twiceArea) / denominator;
-  }
+  
 
   function lookaheadIndex(
     points: PointMeters[],
@@ -1012,7 +997,6 @@
     const goal = points[points.length - 1] ?? null;
     const purePursuitActive =
       running && (runSource === "freehand" || runSource === "svg");
-    const curvatureIndex = nearest?.segmentIndex ?? 0;
 
     return {
       currentCrossTrackError: nearest?.signedDistance ?? null,
@@ -1028,19 +1012,6 @@
       percentile95CrossTrackError: percentile(errors, 95),
       distanceToGoal:
         pose && goal ? Math.hypot(pose.x - goal.x, pose.y - goal.y) : null,
-      currentCurvature: purePursuitActive
-        ? curvatureAt(points, curvatureIndex)
-        : null,
-      targetCurvature: purePursuitActive
-        ? curvatureAt(
-            points,
-            lookaheadIndex(
-              points,
-              curvatureIndex,
-              lookaheadDistance,
-            ),
-          )
-        : null,
       lookaheadDistance,
       purePursuitActive,
       sampleCount: errors.length,

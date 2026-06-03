@@ -6,9 +6,9 @@ from .. import ROBOT_CONFIG
 class HeadingFilter:
     def __init__(self, p: np.ndarray | None = None):
         if p:
-            self.P = p
+            self._P = p
         else:
-            self.P = np.array(
+            self._P = np.array(
                 [[ROBOT_CONFIG.P_THETA, ROBOT_CONFIG.P_THETA_BIAS],
                  [ROBOT_CONFIG.P_THETA_BIAS, ROBOT_CONFIG.P_GYRO_BIAS]]
             )
@@ -29,6 +29,17 @@ class HeadingFilter:
             [[1, -dt],   # d(theta_pred)/d(theta) = 1, d(theta_pred)/d(gyro_bias) = -dt
              [0, 1]]     # d(gyro_bias_pred)/d(theta) = 0, d(gyro_bias_pred)/d(gyro_bias) = 1]
         )
+
+    @property
+    def P(self):
+        return self._P
+
+    @P.setter
+    def P(self, value):
+        if not isinstance(value, np.ndarray):
+            self._P = np.array(value)
+        else:
+            self._P = value
     
     def predict_covariance(self, dt):
         F = self.get_process_jacobian(dt)

@@ -6,8 +6,6 @@
     maxCrossTrackError: number | null;
     percentile95CrossTrackError: number | null;
     distanceToGoal: number | null;
-    currentCurvature: number | null;
-    targetCurvature: number | null;
     lookaheadDistance: number;
     purePursuitActive: boolean;
     sampleCount: number;
@@ -63,7 +61,7 @@
     </div>
   </div>
 
-  <div class="grid grid-cols-2 gap-2 xl:grid-cols-4">
+  <div class="grid grid-cols-2 gap-2 xl:grid-cols-3">
     <div class="rounded-md border border-gray-100 bg-gray-50 px-3 py-2">
       <div class="mb-1 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-gray-500">
         <LocateFixed class="h-3.5 w-3.5" />
@@ -104,34 +102,5 @@
         goal {formatMeters(stats.distanceToGoal)}
       </div>
     </div>
-
-    {#if stats.purePursuitActive}
-      <div class="rounded-md border border-orange-100 bg-orange-50 px-3 py-2">
-        <div class="mb-1 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-orange-700">
-          <Route class="h-3.5 w-3.5" />
-          Pure pursuit
-        </div>
-        <div class="font-mono text-sm font-semibold text-gray-950">
-          {formatCurvature(stats.currentCurvature)}
-        </div>
-        <div class="mt-1 text-[11px] text-orange-700">
-          target {formatCurvature(stats.targetCurvature)} @ {formatMeters(
-            stats.lookaheadDistance,
-            2,
-          )}
-        </div>
-      </div>
-    {:else}
-      <div class="rounded-md border border-gray-100 bg-gray-50 px-3 py-2">
-        <div class="mb-1 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-gray-500">
-          <Route class="h-3.5 w-3.5" />
-          Pure pursuit
-        </div>
-        <div class="font-mono text-sm font-semibold text-gray-950">--</div>
-        <div class="mt-1 text-[11px] text-gray-500">
-          active on freehand/SVG runs
-        </div>
-      </div>
-    {/if}
   </div>
 </div>

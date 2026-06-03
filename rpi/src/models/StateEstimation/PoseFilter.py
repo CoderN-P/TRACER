@@ -13,10 +13,21 @@ class PoseFilter:
         self.process_jacobian = np.eye(2)
         
         if p:
-            self.P = p
+            self._P = p
         else:
-            self.P = np.eye(2) * ROBOT_CONFIG.P_POSITION
+            self._P = np.eye(2) * ROBOT_CONFIG.P_POSITION
 
+    @property
+    def P(self):
+        return self._P
+    
+    @P.setter
+    def P(self, value):
+        if not isinstance(value, np.ndarray):
+            self._P = np.array(value)
+        else:
+            self._P = value
+            
     def reset(self):
         self.state = np.array([0.0, 0.0])
         

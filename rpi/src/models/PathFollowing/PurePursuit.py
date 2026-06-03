@@ -115,7 +115,11 @@ class PurePursuit:
 
         raw_shift = ROBOT_CONFIG.MAX_SHIFT * np.tanh(raw_shift)
 
-        self.lateral_shift = ROBOT_CONFIG.OBSTACLE_ALPHA * self.lateral_shift + (1 - ROBOT_CONFIG.OBSTACLE_ALPHA) * raw_shift
+        if abs(raw_shift) > abs(self.lateral_shift):
+            self.lateral_shift = ROBOT_CONFIG.OBSTACLE_ALPHA * self.lateral_shift + (1 - ROBOT_CONFIG.OBSTACLE_ALPHA) * raw_shift
+        else:
+            self.lateral_shift = 0.95 * self.lateral_shift + (1 - ROBOT_CONFIG.OBSTACLE_ALPHA) * raw_shift
+
 
         return target[0], target[1] + self.lateral_shift # y is lateral relative to robot, so it corresponds to x of repulsive vector
 

@@ -74,7 +74,7 @@ class Controller:
 
     def read_input(self) -> tuple:
         pygame.event.pump()  # Process events to update joystick state
-
+        if not self.controller: return 0, 0
         if self.state == ControllerState.TWO_ARCADE:
             left_y = -self.controller.get_axis(1)
             right_x = -self.controller.get_axis(2)
@@ -91,6 +91,8 @@ class Controller:
         """
         Check if the controller input is significant enough to send a command.
         """
+        if not self.controller: return False
+        
         if self.state == ControllerState.CAR:
             # In CAR state, we consider the speed to determine if we should send an update
             return abs(self.speed) > 0.15
@@ -186,20 +188,6 @@ class Controller:
         duration = 500  # ms
         
         self.rumble(low, high, duration)
-        
-    def on_cliff_detected(self, data):
-        """
-        Handle cliff detection by stopping the motors and providing feedback.
-        """
-        front = data.get("ir_front", True)
-        back = data.get("ir_back", True)
-        
-        if not front and not back:
-            # Both sensors detect a cliff, strong rumble
-            self.rumble(1.0, 1.0, 1000)
-        elif not front or not back:
-            # One sensor detects a cliff, medium rumble
-            self.rumble(0.5, 0.5, 1000)
         
     def stop_recording(self):
         """
@@ -303,6 +291,7 @@ class Controller:
         Send the current joystick data to the specified URL.
         """
         # check if Button B is pressed to reset motors
+        
         if pygame.joystick.get_count() == 0 and not self.reconnecting:
             self.reconnecting = True
             threading.Thread(self.reconnect_controller()).start()

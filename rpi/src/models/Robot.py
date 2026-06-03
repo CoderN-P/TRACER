@@ -146,8 +146,8 @@ class Robot:
         await asyncio.sleep(self.backup_time)
         await self.send_safe_command(Command.stop())
         
-    async def update_virtual_obstacles(self, data: List[VirtualObstacle]):
-        self.virtual_obstacles = data
+    async def update_virtual_obstacles(self, data):
+        self.virtual_obstacles = [VirtualObstacle.model_validate(obstacle) for obstacle in data]
 
     async def update_obstacle_mode(self, data):
         raw_mode = data.get("mode") if isinstance(data, dict) else data
@@ -388,6 +388,10 @@ class Robot:
                 if self.state != Mode.STOPPED and sensor_data.motors_enabled == False and prev_data and prev_data.motors_enabled == True:
                     self._logger.warning("Motors manually disabled via ESTOP button, switching to STOPPED mode")
                     self.state = Mode.STOPPED
+                if self.state == Mode.STOPPED and sensor_data.motors_enabled == True and prev_data and prev_data.motors_enabled == False:
+                    self._logger.warning("Motors manually re-enabled via ESTOP button, switching to MANUAL mode")
+                    self.state = Mode.MANUAL
+                    
                 cur_state = self.state
 
             # Only handle obstacle stopping and detection if in manual mode, since path following uses potential field control.

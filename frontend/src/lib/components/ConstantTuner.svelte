@@ -2,72 +2,11 @@
   import { browser } from "$app/environment";
   import { io as socket } from "$lib/api/socket";
   import * as Card from "$lib/components/ui/card";
+  import DEFAULT_CONSTANTS from "../../../calibration_files/constants/constants.json"
   import { onMount } from "svelte";
   import { SlidersHorizontal, RotateCcw, Save } from "lucide-svelte";
 
   const STORAGE_KEY = "tracer.constant-tuner.constants.v1";
-
-  const DEFAULT_CONSTANTS = {
-    WHEEL_BASE: 0.255,
-    WHEEL_DIAMETER: 0.0545,
-    MAX_RPM: 178,
-    REDUCTION_RATIO: 56.0,
-    ENCODER_PPR: 11,
-    P_THETA: 0.1,
-    P_GYRO_BIAS: 1.0e-4,
-    P_THETA_BIAS: 0.0,
-    P_POSITION: 0.01,
-    Q_THETA: 1.0e-4,
-    Q_BIAS: 1.0e-6,
-    Q_X: 0.01,
-    Q_Y: 0.01,
-    R_THETA_ENCODER: 0.01,
-    R_THETA_MAGNETOMETER: 0.1,
-    R_POSITION: 0.05,
-    K_REPULSIVE_SOFT: 40,
-    K_REPULSIVE_HARD: 100,
-    REPULSIVE_THRESHOLD: 100,
-    LOOKAHEAD_DISTANCE: 0.2,
-    COMPLETION_THRESHOLD: 0.01,
-    END_LOOKAHEAD_MULTIPLIER: 1.1,
-    BETA: 3.0,
-    ZETA: 0.7,
-    MAX_LATERAL_ACCEL: 0.125,
-    MAX_LONG_ACCEL: 0.6,
-    K_OMEGA: 3.14,
-    K_V: 6.0,
-    K_D: 7.0,
-    JOYSTICK_DEADZONE: 0.15,
-    CHECK_OBSTACLE_FREQ: 20.0,
-    BACKUP_TIME: 2.0,
-    OBSTACLE_DETECTED_THRESHOLD: 30.0,
-    OBSTACLE_AVOID_THRESHOLD: 20.0,
-    SYMMETRY_THRESHOLD: 0.5,
-    K_NUDGE: 0.5,
-    K_LIDAR_SHIFT: 0.001,
-    K_US_SHIFT: 0.5,
-    OBSTACLE_ALPHA: 0.9,
-    MAX_SHIFT: 0.003,
-    EMIT_SENSOR_FREQ: 20.0,
-    SENSOR_TIMEOUT: 0.05,
-    MAIN_LOOP_FREQ: 200.0,
-    PATH_FOLLOWING_FREQ: 100.0,
-    MANUAL_FREQ: 50.0,
-    MAX_ENCODER_MARGIN: 1.3,
-    LEFT_CORRECTION_POS: 0.951,
-    RIGHT_CORRECTION_POS: 1.0,
-    LEFT_CORRECTION_NEG: 0.951,
-    RIGHT_CORRECTION_NEG: 1.0,
-    G: 9.81,
-    LSB_G: 0.061 / 1000.0,
-    LSB_uT: 1.0 / 120.0,
-    LSB_C: 1.0 / 256.0,
-    TEMP_OFFSET: 25.0,
-    MAX_SEARCH_POINTS: 50,
-    K_CURVE: 0.1,
-    SPLINE_SAMPLES: 1000,
-    TRAJECTORY_DT: 0.01,
-  } as const;
 
   type ConstantKey = keyof typeof DEFAULT_CONSTANTS;
 

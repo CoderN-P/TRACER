@@ -166,7 +166,7 @@ void mainLoop(void *pvParameters)
         packet.rightEncoder = pcntRight;
         packet.flags = (newMagData << 0) | (enabled << 1);
         packet.batteryPercent = curBatteryPercent;
-        packet.timestamp = micros();
+        packet.timestamp = startTime; // micros();
         packet.checksum = computeChecksum((uint8_t *)&packet, sizeof(packet) - 1);
         
         xQueueSend(sensorQueue, &packet, 0);

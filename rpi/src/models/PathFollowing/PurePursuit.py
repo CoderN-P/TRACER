@@ -108,8 +108,8 @@ class PurePursuit:
         
         return None # no goal point found
 
-    def shift_omega_apf(self, repulsive_vector: tuple[float, float], target: list[float], sensor_data: SensorData):
-        omega_shift = -repulsive_vector[0] * ROBOT_CONFIG.K_LIDAR_SHIFT
+    def shift_omega_apf(self, repulsive_vector: tuple[float, float], sensor_data: SensorData):
+        omega_shift = repulsive_vector[0] * ROBOT_CONFIG.K_LIDAR_SHIFT
         omega_shift += (1 / sensor_data.ultrasonic.distance_left) * ROBOT_CONFIG.K_US_SHIFT if 1e-4 < sensor_data.ultrasonic.distance_left <= ROBOT_CONFIG.OBSTACLE_AVOID_THRESHOLD else 0
         omega_shift -= (1 / sensor_data.ultrasonic.distance_right) * ROBOT_CONFIG.K_US_SHIFT if 1e-4 < sensor_data.ultrasonic.distance_right <= ROBOT_CONFIG.OBSTACLE_AVOID_THRESHOLD else 0
 
@@ -151,7 +151,7 @@ class PurePursuit:
         lateral_y = local_target[1]
         
         curvature = 2*lateral_y / (math.hypot(*local_target) ** 2)
-
+        self.shift_omega_apf(repulsive_vector, sensor_data)
         linear_velocity = ROBOT_CONFIG.MAX_LINEAR_VEL / (1 + ROBOT_CONFIG.K_CURVE * abs(curvature))
         angular_velocity = curvature * linear_velocity + self.omega_shift
         

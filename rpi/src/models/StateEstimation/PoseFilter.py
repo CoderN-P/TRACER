@@ -40,7 +40,7 @@ class PoseFilter:
     
     def update(self, glob_x, glob_y, predicted_state, P_pred):
         y = np.array([glob_x - predicted_state[0], glob_y - predicted_state[1]])
-        S = P_pred + ROBOT_CONFIG.R_POSITION # Measurement noise covariance
+        S = P_pred + ROBOT_CONFIG.R_POSITION * np.eye(2) # Measurement noise covariance
         K = P_pred @ np.linalg.inv(S) # Kalman gain
         
         self.state = predicted_state + K @ y

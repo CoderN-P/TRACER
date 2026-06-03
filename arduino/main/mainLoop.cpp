@@ -146,32 +146,30 @@ void mainLoop(void *pvParameters)
         }
 
         // Set global packet struct
-        if (xSemaphoreTake(sensor_mutex, 0) == pdTRUE)
-        {
-            packet.startByte = 0xAA;
-            packet.packetSeq = packetSeq++;
-            packet.distance_left = lastDistance1;
-            packet.distance_right = lastDistance2;
-            packet.distance_front = distanceFront;
-            packet.ax = ax;
-            packet.ay = ay;
-            packet.az = az;
-            packet.gx = gx;
-            packet.gy = gy;
-            packet.gz = gz;
-            packet.tempC = tempC;
-            packet.magX = magX;
-            packet.magY = magY;
-            packet.magZ = magZ;
-            packet.leftEncoder = pcntLeft;
-            packet.rightEncoder = pcntRight;
-            packet.flags = (newMagData << 0) | (enabled << 1);
-            packet.batteryPercent = curBatteryPercent;
-            packet.timestamp = micros();
-            packet.checksum = computeChecksum((uint8_t *)&packet, sizeof(packet) - 1);
-            xSemaphoreGive(sensor_mutex);
-            xTaskNotifyGive(sensorTransmitHandle);
-        }
+  
+        packet.startByte = 0xAA;
+        packet.packetSeq = packetSeq++;
+        packet.distance_left = lastDistance1;
+        packet.distance_right = lastDistance2;
+        packet.distance_front = distanceFront;
+        packet.ax = ax;
+        packet.ay = ay;
+        packet.az = az;
+        packet.gx = gx;
+        packet.gy = gy;
+        packet.gz = gz;
+        packet.tempC = tempC;
+        packet.magX = magX;
+        packet.magY = magY;
+        packet.magZ = magZ;
+        packet.leftEncoder = pcntLeft;
+        packet.rightEncoder = pcntRight;
+        packet.flags = (newMagData << 0) | (enabled << 1);
+        packet.batteryPercent = curBatteryPercent;
+        packet.timestamp = micros();
+        packet.checksum = computeChecksum((uint8_t *)&packet, sizeof(packet) - 1);
+        
+        xQueueSend(sensorQueue, &packet, 0);
 
         uint32_t totalTime = micros() - startTime;
         

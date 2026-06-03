@@ -11,13 +11,13 @@
 extern RobotState robot_state;
 extern SemaphoreHandle_t state_mutex;
 extern SensorPacket packet;
-extern SemaphoreHandle_t sensor_mutex;
 extern SemaphoreHandle_t i2c_mutex;
 extern std::atomic<bool> motorsEnabled;
 extern std::atomic<uint32_t> lastMotorCommandMs;
 extern PIDController pidLeft;
 extern PIDController pidRight;
 extern QueueHandle_t commandQueue;
+extern QueueHandle_t sensorQueue;
 extern pcnt_unit_t pcnt_unit_left;
 extern pcnt_unit_t pcnt_unit_right;
 extern std::atomic<uint8_t> pageIndex;

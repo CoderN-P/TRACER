@@ -192,6 +192,7 @@ class StateEstimator:
                 self.heading_filter.P = closest.heading_covariance
                 self.heading_filter.state = np.array([closest.robot_state.yaw, closest.gyro_bias])
                 self.pose_filter.P = closest.pose_covariance
+                
                 self.pose_filter.state = np.array([closest.robot_state.x, closest.robot_state.y])
                 self.theta_encoders = closest.theta_encoders
                 self.state = closest.robot_state

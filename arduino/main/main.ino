@@ -34,10 +34,10 @@ PIDController pidRight(P_RIGHT, I_RIGHT, D_RIGHT);
 RobotState robot_state;
 SemaphoreHandle_t state_mutex;
 SensorPacket packet;
-SemaphoreHandle_t sensor_mutex;
 SemaphoreHandle_t i2c_mutex;
 
 QueueHandle_t commandQueue;
+QueueHandle_t sensorQueue;
 std::atomic<bool> motorsEnabled{true};
 std::atomic<uint32_t> lastMotorCommandMs{0};
 
@@ -71,7 +71,6 @@ void setup()
 
     state_mutex = xSemaphoreCreateMutex();
     i2c_mutex = xSemaphoreCreateMutex();
-    sensor_mutex = xSemaphoreCreateMutex();
     
 
     if (state_mutex == NULL || i2c_mutex == NULL)
@@ -95,6 +94,7 @@ void setup()
 
     // Create the command queue (10 commands deep, each command can be up to MAX_BUFFER_SIZE bytes)
     commandQueue = xQueueCreate(10, sizeof(byte) * MAX_BUFFER_SIZE);
+    sensorQueue = xQueueCreate(3, sizeof(SensorPacket));
 
     // setup_magnetometer(); // Not currently used
     setup_pwm();

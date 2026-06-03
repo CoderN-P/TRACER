@@ -142,7 +142,7 @@ class Robot:
 
     async def obstacle_stop(self):
         """Stop the robot for a short duration when an obstacle is detected."""
-        await self.send_safe_command(Command.from_joystic(-1, 0), wait_after=self.backup_time)  # Stop
+        await self.send_safe_command(Command.from_joystick(-1, 0), wait_after=self.backup_time)  # Stop
         await asyncio.sleep(self.backup_time)
         await self.send_safe_command(Command.stop())
         
@@ -308,7 +308,6 @@ class Robot:
         
     async def process_lidar_data(self, data: any):
         lidar_data = LidarData.model_validate(data[0])
-        
         async with self.lidar_lock:
             self.lidar_data = lidar_data
         

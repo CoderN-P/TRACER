@@ -40,11 +40,11 @@ class LidarData(BaseModel):
         hard_mask = mask & (depth_m < hard_thresh)
         soft_mask = mask & (depth_m >= hard_thresh)
     
+        depth_safe = np.where(mask, depth_m, 1.0)  # replace zeros with 1.0 before dividing
         magnitude = np.zeros_like(dist)
-        magnitude = np.where(hard_mask, ROBOT_CONFIG.K_REPULSIVE_HARD * (1.0/depth_m - 1.0/hard_thresh), magnitude)
-        magnitude = np.where(soft_mask, ROBOT_CONFIG.K_REPULSIVE_SOFT * (1.0/depth_m - 1.0/soft_thresh), magnitude)
-        magnitude *= np.where(mask, depth_m/dist, 0.0)
-    
+        magnitude = np.where(hard_mask, ROBOT_CONFIG.K_REPULSIVE_HARD * (1.0/depth_safe - 1.0/hard_thresh), magnitude)
+        magnitude = np.where(soft_mask, ROBOT_CONFIG.K_REPULSIVE_SOFT * (1.0/depth_safe - 1.0/soft_thresh), magnitude)
+        magnitude *= np.where(mask, depth_safe/dist, 0.0)    
         repulsive_x = -np.sum((lateral/dist) * magnitude * mask)
         repulsive_y = -np.sum((depth_m/dist) * magnitude * mask)
     

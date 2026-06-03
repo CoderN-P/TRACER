@@ -16,7 +16,7 @@ class GoToGoal:
    
     
     def shift_omega_apf(self, repulsive_vector: tuple[float, float], sensor_data: SensorData):
-        omega_shift = repulsive_vector[0] * ROBOT_CONFIG.K_LIDAR_SHIFT
+        omega_shift = -repulsive_vector[0] * ROBOT_CONFIG.K_LIDAR_SHIFT
         omega_shift += (1 / sensor_data.ultrasonic.distance_left) * ROBOT_CONFIG.K_US_SHIFT if 1e-4 < sensor_data.ultrasonic.distance_left <= ROBOT_CONFIG.OBSTACLE_AVOID_THRESHOLD else 0
         omega_shift -= (1 / sensor_data.ultrasonic.distance_right) * ROBOT_CONFIG.K_US_SHIFT if 1e-4 < sensor_data.ultrasonic.distance_right <= ROBOT_CONFIG.OBSTACLE_AVOID_THRESHOLD else 0
 
@@ -42,6 +42,7 @@ class GoToGoal:
         heading_error = math.atan2(local_target[1], local_target[0])
 
         v = ROBOT_CONFIG.MAX_LINEAR_VEL * (1 - np.exp(-ROBOT_CONFIG.K_V * (distance_to_goal ** 1.25)))
+        print(self.omega_shift * 180 / math.pi, repulsive_vector)
         omega = ROBOT_CONFIG.K_OMEGA * heading_error * (1 - np.exp(-ROBOT_CONFIG.K_D * (distance_to_goal ** 1.25)))  + self.omega_shift
         
         """

@@ -45,6 +45,7 @@ class StateEstimator:
         self.initial_mag_heading = None
         self.heading_filter.reset()
         self.pose_filter.reset()
+        self.history.clear()
 
     # Python logic to find how many packets were missed
     @staticmethod

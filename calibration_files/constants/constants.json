@@ -10,12 +10,12 @@
   "JOYSTICK_DEADZONE": 0.15,
   "K_CURVE": 0.1,
   "K_D": 7,
-  "K_LIDAR_SHIFT": 0.4,
+  "K_LIDAR_SHIFT": 0.3,
   "K_NUDGE": 0.5,
   "K_OMEGA": 5,
   "K_REPULSIVE_HARD": 100,
   "K_REPULSIVE_SOFT": 40,
-  "K_US_SHIFT": 5,
+  "K_US_SHIFT": 4,
   "K_V": 6,
   "LEFT_CORRECTION_NEG": 0.995,
   "LEFT_CORRECTION_POS": 0.97,
@@ -24,38 +24,38 @@
   "LSB_G": 6.1e-05,
   "LSB_uT": 0.008333333333333333,
   "MAGNETOMETER_HARD_IRON_OFFSETS": [
-    0.0,
-    0.0,
-    0.0
+    0,
+    0,
+    0
   ],
   "MAGNETOMETER_SOFT_IRON_MATRIX": [
     [
-      1.0,
-      0.0,
-      0.0
+      1,
+      0,
+      0
     ],
     [
-      0.0,
-      1.0,
-      0.0
+      0,
+      1,
+      0
     ],
     [
-      0.0,
-      0.0,
-      1.0
+      0,
+      0,
+      1
     ]
   ],
   "MAIN_LOOP_FREQ": 200,
   "MANUAL_FREQ": 50,
   "MAX_ENCODER_MARGIN": 1,
-  "MAX_LATERAL_ACCEL": 0.125,
+  "MAX_LATERAL_ACCEL": 0.15,
   "MAX_LONG_ACCEL": 0.6,
   "MAX_RPM": 167,
   "MAX_SEARCH_POINTS": 50,
-  "MAX_SHIFT": 0.5,
-  "OBSTACLE_ALPHA": 0.65,
+  "MAX_SHIFT": 3,
+  "OBSTACLE_ALPHA": 0.7,
   "OBSTACLE_AVOID_THRESHOLD": 35,
-  "OBSTACLE_DETECTED_THRESHOLD": 90,
+  "OBSTACLE_DETECTED_THRESHOLD": 70,
   "PATH_FOLLOWING_FREQ": 100,
   "P_GYRO_BIAS": 0.0001,
   "P_POSITION": 0.01,
@@ -72,7 +72,7 @@
   "R_POSITION": 0.001,
   "R_THETA_ENCODER": 0.01,
   "R_THETA_MAGNETOMETER": 0.1,
-  "SENSOR_TIMEOUT": 0.5,
+  "SENSOR_TIMEOUT": 0.05,
   "SPLINE_SAMPLES": 1000,
   "STATE_HISTORY_SIZE": 250,
   "SYMMETRY_THRESHOLD": 0.5,

@@ -1643,7 +1643,7 @@
         {/if}
 
         <!-- Virtual obstacle avoidance rays: one plain line per valid ray endpoint -->
-        {#if obstacleAvoidanceMode === 'virtual' && rayPoints && displayRobotPos}
+        {#if rayPoints && displayRobotPos}
           <Layer>
             {#each rayPoints as rp}
               {#if rp && rp[0] !== null && rp[1] !== null}

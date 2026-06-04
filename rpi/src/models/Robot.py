@@ -284,6 +284,14 @@ class Robot:
             return
         
     async def process_lidar_data(self, data: any):
+        grid_2d = []
+        for y in range(0, 48):
+            start = y*64
+            end = start + 64
+            row = data[0]["grid"]["values"][start:end]
+            grid_2d.append(row)
+            
+        data[0]["grid"]["values"] = grid_2d
         lidar_data = LidarData.model_validate(data[0])
         async with self.lidar_lock:
             self.lidar_data = lidar_data
@@ -305,7 +313,7 @@ class Robot:
                     "timestamp": datetime.datetime.now().isoformat(),
                     "max_loop_time": self.max_loop_time,
                     "velocity_profile_t": time.monotonic() - self.velocity_profile_start if self.velocity_profile_start else None,
-                    "virtual_rays": self.gap_navigator.ray_points if self.gap_navigator.mode == ObstacleMode.VIRTUAL else None
+                    "virtual_rays": self.gap_navigator.ray_points
                 },
             )  
             

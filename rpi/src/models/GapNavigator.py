@@ -23,6 +23,17 @@ class GapNavigator:
             self.column_depths = self.simulate_lidar(robot_state)
         elif grid:
             self.column_depths = self.get_column_depths(grid)
+            self.ray_points = [(None, None)] * ROBOT_CONFIG.GRID_COLS
+            
+            for i, depth in enumerate(self.column_depths):
+                if depth > ROBOT_CONFIG.OBSTACLE_DETECTED_THRESHOLD:
+                    continue
+
+                col_angle = (i / ROBOT_CONFIG.GRID_COLS - 0.5) * ROBOT_CONFIG.FOV_RAD
+                self.ray_points[i] = (self.column_depths[i] * math.cos(col_angle), self.column_depths[i] * math.sin(col_angle))
+                
+            self.convert_rays_to_global(robot_state)
+            
     
     @staticmethod
     def get_goal_col(local_target: List[float], grid_cols: int, grid_fov: float) -> int:
@@ -160,7 +171,7 @@ class GapNavigator:
                 col_angle
             )
             if column_depths[col] == np.inf:
-                self.ray_points[col] = (None, None)
+                continue
             else:
                 self.ray_points[col] = (column_depths[col] * math.cos(col_angle), column_depths[col] * math.sin(col_angle))
         

@@ -610,6 +610,7 @@ class Robot:
                 return
         
         if mode == 'twist':
+            print(f"linear: {v1}, angular: {v2}")
             vl, vr = twist_to_wheel_speeds(v1, v2)
             
             async with self.motor_lock:

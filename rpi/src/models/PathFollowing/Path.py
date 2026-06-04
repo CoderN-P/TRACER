@@ -100,7 +100,6 @@ class Path:
             self.ramsete = RAMSETE(self.trajectory)
             self._shm.close()
             self._shm.unlink()
-            unregister(self._shm._name, 'shared_memory')
             return True
         
         return False

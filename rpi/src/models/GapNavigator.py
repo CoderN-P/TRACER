@@ -78,12 +78,33 @@ class GapNavigator:
     @staticmethod
     def get_column_depths(grid: LidarGrid) -> np.ndarray:
         depth = np.array(grid.values)  # Shape is already (rows, cols)
+
+        v_fov_rad = np.radians(48.0)
+        v_step_rad = v_fov_rad / 48.0
+        phi_angles = - (v_fov_rad / 2.0) + (np.arange(48) * v_step_rad) + (v_step_rad / 2.0)
     
-        # Filter points where depth is greater than 0
-        valid = depth > 0
-        depth_valid = np.where(valid, depth, np.inf)
+        # Reshape phi angles to a column vector (48, 1) so it broadcasts across all 64 columns
+        phi_grid = phi_angles[:, np.newaxis]
     
-        return np.min(depth_valid, axis=0)  # (cols,) min depth per column
+        # 3. Calculate physical height of every pixel relative to the ground
+        # d * sin(phi) gives height relative to lens. Add mounting height to get ground relative.
+        height_grid = (depth * np.sin(phi_grid)) + ROBOT_CONFIG.LIDAR_HEIGHT
+    
+        # 4. Create a mask for valid obstacles
+        # Must be further than 0 meters (filter out noise/empty space) AND higher than your clearance limit
+        valid_obstacle_mask = (depth > 0.0) & (height_grid >= ROBOT_CONFIG.CLEARANCE_HEIGHT)
+    
+        # 5. Create a filtered version of your depth matrix
+        # Replace ground/small objects with Infinity so they don't break your minimum depth calculation
+        filtered_depths = np.where(valid_obstacle_mask, depth, np.inf)
+    
+        # 6. Find the minimum distance per column across all rows
+        min_depth_per_column = np.min(filtered_depths, axis=0)
+    
+        # Replace any columns that are entirely clear (np.inf) back to 0.0 or a max range value
+        min_depth_per_column[min_depth_per_column == np.inf] = 0.0
+    
+        return min_depth_per_column
 
 
     @staticmethod

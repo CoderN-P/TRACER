@@ -224,6 +224,24 @@
           min: 0,
         },
         {
+          key: "CLEAR_FRAMES_THRESHOLD",
+          label: "CLEAR_FRAMES_THRESHOLD",
+          step: "1",
+          min: 0
+        },
+        {
+          key: "LIDAR_HEIGHT",
+          label: "LIDAR_HEIGHT",
+          step: "0.01",
+          min: 0,
+        },
+        {
+          key: "CLEARANCE_HEIGHT",
+          label: "CLEARANCE_HEIGHT",
+          step: "0.01",
+          min: 0,
+        },
+        {
           key: "GRID_COLS",
           label: "GRID_COLS",
           step: "1",

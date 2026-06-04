@@ -22,6 +22,8 @@ class RobotConfig:
     OBSTACLE_AVOID_THRESHOLD: float
     LIDAR_FOV: float
     LIDAR_OFFSET: float
+    LIDAR_HEIGHT: float
+    CLEARANCE_HEIGHT: float 
     CLEAR_FRAMES_THRESHOLD: float
     EMIT_SENSOR_FREQ: float
     SENSOR_TIMEOUT: float

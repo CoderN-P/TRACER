@@ -74,17 +74,17 @@ class GapNavigator:
                 gap = self.select_gap(gaps, self.column_depths, goal_col)
                 if gap and abs(gap.center - self.committed_gap_center) > ROBOT_CONFIG.GAP_UPDATE_THRESHOLD:
                     self.committed_gap_center = gap.center
-    
+
     @staticmethod
     def get_column_depths(grid: LidarGrid) -> np.ndarray:
-        values = np.array(grid.values)  # (rows, cols, 2)
-        depth = values[:, :, 1]  # (rows, cols)
-        dist = np.linalg.norm(values, axis=2)
+        depth = np.array(grid.values)  # Shape is already (rows, cols)
     
-        valid = (dist > 0) & (depth > 0)
+        # Filter points where depth is greater than 0
+        valid = depth > 0
         depth_valid = np.where(valid, depth, np.inf)
     
         return np.min(depth_valid, axis=0)  # (cols,) min depth per column
+
 
     @staticmethod
     def min_gap_columns(min_width_m: float, depth: float, grid_cols: int, fov_rad: float) -> int:

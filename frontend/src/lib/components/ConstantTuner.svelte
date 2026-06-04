@@ -106,6 +106,7 @@
           min: 0,
         },
         { key: "R_POSITION", label: "R_POSITION", step: "0.001", min: 0 },
+        { key: "STATE_HISTORY_SIZE", label: "STATE_HISTORY_SIZE", step: "1", min: 5},
       ],
     },
     {
@@ -190,6 +191,12 @@
           key: "CHECK_OBSTACLE_FREQ",
           label: "CHECK_OBSTACLE_FREQ",
           step: "0.1",
+          min: 0,
+        },
+        {
+          key: "MIN_GAP_WIDTH",
+          label: "MIN_GAP_WIDTH",
+          step: "0.01",
           min: 0,
         },
         {

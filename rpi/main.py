@@ -15,7 +15,6 @@ parser = argparse.ArgumentParser(
     description="Main control program for TRACER robot running on Raspberry Pi. Handles serial communication with the robot's microcontroller and serves a Socket.IO API for remote control and telemetry.",
 )
 
-parser.add_argument('--speed', type=float, default=ROBOT_CONFIG.MAX_LINEAR_VEL, help="Speed in m/s to run the motors during wheel calibration (default: Robot max vel).")
 parser.add_argument('--duration', type=float, default=2.0, help="Duration in seconds to run the motors during wheel calibration (default: 2 seconds).")
 parser.add_argument('--resolution', type=float, default=0.1, help="Time resolution in seconds for testing different PWM values during kS calibration (default: 0.1 seconds).")
 parser.add_argument('--serial-test', action='store_true', help="Run a test that continuously prints out sensor packets from the robot to verify serial communication and packet parsing.")

@@ -526,8 +526,8 @@ def interactive_test(port=None):
                         speed = float(args[0])
                         duration = 10.0  # Default 10 seconds
                         
-                        if not (-ROBOT_CONFIG.MAX_LINEAR_VEL <= speed <= ROBOT_CONFIG.MAX_LINEAR_VEL):
-                            print(f"✗ Speed must be between -{ROBOT_CONFIG.MAX_LINEAR_VEL:.2f} and {ROBOT_CONFIG.MAX_LINEAR_VEL:.2f} m/s\n")
+                        if not (-ROBOT_CONFIG.MAX_LINEAR_VEL_NEG <= speed <= ROBOT_CONFIG.MAX_LINEAR_VEL_POS):
+                            print(f"✗ Speed must be between -{ROBOT_CONFIG.MAX_LINEAR_VEL_NEG:.2f} and {ROBOT_CONFIG.MAX_LINEAR_VEL_POS:.2f} m/s\n")
                             continue
                         
                         with lock:
@@ -555,8 +555,8 @@ def interactive_test(port=None):
                         speed = float(args[0])
                         duration = float(args[1])
                         
-                        if not (-ROBOT_CONFIG.MAX_LINEAR_VEL <= speed <= ROBOT_CONFIG.MAX_LINEAR_VEL):
-                            print(f"✗ Speed must be between -{ROBOT_CONFIG.MAX_LINEAR_VEL:.2f} and {ROBOT_CONFIG.MAX_LINEAR_VEL:.2f} m/s\n")
+                        if not (-ROBOT_CONFIG.MAX_LINEAR_VEL_NEG <= speed <= ROBOT_CONFIG.MAX_LINEAR_VEL_POS):
+                            print(f"✗ Speed must be between -{ROBOT_CONFIG.MAX_LINEAR_VEL_NEG:.2f} and {ROBOT_CONFIG.MAX_LINEAR_VEL_POS:.2f} m/s\n")
                             continue
                         
                         if duration <= 0:
@@ -589,12 +589,12 @@ def interactive_test(port=None):
                         right_speed = float(args[1])
                         duration = float(args[2])
                         
-                        if not (-ROBOT_CONFIG.MAX_LINEAR_VEL <= left_speed <= ROBOT_CONFIG.MAX_LINEAR_VEL):
-                            print(f"✗ Left speed must be between -{ROBOT_CONFIG.MAX_LINEAR_VEL:.2f} and {ROBOT_CONFIG.MAX_LINEAR_VEL:.2f} m/s\n")
+                        if not (-ROBOT_CONFIG.MAX_LINEAR_VEL_NEG <= left_speed <= ROBOT_CONFIG.MAX_LINEAR_VEL_POS):
+                            print(f"✗ Left speed must be between -{ROBOT_CONFIG.MAX_LINEAR_VEL_NEG:.2f} and {ROBOT_CONFIG.MAX_LINEAR_VEL_PIS:.2f} m/s\n")
                             continue
                         
-                        if not (-ROBOT_CONFIG.MAX_LINEAR_VEL <= right_speed <= ROBOT_CONFIG.MAX_LINEAR_VEL):
-                            print(f"✗ Right speed must be between -{ROBOT_CONFIG.MAX_LINEAR_VEL:.2f} and {ROBOT_CONFIG.MAX_LINEAR_VEL:.2f} m/s\n")
+                        if not (-ROBOT_CONFIG.MAX_LINEAR_VEL_NEG <= right_speed <= ROBOT_CONFIG.MAX_LINEAR_VEL_POS):
+                            print(f"✗ Right speed must be between -{ROBOT_CONFIG.MAX_LINEAR_VEL_NEG:.2f} and {ROBOT_CONFIG.MAX_LINEAR_VEL_POS:.2f} m/s\n")
                             continue
                         
                         if duration <= 0:
@@ -642,8 +642,8 @@ def interactive_test(port=None):
                     left_speed, right_speed = twist_to_wheel_speeds(linear, angular)
                     
                     # Clamp to max speeds
-                    left_speed = max(-ROBOT_CONFIG.MAX_LINEAR_VEL, min(ROBOT_CONFIG.MAX_LINEAR_VEL, left_speed))
-                    right_speed = max(-ROBOT_CONFIG.MAX_LINEAR_VEL, min(ROBOT_CONFIG.MAX_LINEAR_VEL, right_speed))
+                    left_speed = max(-ROBOT_CONFIG.MAX_LINEAR_VEL_NEG, min(ROBOT_CONFIG.MAX_LINEAR_VEL_POS, left_speed))
+                    right_speed = max(-ROBOT_CONFIG.MAX_LINEAR_VEL_NEG, min(ROBOT_CONFIG.MAX_LINEAR_VEL_POS, right_speed))
                     
                     with lock:
                         state.target_vel_left = left_speed
@@ -817,8 +817,8 @@ def interactive_test(port=None):
                     speed = float(args[0])
                     duration = float(args[1]) if len(args) > 1 else 3.0  # Default 3 seconds
                     
-                    if not (0 < speed <= ROBOT_CONFIG.MAX_LINEAR_VEL):
-                        print(f"✗ Speed must be between 0 and {ROBOT_CONFIG.MAX_LINEAR_VEL:.2f} m/s\n")
+                    if not (0 < speed <= ROBOT_CONFIG.MAX_LINEAR_VEL_POS):
+                        print(f"✗ Speed must be between 0 and {ROBOT_CONFIG.MAX_LINEAR_VEL_POS:.2f} m/s\n")
                         continue
                     
                     if duration <= 0:

@@ -126,10 +126,10 @@ class QuinticHermiteSpline:
         eps = 1e-6
         
         if abs(curvature) < eps:
-            return ROBOT_CONFIG.MAX_LINEAR_VEL
+            return ROBOT_CONFIG.MAX_LINEAR_VEL_POS
         else:
             v = np.sqrt(ROBOT_CONFIG.MAX_LATERAL_ACCEL / abs(curvature))
-            return min(v, ROBOT_CONFIG.MAX_LINEAR_VEL)
+            return min(v, ROBOT_CONFIG.MAX_LINEAR_VEL_POS)
             
     def build_velocity_profile(self, start_velocity=0, end_velocity=None):
         self.velocity_profile[0] = start_velocity

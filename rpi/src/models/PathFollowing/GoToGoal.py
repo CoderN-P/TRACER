@@ -31,7 +31,7 @@ class GoToGoal:
         heading_offset = gap_navigator.heading_offset()
         heading_error = math.atan2(local_target[1], local_target[0]) + heading_offset
 
-        v = ROBOT_CONFIG.MAX_LINEAR_VEL * (1 - np.exp(-ROBOT_CONFIG.K_V * (distance_to_goal ** 1.25)))
+        v = ROBOT_CONFIG.MAX_LINEAR_VEL_POS * (1 - np.exp(-ROBOT_CONFIG.K_V * (distance_to_goal ** 1.25)))
 
         omega = ROBOT_CONFIG.K_OMEGA * heading_error * (1 - np.exp(-ROBOT_CONFIG.K_D * (distance_to_goal ** 1.25))) 
         

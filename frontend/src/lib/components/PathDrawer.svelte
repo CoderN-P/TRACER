@@ -38,6 +38,7 @@
     pathComplete = false,
     onRunPath = (_payload: RunPathPayload) => {},
     onStopRun = () => {},
+    rayPoints = null,
   }: {
     robotPos?: { x: number; y: number; theta: number } | null;
     freehandPath?: { x: number; y: number }[];
@@ -47,6 +48,7 @@
     onRunPath?: (payload: RunPathPayload) => void;
     /** Called when the user presses Stop while a run is active. */
     onStopRun?: () => void;
+    rayPoints?: (number | null)[][] | null;
   } = $props();
 
   let path = new SplinePathSvelte();
@@ -916,7 +918,10 @@
     if (points.length === 1) {
       return {
         distance: Math.hypot(point.x - points[0].x, point.y - points[0].y),
-        signedDistance: Math.hypot(point.x - points[0].x, point.y - points[0].y),
+        signedDistance: Math.hypot(
+          point.x - points[0].x,
+          point.y - points[0].y,
+        ),
         heading: null,
         segmentIndex: 0,
       };
@@ -933,7 +938,10 @@
 
       const projection = Math.max(
         0,
-        Math.min(1, ((point.x - start.x) * dx + (point.y - start.y) * dy) / lenSq),
+        Math.min(
+          1,
+          ((point.x - start.x) * dx + (point.y - start.y) * dy) / lenSq,
+        ),
       );
       const nearest = {
         x: start.x + projection * dx,
@@ -965,8 +973,6 @@
     );
     return sorted[Math.max(0, index)];
   }
-
-  
 
   function lookaheadIndex(
     points: PointMeters[],
@@ -1020,6 +1026,43 @@
 
   let routeStats = $derived(
     buildRouteStats(activePathPoints(), displayRobotPos, robotTrajectory),
+  );
+
+  let virtualRayLines = $derived(
+    running &&
+      obstacleAvoidanceMode === "virtual" &&
+      displayRobotPos !== null &&
+      rayPoints !== null
+      ? (() => {
+          const robotCenter = displayRobotPos;
+          const rays = rayPoints;
+
+          if (robotCenter === null || rays === null) return [];
+
+          return rays.flatMap((point) => {
+            const [x, y] = point;
+            if (
+              x === null ||
+              y === null ||
+              !Number.isFinite(x) ||
+              !Number.isFinite(y)
+            ) {
+              return [];
+            }
+
+            return [
+              {
+                points: [
+                  robotCenter.x * SCALE,
+                  -robotCenter.y * SCALE,
+                  x * SCALE,
+                  -y * SCALE,
+                ],
+              },
+            ];
+          });
+        })()
+      : [],
   );
 </script>
 
@@ -1297,8 +1340,8 @@
         <span class="text-xs text-gray-400">
           {virtualObstacles.length} obstacle{virtualObstacles.length === 1
             ? ""
-            : "s"} · click map to place, drag to move, drag red/orange handles
-          to scale/rotate
+            : "s"} · click map to place, drag to move, drag red/orange handles to
+          scale/rotate
         </span>
       {/if}
 
@@ -1630,6 +1673,21 @@
                   />
                 {/if}
               {/if}
+            {/each}
+          </Layer>
+        {/if}
+
+        <!-- Virtual obstacle avoidance rays -->
+        {#if virtualRayLines.length > 0}
+          <Layer>
+            {#each virtualRayLines as ray}
+              <Line
+                points={ray.points}
+                stroke="#f59e0b"
+                strokeWidth={1.5 / zoom}
+                dash={[6 / zoom, 4 / zoom]}
+                opacity={0.9}
+              />
             {/each}
           </Layer>
         {/if}

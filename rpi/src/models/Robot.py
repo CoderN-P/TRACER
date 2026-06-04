@@ -304,7 +304,8 @@ class Robot:
                     "mode": current_mode.name,
                     "timestamp": datetime.datetime.now().isoformat(),
                     "max_loop_time": self.max_loop_time,
-                    "velocity_profile_t": time.monotonic() - self.velocity_profile_start if self.velocity_profile_start else None
+                    "velocity_profile_t": time.monotonic() - self.velocity_profile_start if self.velocity_profile_start else None,
+                    "virtual_rays": self.gap_navigator.ray_points if self.gap_navigator.mode == ObstacleMode.VIRTUAL and self.state == Mode.PATH_FOLLOWING else None,
                 },
             )  
             
@@ -429,6 +430,7 @@ class Robot:
                         async with self.state_lock:
                             self.state = Mode.MANUAL
                         self.cur_path = None
+                        self.gap_navigator.ray_points = []
                         await self.send_safe_command(Command.stop())
                         await self.socketio.emit('path_complete', {"status": "success"})
                         

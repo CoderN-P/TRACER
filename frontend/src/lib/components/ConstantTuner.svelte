@@ -168,15 +168,18 @@
           step: "0.001",
           min: 0,
         },
-      ],
-    },
-    {
-      title: "Attractive Potential Field",
-      subtitle: "Obstacle avoidance and path attraction tuning.",
-      fields: [
-        { key: "K_REPULSIVE_SOFT", label: "K_REPULSIVE_SOFT", min: 0 },
-        { key: "K_REPULSIVE_HARD", label: "K_REPULSIVE_HARD", min: 0 },
-        { key: "REPULSIVE_THRESHOLD", label: "REPULSIVE_THRESHOLD", min: 0 },
+        {
+          key: "MAX_LINEAR_VEL_POS",
+          label: "MAX_LINEAR_VEL_POS",
+          step: "0.001",
+          min: 0,
+        },
+        {
+          key: "MAX_LINEAR_VEL_NEG",
+          label: "MAX_LINEAR_VEL_NEG",
+          step: "0.001",
+          min: 0,
+        }
       ],
     },
     {
@@ -189,7 +192,6 @@
           step: "0.1",
           min: 0,
         },
-        { key: "BACKUP_TIME", label: "BACKUP_TIME", step: "0.1", min: 0 },
         {
           key: "OBSTACLE_DETECTED_THRESHOLD",
           label: "OBSTACLE_DETECTED_THRESHOLD",
@@ -203,26 +205,23 @@
           min: 0,
         },
         {
-          key: "SYMMETRY_THRESHOLD",
-          label: "SYMMETRY_THRESHOLD",
+          key: "LIDAR_OFFSET",
+          label: "LIDAR_OFFSET",
+          step: "0.01",
+          min: -100,
+        },
+        {
+          key: "GAP_UPDATE_THRESHOLD",
+          label: "GAP_UPDATE_THRESHOLD",
           step: "0.01",
           min: 0,
         },
-        { key: "K_NUDGE", label: "K_NUDGE", step: "0.01", min: 0 },
         {
-          key: "K_LIDAR_SHIFT",
-          label: "K_LIDAR_SHIFT",
-          step: "0.0001",
-          min: 0,
+          key: "GRID_COLS",
+          label: "GRID_COLS",
+          step: "1",
+          min: 1,
         },
-        { key: "K_US_SHIFT", label: "K_US_SHIFT", step: "0.01", min: 0 },
-        {
-          key: "OBSTACLE_ALPHA",
-          label: "OBSTACLE_ALPHA",
-          step: "0.01",
-          min: 0,
-        },
-        { key: "MAX_SHIFT", label: "MAX_SHIFT", step: "0.0001", min: 0 },
       ],
     },
     {

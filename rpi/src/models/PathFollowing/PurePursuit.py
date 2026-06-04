@@ -142,7 +142,7 @@ class PurePursuit:
         lateral_y = local_target[1] + math.tan(gap_navigator.heading_offset()) * math.hypot(*local_target)
         
         curvature = 2*lateral_y / (math.hypot(*local_target) ** 2)
-        linear_velocity = ROBOT_CONFIG.MAX_LINEAR_VEL / (1 + ROBOT_CONFIG.K_CURVE * abs(curvature))
+        linear_velocity = ROBOT_CONFIG.MAX_LINEAR_VEL_POS / (1 + ROBOT_CONFIG.K_CURVE * abs(curvature))
         angular_velocity = curvature * linear_velocity 
         
         motor_speeds = twist_to_wheel_speeds(linear_velocity, angular_velocity)

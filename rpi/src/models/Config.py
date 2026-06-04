@@ -15,6 +15,8 @@ class RobotConfig:
     MAGNETOMETER_SOFT_IRON_MATRIX: tuple[tuple[float, float, float], tuple[float, float, float], tuple[float, float, float]]
     CHECK_OBSTACLE_FREQ: float
     MIN_GAP_WIDTH: float
+    MAX_LINEAR_VEL_POS: float
+    MAX_LINEAR_VEL_NEG: float 
     OBSTACLE_DETECTED_THRESHOLD: float
     GAP_UPDATE_THRESHOLD: float
     OBSTACLE_AVOID_THRESHOLD: float
@@ -74,10 +76,6 @@ class RobotConfig:
     @property
     def FOV_RAD(self) -> float:
         return math.radians(self.LIDAR_FOV)
-    
-    @property
-    def MAX_LINEAR_VEL(self) -> float:
-        return 0.45 # (self.MAX_RPM * self.WHEEL_CIRCUMFERENCE) / 60.0
 
     @property
     def ENCODER_TICKS_PER_REV(self) -> int:

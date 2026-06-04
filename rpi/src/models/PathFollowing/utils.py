@@ -4,14 +4,27 @@ from typing import List
 
 def scale_to_max(left, right) -> tuple:
     
-    
+    if left > 0:
+        left_scale = ROBOT_CONFIG.MAX_LINEAR_VEL_POS / left
+    elif left < 0:
+        left_scale = ROBOT_CONFIG.MAX_LINEAR_VEL_NEG / left
+    else:
+        left_scale = 1
+
+    if right > 0:
+        right_scale = ROBOT_CONFIG.MAX_LINEAR_VEL_POS / right
+    elif left < 0:
+        right_scale = ROBOT_CONFIG.MAX_LINEAR_VEL_NEG / right
+    else:
+        right_scale = 1
+        
     scale = min(
-        ROBOT_CONFIG.MAX_LINEAR_VEL / abs(left) if left > 1e-04 else 1,
-        ROBOT_CONFIG.MAX_LINEAR_VEL / abs(right) if right > 1e-04 else 1,
+        left_scale,
+        right_scale,
         1
     )
 
-    return max(-ROBOT_CONFIG.MAX_LINEAR_VEL, min(left * scale, ROBOT_CONFIG.MAX_LINEAR_VEL)),  max(-ROBOT_CONFIG.MAX_LINEAR_VEL, min(right * scale, ROBOT_CONFIG.MAX_LINEAR_VEL))
+    return max(-ROBOT_CONFIG.MAX_LINEAR_VEL_NEG, min(left * scale, ROBOT_CONFIG.MAX_LINEAR_VEL_POS)),  max(-ROBOT_CONFIG.MAX_LINEAR_VEL_NEG, min(right * scale, ROBOT_CONFIG.MAX_LINEAR_VEL_POS))
 
 def twist_to_wheel_speeds(v, w):
     left = v - (w * ROBOT_CONFIG.WHEEL_BASE / 2.0)

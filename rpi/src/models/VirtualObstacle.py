@@ -1,7 +1,7 @@
 from pydantic import Field, BaseModel
-import math
-from . import RobotState, ROBOT_CONFIG
+import math, numpy as np
 from .VirtualObstacleType import VirtualObstacleType
+from .StateEstimation import RobotState
 
 class VirtualObstacle(BaseModel):
     obstacle_type: VirtualObstacleType = Field(default=VirtualObstacleType.CIRCLE, description="Obstacle type (rectangle/circle)")
@@ -12,77 +12,52 @@ class VirtualObstacle(BaseModel):
     radius: float | None = Field(default=None, description="Radius of the circular obstacle in meters")
 
 
-    def closest_rect_pos(self, robot_state: RobotState):
-        # --- STEP 1: Transform Rectangle Center to Robot Local Frame ---
-        dx = self.position[0] - robot_state.x
-        dy = self.position[1] - robot_state.y 
+    def ray_intersect_rect(self, ray_origin, ray_dir) -> float | None:
+        # Transform ray into rectangle's local frame
+        cos_a = math.cos(-self.rotation)
+        sin_a = math.sin(-self.rotation)
     
-        # Negative theta to un-rotate the robot's orientation
-        cos_t = math.cos(robot_state.yaw)
-        sin_t = math.sin(robot_state.yaw)
+        # Translate ray origin relative to rect center
+        ox = ray_origin[0] - self.position[0]
+        oy = ray_origin[1] - self.position[1]
     
-        rect_local_x = dx * cos_t + dy * sin_t
-        rect_local_y = -dx * sin_t + dy * cos_t
-        rect_local_alpha = self.rotation - robot_state.yaw
+        # Rotate into rect local frame
+        local_ox = ox * cos_a - oy * sin_a
+        local_oy = ox * sin_a + oy * cos_a
+        local_dx = ray_dir[0] * cos_a - ray_dir[1] * sin_a
+        local_dy = ray_dir[0] * sin_a + ray_dir[1] * cos_a
     
-        # --- STEP 2: Find Closest Point to Robot (0, 0) in Robot Frame ---
-        # To do this, we treat rect_local as our target, and un-rotate *it* to axis-aligned
-        cos_a = math.cos(-rect_local_alpha)
-        sin_a = math.sin(-rect_local_alpha)
+        # Now it's axis-aligned, use slab method
+        dx = 1/local_dx if abs(local_dx) > 1e-9 else np.inf
+        dy = 1/local_dy if abs(local_dy) > 1e-9 else np.inf
     
-        # Translate robot (0,0) relative to local rect center, then un-rotate
-        rel_robot_x = 0.0 - rect_local_x
-        rel_robot_y = 0.0 - rect_local_y
+        tx1 = (-self.w/2 - local_ox) * dx
+        tx2 = ( self.w/2 - local_ox) * dx
+        ty1 = (-self.h/2 - local_oy) * dy
+        ty2 = ( self.h/2 - local_oy) * dy
     
-        unrotated_robot_x = rel_robot_x * cos_a - rel_robot_y * sin_a
-        unrotated_robot_y = rel_robot_x * sin_a + rel_robot_y * cos_a
+        tmin = max(min(tx1, tx2), min(ty1, ty2))
+        tmax = min(max(tx1, tx2), max(ty1, ty2))
     
-        # Clamp to the rectangle's half-dimensions
-        half_w = self.width / 2.0
-        half_h = self.height / 2.0
-        clamped_x = max(-half_w, min(unrotated_robot_x, half_w))
-        clamped_y = max(-half_h, min(unrotated_robot_y, half_h))
-    
-        # Rotate clamped point back to the rectangle's local orientation
-        cos_a_fwd = math.cos(rect_local_alpha)
-        sin_a_fwd = math.sin(rect_local_alpha)
-    
-        closest_local_x = clamped_x * cos_a_fwd - clamped_y * sin_a_fwd + rect_local_x
-        closest_local_y = clamped_x * sin_a_fwd + clamped_y * cos_a_fwd + rect_local_y
-    
-        return closest_local_x, closest_local_y
+        if tmax < 0 or tmin > tmax:
+            return None
+        return tmin if tmin > 0 else tmax
 
 
-    def closest_circle_pos(self, robot_state: RobotState):
-        # --- STEP 1: Transform Circle Center to Robot Local Frame ---
-        dx = self.position[0] - robot_state.x
-        dy = self.position[1] - robot_state.y
+    def ray_intersect_circle(self, ray_origin, ray_dir) -> float | None:
+        # Vector from ray origin to circle center
+        oc = (ray_origin[0] - self.position[0], ray_origin[1] - self.position[1])
     
-        cos_t = math.cos(robot_state.yaw)
-        sin_t = math.sin(robot_state.yaw)
+        a = ray_dir[0]**2 + ray_dir[1]**2
+        b = 2 * (oc[0]*ray_dir[0] + oc[1]*ray_dir[1])
+        c = oc[0]**2 + oc[1]**2 - self.radius**2
     
-        # Circle center coordinates in the robot's local frame
-        circle_local_x = dx * cos_t + dy * sin_t
-        circle_local_y = -dx * sin_t + dy * cos_t
+        discriminant = b**2 - 4*a*c
+        if discriminant < 0:
+            return None
     
-        # --- STEP 2: Find Closest Point on Perimeter to Robot (0,0) ---
-        # Calculate distance from robot (0,0) to circle center
-        distance_to_center = math.hypot(circle_local_x, circle_local_y)
-    
-        # Edge case: Robot is exactly at the center of the circle
-        if distance_to_center < 1e-9:
-            return self.radius, 0.0  # Return a point on the perimeter directly ahead of the robot
-    
-        # Vector pointing from circle center to robot (0,0)
-        # This direction is simply the negative of the center's position vector
-        dir_x = -circle_local_x / distance_to_center
-        dir_y = -circle_local_y / distance_to_center
-    
-        # Move from the circle center along that unit vector by radius r
-        closest_local_x = circle_local_x + dir_x * self.radius
-        closest_local_y = circle_local_y + dir_y * self.radius
-    
-        return closest_local_x, closest_local_y
+        t = (-b - math.sqrt(discriminant)) / (2*a)
+        return t if t > 0 else None
 
 
     def beam_distances_to_circle(self, robot_state: RobotState):
@@ -207,24 +182,3 @@ class VirtualObstacle(BaseModel):
         
         return left_dist, right_dist
 
-    def get_repulsive_vector(self, robot_state: RobotState):
-        dist = math.hypot(self.position[0] - robot_state.x, self.position[1] - robot_state.y)
-        
-        if self.obstacle_type == VirtualObstacleType.RECTANGLE:
-            depth, lateral = self.closest_rect_pos(robot_state)
-        elif self.obstacle_type == VirtualObstacleType.CIRCLE:
-            depth, lateral = self.closest_circle_pos(robot_state)
-        else:
-            return 0, 0
-
-        if depth <= 0:
-            return 0, 0
-
-        if depth < ROBOT_CONFIG.OBSTACLE_AVOID_THRESHOLD/100.0:
-            magnitude = ROBOT_CONFIG.K_REPULSIVE_HARD * (1.0 / depth - 1.0 / (ROBOT_CONFIG.OBSTACLE_AVOID_THRESHOLD/100.0))
-        else:
-            magnitude = ROBOT_CONFIG.K_REPULSIVE_SOFT * (1.0 / depth - 1.0 / (ROBOT_CONFIG.OBSTACLE_DETECTED_THRESHOLD/100.0))
-
-        magnitude *= depth/dist
-        
-        return -(lateral/dist) * magnitude, -(depth/dist) * magnitude

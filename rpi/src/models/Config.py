@@ -10,21 +10,17 @@ class RobotConfig:
     JOYSTICK_DEADZONE: float
     MAX_LATERAL_ACCEL: float
     MAX_LONG_ACCEL: float
+    GRID_COLS: int
     MAGNETOMETER_HARD_IRON_OFFSETS: tuple[float, float, float]
     MAGNETOMETER_SOFT_IRON_MATRIX: tuple[tuple[float, float, float], tuple[float, float, float], tuple[float, float, float]]
     CHECK_OBSTACLE_FREQ: float
-    BACKUP_TIME: float
+    MIN_GAP_WIDTH: float
     OBSTACLE_DETECTED_THRESHOLD: float
+    GAP_UPDATE_THRESHOLD: float
     OBSTACLE_AVOID_THRESHOLD: float
-    K_REPULSIVE_SOFT: int
-    K_REPULSIVE_HARD: int
-    REPULSIVE_THRESHOLD: float
-    SYMMETRY_THRESHOLD: float
-    K_NUDGE: float
-    K_LIDAR_SHIFT: float
-    K_US_SHIFT: float
-    OBSTACLE_ALPHA: float
-    MAX_SHIFT: float
+    LIDAR_FOV: float
+    LIDAR_OFFSET: float
+    CLEAR_FRAMES_THRESHOLD: float
     EMIT_SENSOR_FREQ: float
     SENSOR_TIMEOUT: float
     MAIN_LOOP_FREQ: float
@@ -52,6 +48,7 @@ class RobotConfig:
     R_THETA_ENCODER: float
     R_THETA_MAGNETOMETER: float
     R_POSITION: float
+    USE_VIO: bool
     STATE_HISTORY_SIZE: int
     LOOKAHEAD_DISTANCE: float
     COMPLETION_THRESHOLD: float
@@ -74,6 +71,10 @@ class RobotConfig:
     def WHEEL_CIRCUMFERENCE(self) -> float:
         return math.pi * self.WHEEL_DIAMETER
 
+    @property
+    def FOV_RAD(self) -> float:
+        return math.radians(self.LIDAR_FOV)
+    
     @property
     def MAX_LINEAR_VEL(self) -> float:
         return 0.45 # (self.MAX_RPM * self.WHEEL_CIRCUMFERENCE) / 60.0

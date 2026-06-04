@@ -4,7 +4,7 @@ import logging
 
 from .GoToGoal import GoToGoal
 from .utils import twist_to_wheel_speeds, get_local_target
-from .. import ROBOT_CONFIG
+from .. import ROBOT_CONFIG, GapNavigator
 from ..Command import Command, CommandType, MotorCommand
 from ..StateEstimation import RobotState
 from ..SensorData import SensorData
@@ -20,7 +20,6 @@ class PurePursuit:
         self.path = path
         self.last_found_index = 0 # to prevent the robot from going backwards along the path
         self.go_to_goal = None
-        self.omega_shift = 0
 
 
     @classmethod
@@ -108,19 +107,7 @@ class PurePursuit:
         
         return None # no goal point found
 
-    def shift_omega_apf(self, repulsive_vector: tuple[float, float], sensor_data: SensorData):
-        omega_shift = repulsive_vector[0] * ROBOT_CONFIG.K_LIDAR_SHIFT
-        omega_shift += (1 / sensor_data.ultrasonic.distance_left) * ROBOT_CONFIG.K_US_SHIFT if 1e-4 < sensor_data.ultrasonic.distance_left <= ROBOT_CONFIG.OBSTACLE_AVOID_THRESHOLD else 0
-        omega_shift -= (1 / sensor_data.ultrasonic.distance_right) * ROBOT_CONFIG.K_US_SHIFT if 1e-4 < sensor_data.ultrasonic.distance_right <= ROBOT_CONFIG.OBSTACLE_AVOID_THRESHOLD else 0
-
-        omega_shift = ROBOT_CONFIG.MAX_SHIFT * np.tanh(omega_shift)
-
-        if abs(omega_shift) > abs(self.omega_shift):
-            self.omega_shift = ROBOT_CONFIG.OBSTACLE_ALPHA * self.omega_shift + (1 - ROBOT_CONFIG.OBSTACLE_ALPHA) * omega_shift
-        else:
-            self.omega_shift = 0.95 * self.omega_shift + (1 - ROBOT_CONFIG.OBSTACLE_ALPHA) * omega_shift
-
-    def calculate_control_command(self, robot_state: RobotState, repulsive_vector: tuple[float, float], sensor_data: SensorData) -> Command | None:
+    def calculate_control_command(self, robot_state: RobotState, sensor_data: SensorData, gap_navigator: GapNavigator, update_gap_navigator: bool) -> Command | None:
         """
         Calculate the control command (linear and angular velocity) based on the current robot state and the path.
         """
@@ -138,7 +125,7 @@ class PurePursuit:
                 logger.warning("PurePursuit lost the path")
                 self.go_to_goal = GoToGoal(self.path[self.last_found_index +  1])
 
-            return self.go_to_goal.calculate_control_command(robot_state, repulsive_vector, sensor_data)
+            return self.go_to_goal.calculate_control_command(robot_state, sensor_data, gap_navigator, update_gap_navigator)
         else:
             if self.go_to_goal:
                 logger = logging.getLogger("RobotManager")
@@ -148,12 +135,15 @@ class PurePursuit:
         local_target = get_local_target(robot_state, goal_point)
         # Repulsive vector is already in the robot's local frame
         # Only apply lateral force to avoid pushing waypoints behind us
-        lateral_y = local_target[1]
+        
+        if update_gap_navigator:
+            gap_navigator.update(local_target)
+            
+        lateral_y = local_target[1] + math.tan(gap_navigator.heading_offset()) * math.hypot(*local_target)
         
         curvature = 2*lateral_y / (math.hypot(*local_target) ** 2)
-        self.shift_omega_apf(repulsive_vector, sensor_data)
         linear_velocity = ROBOT_CONFIG.MAX_LINEAR_VEL / (1 + ROBOT_CONFIG.K_CURVE * abs(curvature))
-        angular_velocity = curvature * linear_velocity + self.omega_shift
+        angular_velocity = curvature * linear_velocity 
         
         motor_speeds = twist_to_wheel_speeds(linear_velocity, angular_velocity)
         

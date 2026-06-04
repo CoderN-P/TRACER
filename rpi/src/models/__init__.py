@@ -33,6 +33,9 @@ from .Command import Command
 from .VirtualObstacleType import VirtualObstacleType
 from .VirtualObstacle import VirtualObstacle
 from .ObstacleMode import ObstacleMode
+from .ObstacleState import ObstacleState
+from .Gap import Gap
+from .GapNavigator import GapNavigator
 from .MetaMode import MetaMode
 from .Mode import Mode
 from .Robot import Robot

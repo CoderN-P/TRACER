@@ -162,13 +162,14 @@ class GapNavigator:
             if column_depths[col] == np.inf:
                 self.ray_points[col] = (None, None)
             else:
-                self.ray_points[col] = (column_depths[col] * math.sin(col_angle), column_depths[col] * math.cos(col_angle))
+                self.ray_points[col] = (column_depths[col] * math.cos(col_angle), column_depths[col] * math.sin(col_angle))
+        
         self.convert_rays_to_global(robot_state)
         return column_depths
     
     def convert_rays_to_global(self, robot_state: RobotState):
         for i, ray in enumerate(self.ray_points):
-            if ray[0] == None: continue
+            if ray[0] is None: continue
             self.ray_points[i] = (
                 robot_state.x + ray[0] * math.cos(robot_state.yaw) - ray[1] * math.sin(robot_state.yaw),
                 robot_state.y + ray[0] * math.sin(robot_state.yaw) + ray[1] * math.cos(robot_state.yaw)

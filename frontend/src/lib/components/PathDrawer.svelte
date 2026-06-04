@@ -1028,42 +1028,7 @@
     buildRouteStats(activePathPoints(), displayRobotPos, robotTrajectory),
   );
 
-  let virtualRayLines = $derived(
-    running &&
-      obstacleAvoidanceMode === "virtual" &&
-      displayRobotPos !== null &&
-      rayPoints !== null
-      ? (() => {
-          const robotCenter = displayRobotPos;
-          const rays = rayPoints;
-
-          if (robotCenter === null || rays === null) return [];
-
-          return rays.flatMap((point) => {
-            const [x, y] = point;
-            if (
-              x === null ||
-              y === null ||
-              !Number.isFinite(x) ||
-              !Number.isFinite(y)
-            ) {
-              return [];
-            }
-
-            return [
-              {
-                points: [
-                  robotCenter.x * SCALE,
-                  -robotCenter.y * SCALE,
-                  x * SCALE,
-                  -y * SCALE,
-                ],
-              },
-            ];
-          });
-        })()
-      : [],
-  );
+  // virtual rays are rendered directly in the template to keep logic simple
 </script>
 
 {#if !browser}
@@ -1677,17 +1642,22 @@
           </Layer>
         {/if}
 
-        <!-- Virtual obstacle avoidance rays -->
-        {#if virtualRayLines.length > 0}
+        <!-- Virtual obstacle avoidance rays: one plain line per valid ray endpoint -->
+        {#if obstacleAvoidanceMode === 'virtual' && rayPoints && displayRobotPos}
           <Layer>
-            {#each virtualRayLines as ray}
-              <Line
-                points={ray.points}
-                stroke="#f59e0b"
-                strokeWidth={1.5 / zoom}
-                dash={[6 / zoom, 4 / zoom]}
-                opacity={0.9}
-              />
+            {#each rayPoints as rp}
+              {#if rp && rp[0] !== null && rp[1] !== null}
+                <Line
+                  points={[
+                    displayRobotPos.x * SCALE,
+                    -displayRobotPos.y * SCALE,
+                    rp[0] * SCALE,
+                    -rp[1] * SCALE,
+                  ]}
+                  stroke="#DC143C"
+                  strokeWidth={2 / zoom}
+                />
+              {/if}
             {/each}
           </Layer>
         {/if}

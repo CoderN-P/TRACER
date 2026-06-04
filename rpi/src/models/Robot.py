@@ -305,7 +305,7 @@ class Robot:
                     "timestamp": datetime.datetime.now().isoformat(),
                     "max_loop_time": self.max_loop_time,
                     "velocity_profile_t": time.monotonic() - self.velocity_profile_start if self.velocity_profile_start else None,
-                    "virtual_rays": self.gap_navigator.ray_points if self.gap_navigator.mode == ObstacleMode.VIRTUAL and self.state == Mode.PATH_FOLLOWING else None,
+                    "virtual_rays": self.gap_navigator.ray_points if self.gap_navigator.mode == ObstacleMode.VIRTUAL else None
                 },
             )  
             

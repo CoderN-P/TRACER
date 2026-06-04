@@ -229,6 +229,12 @@
           step: "1",
           min: 1,
         },
+        {
+          key: "K_WIDTH",
+          label: "K_WIDTH",
+          step: "0.01",
+          min: 0,
+        },
       ],
     },
     {

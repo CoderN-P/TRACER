@@ -90,6 +90,7 @@
   let robotState = $state<RobotState | null>(null);
   let gestureData = $state<GestureData | null>(null);
   let previousSensorData = $state<SensorData | null>(null);
+  let rayPoints = $state<(number | null)[][] | null>(null);
   let mode = $state<Mode>(Mode.MANUAL);
   let logs = $state<LogEntry[]>([]);
   let joystickInput = $state<Joystick>({
@@ -210,6 +211,7 @@
         velocityProfileT = data.velocity_profile_t ?? null;
         velocityCommand = data.velocityCommand;
         maxLoopTime = data.max_loop_time ?? null;
+        rayPoints = data.virtual_rays ?? null;
 
         packetCount++;
         const now = new Date().getTime();
@@ -408,6 +410,7 @@
                 bind:freehandPath
                 onRunPath={runPath}
                 onStopRun={stopPathRun}
+                {rayPoints}
               />
             </div>
             <div class="col-span-5 row-span-8 min-h-0">

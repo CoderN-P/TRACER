@@ -61,6 +61,7 @@ class RobotConfig:
     ZETA: float
     SPLINE_SAMPLES: int
     TRAJECTORY_DT: float
+    K_WIDTH: float
     K_OMEGA: float
     K_V: float
     K_D: float

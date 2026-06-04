@@ -61,7 +61,7 @@ class Robot:
         self.pending_motor_command: Command | None = None
         
         self.max_loop_time: float = 0.0
-        self.gap_navigator: GapNavigator = GapNavigator
+        self.gap_navigator: GapNavigator = GapNavigator()
         
         self.obstacle_clear.set()
 
@@ -384,7 +384,7 @@ class Robot:
                 self.last_obstacle_detect_time = asyncio.get_event_loop().time()
             
             if cur_state != Mode.STOPPED: # Only update state estimator if not stopped
-                if ROBOT_CONFIG.use_vio:
+                if ROBOT_CONFIG.USE_VIO:
                     self.state_estimator.update(sensor_data, prev_data, self.lidar_data)
                     self.lidar_data = None
                 else:
@@ -408,7 +408,7 @@ class Robot:
                                 
                     elif isinstance(self.cur_path, PurePursuit):
                         # Run pure pursuit
-                        command = self.cur_path.calculate_control_command(self.state_estimator.state, self.repulsive_vector, sensor_data, self.gap_navigator, update_gap_navigator)
+                        command = self.cur_path.calculate_control_command(self.state_estimator.state, self.repulsive_vector, self.gap_navigator, update_gap_navigator)
                         
                         if not command:
                             exit_path = True
@@ -416,7 +416,7 @@ class Robot:
                             await self.send_safe_command(command)
                             
                     elif isinstance(self.cur_path, GoToGoal): # simple point goal (x, y)
-                        command = self.cur_path.calculate_control_command(self.state_estimator.state, self.repulsive_vector, sensor_data, self.gap_navigator, update_gap_navigator)
+                        command = self.cur_path.calculate_control_command(self.state_estimator.state, self.repulsive_vector, self.gap_navigator, update_gap_navigator)
                         if not command:
                             exit_path = True
                         else:

@@ -1,9 +1,12 @@
 from typing import List
 import numpy as np, math
-from . import ObstacleState, VirtualObstacle, ObstacleMode, ROBOT_CONFIG
+from . import ROBOT_CONFIG
 from .SensorData.Lidar import LidarGrid
 from .Gap import Gap
+from .ObstacleState import ObstacleState
 from .StateEstimation import RobotState
+from .ObstacleMode import ObstacleMode
+from .VirtualObstacle import VirtualObstacle
 
 class GapNavigator:
     def __init__(self):
@@ -13,7 +16,7 @@ class GapNavigator:
         self.committed_gap_center: int | None = None  # column index
         self.clear_counter: int = 0
         self.column_depths: np.ndarray = np.array([])
-        self.ray_points: List[tuple[float, float]] = []
+        self.ray_points: List[tuple[float | None, float | None]] = [(None, None)] * ROBOT_CONFIG.GRID_COLS
 
     def update_grid(self, robot_state: RobotState, grid: LidarGrid | None = None):
         if not grid and self.mode == ObstacleMode.VIRTUAL:
@@ -148,7 +151,7 @@ class GapNavigator:
 
     def simulate_lidar(self, robot_state: RobotState) -> np.ndarray:
         column_depths = np.full(ROBOT_CONFIG.GRID_COLS, np.inf)
-        self.ray_points = []
+        self.ray_points = [(None, None)] * ROBOT_CONFIG.GRID_COLS
 
         for col in range(ROBOT_CONFIG.GRID_COLS):
             col_angle = (col / ROBOT_CONFIG.GRID_COLS - 0.5) * ROBOT_CONFIG.FOV_RAD  # -fov/2 to +fov/2
@@ -157,7 +160,7 @@ class GapNavigator:
                 col_angle
             )
             if column_depths[col] == np.inf:
-                self.ray_points[col] = [None, None]
+                self.ray_points[col] = (None, None)
             else:
                 self.ray_points[col] = (column_depths[col] * math.sin(col_angle), column_depths[col] * math.cos(col_angle))
         self.convert_rays_to_global(robot_state)
@@ -165,6 +168,7 @@ class GapNavigator:
     
     def convert_rays_to_global(self, robot_state: RobotState):
         for i, ray in enumerate(self.ray_points):
+            if ray[0] == None: continue
             self.ray_points[i] = (
                 robot_state.x + ray[0] * math.cos(robot_state.yaw) - ray[1] * math.sin(robot_state.yaw),
                 robot_state.y + ray[0] * math.sin(robot_state.yaw) + ray[1] * math.cos(robot_state.yaw)

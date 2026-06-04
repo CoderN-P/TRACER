@@ -31,10 +31,10 @@ class VirtualObstacle(BaseModel):
         dx = 1/local_dx if abs(local_dx) > 1e-9 else np.inf
         dy = 1/local_dy if abs(local_dy) > 1e-9 else np.inf
     
-        tx1 = (-self.w/2 - local_ox) * dx
-        tx2 = ( self.w/2 - local_ox) * dx
-        ty1 = (-self.h/2 - local_oy) * dy
-        ty2 = ( self.h/2 - local_oy) * dy
+        tx1 = (-self.width/2 - local_ox) * dx
+        tx2 = ( self.width/2 - local_ox) * dx
+        ty1 = (-self.height/2 - local_oy) * dy
+        ty2 = ( self.height/2 - local_oy) * dy
     
         tmin = max(min(tx1, tx2), min(ty1, ty2))
         tmax = min(max(tx1, tx2), max(ty1, ty2))
@@ -182,3 +182,10 @@ class VirtualObstacle(BaseModel):
         
         return left_dist, right_dist
 
+    def ray_intersect(self, ray_origin_x, ray_origin_y, ray_dir):
+        ray_origin = [ray_origin_x, ray_origin_y] 
+        if self.obstacle_type == VirtualObstacleType.CIRCLE:
+            return self.ray_intersect_circle(ray_origin, ray_dir)
+        else:
+            return self.ray_intersect_rect(ray_origin, ray_dir)
+    

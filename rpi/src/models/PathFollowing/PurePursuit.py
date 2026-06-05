@@ -133,14 +133,7 @@ class PurePursuit:
                 self.go_to_goal = None
                 
         local_target = get_local_target(robot_state, goal_point)
-        # Repulsive vector is already in the robot's local frame
-        # Only apply lateral force to avoid pushing waypoints behind us
-        
-        if update_gap_navigator:
-            gap_navigator.update(local_target)
-            
-        lateral_y = local_target[1] + math.tan(gap_navigator.heading_offset()) * math.hypot(*local_target)
-        
+        lateral_y = local_target[1]
         curvature = 2*lateral_y / (math.hypot(*local_target) ** 2)
         linear_velocity = ROBOT_CONFIG.MAX_LINEAR_VEL_POS / (1 + ROBOT_CONFIG.K_CURVE * abs(curvature))
         angular_velocity = curvature * linear_velocity 

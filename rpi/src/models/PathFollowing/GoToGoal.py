@@ -2,7 +2,7 @@ import math
 
 import numpy as np
 
-from .. import ROBOT_CONFIG, GapNavigator
+from .. import ROBOT_CONFIG, GapNavigator, RecoveryState
 from ..StateEstimation import RobotState
 from ..SensorData import SensorData
 from ..Command import Command, CommandType, MotorCommand
@@ -27,13 +27,26 @@ class GoToGoal:
 
         if update_gap_navigator:
             gap_navigator.update(local_target)
-            
-        heading_offset = gap_navigator.heading_offset()
-        heading_error = math.atan2(local_target[1], local_target[0]) + heading_offset
 
-        v = ROBOT_CONFIG.MAX_LINEAR_VEL_POS * (1 - np.exp(-ROBOT_CONFIG.K_V * (distance_to_goal ** 1.25)))
+        if gap_navigator.recovery_state == RecoveryState.SCANNING:
+            v = 0.0
+            # Rotate slowly at 30 degrees/sec scaled to your spin direction parameter
+            omega = gap_navigator.spin_direction * 0.5236
 
-        omega = ROBOT_CONFIG.K_OMEGA * heading_error * (1 - np.exp(-ROBOT_CONFIG.K_D * (distance_to_goal ** 1.25))) 
+        elif gap_navigator.recovery_state == RecoveryState.ALIGNING:
+            v = 0.0
+            # Use your normal alignment offset math to lock onto the gap center while standing still
+            omega = gap_navigator.heading_offset() * 1.5 # Proportional gain booster for snaps
+
+        else:
+            # NORMAL TRACKING NAVIGATION MODE
+            # If CLEAR, head straight to target. If AVOIDING, head to committed_gap_center.
+            heading_offset = gap_navigator.heading_offset()
+            heading_error = math.atan2(local_target[1], local_target[0]) + heading_offset
+    
+            v = ROBOT_CONFIG.MAX_LINEAR_VEL_POS * (1 - np.exp(-ROBOT_CONFIG.K_V * (distance_to_goal ** 1.25)))
+    
+            omega = ROBOT_CONFIG.K_OMEGA * heading_error * (1 - np.exp(-ROBOT_CONFIG.K_D * (distance_to_goal ** 1.25))) 
         
         vl, vr = twist_to_wheel_speeds(v, omega)
 

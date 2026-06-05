@@ -35,6 +35,7 @@ from .VirtualObstacle import VirtualObstacle
 from .ObstacleMode import ObstacleMode
 from .ObstacleState import ObstacleState
 from .Gap import Gap
+from .RecoveryState import RecoveryState
 from .GapNavigator import GapNavigator
 from .MetaMode import MetaMode
 from .Mode import Mode

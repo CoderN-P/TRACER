@@ -119,6 +119,7 @@ class GapNavigator:
                     valid_gaps.append((gap, width))
 
             if not valid_gaps:
+                print(gaps)
                 # Gaps exist but none are wide enough to fit physical robot bounds
                 self.recovery_state = RecoveryState.SCANNING
                 self.spin_direction = 1 if goal_is_left else -1
@@ -199,7 +200,7 @@ class GapNavigator:
             collapsed_1d = np.nanmedian(filtered_depths, axis=0)
 
         # 7. Replace entirely clear columns (which result in NaN from nanmedian) with your max range (3.0m)
-        collapsed_1d = np.nan_to_num(collapsed_1d, nan=3.0)
+        collapsed_1d = np.nan_to_num(collapsed_1d, nan=300.0)
 
         # 8. 1D Horizontal Smoothing (3-degree moving average)
         # Drops pixel-to-pixel jitter between adjacent columns
@@ -246,6 +247,7 @@ class GapNavigator:
     
     @staticmethod
     def find_gaps(column_depths: np.ndarray, threshold: float) -> List[Gap]:
+        print(column_depths)
         navigable = column_depths > threshold  # True = passable column
         gaps = []
     
@@ -283,44 +285,43 @@ class GapNavigator:
         self.ray_points = [(None, None)] * ROBOT_CONFIG.GRID_COLS
 
         for col in range(ROBOT_CONFIG.GRID_COLS):
-            col_angle = (col / ROBOT_CONFIG.GRID_COLS - 0.5) * ROBOT_CONFIG.FOV_RAD  # -fov/2 to +fov/2
-            column_depths[col] = self.simulate_lidar_column(
-                robot_state,
-                col_angle
-            )
-            if column_depths[col] == np.inf:
-                continue
-            else:
-                self.ray_points[col] = (column_depths[col] * math.cos(col_angle), column_depths[col] * math.sin(col_angle))
+           col_angle = (col / ROBOT_CONFIG.GRID_COLS - 0.5) * ROBOT_CONFIG.FOV_RAD
+           column_depths[col] = self.simulate_lidar_column(robot_state, col_angle)
         
-        # Inflate column depths
-        raw_simulated_depths = np.clip(column_depths, 0.15, 3.0)
+           if column_depths[col] == np.inf:
+               continue
+           else:
+               self.ray_points[col] = (column_depths[col] * math.cos(col_angle), column_depths[col] * math.sin(col_angle))
+    
+        # 1. Handle near-field clipping ONLY first (Keep open sky as np.inf!)
+        raw_simulated_depths = np.where(column_depths < 0.15, 0.15, column_depths)
 
-        # 2. APPLY THE EXACT SAME 1D HORIZONTAL SMOOTHING (From get_column_depths)
-        # This mirrors the 3-degree moving average pixel blur
+        # 2. Apply 1D Horizontal Smoothing
         kernel = np.ones(3) / 3.0
         smoothed_1d = np.convolve(raw_simulated_depths, kernel, mode='same')
 
-        # 3. APPLY THE EXACT SAME VECTORIZED OBSTACLE EROSION
-        # This ensures virtual boxes are widened by 12 degrees, forcing the simulation 
-        # to test the state machine, gap selection, and recovery spins accurately!
+        # 3. Apply Vectorized Obstacle Erosion while open space is still inf
         buffer = 12
         window_width = (2 * buffer) + 1
-
-        # Pad boundaries using edge values
         padded = np.pad(smoothed_1d, buffer, mode='edge')
 
-        # Create the identical sliding window view via NumPy stride mechanics
         shape = (smoothed_1d.size, window_width)
         strides = (padded.strides[0], padded.strides[0])
         windows = np.lib.stride_tricks.as_strided(padded, shape=shape, strides=strides)
 
-        # Force virtual obstacles to expand horizontally
+        # Open space (inf) will lose to obstacles correctly, but obstacles won't pollute open columns past 12 cols
         simulated_min_depth_per_column = np.min(windows, axis=1)
-        
+    
+        # 4. CRITICAL: Now turn remaining open spaces/inf into your maximum range threshold
+        simulated_min_depth_per_column = np.where(
+            simulated_min_depth_per_column > ROBOT_CONFIG.OBSTACLE_DETECTED_THRESHOLD, 
+            300.0, 
+            simulated_min_depth_per_column
+        )
+    
         self.convert_rays_to_global(robot_state)
         return simulated_min_depth_per_column
-    
+
     def convert_rays_to_global(self, robot_state: RobotState):
         for i, ray in enumerate(self.ray_points):
             if ray[0] is None: continue

@@ -2,7 +2,8 @@ import math
 
 import numpy as np
 
-from .. import ROBOT_CONFIG, GapNavigator, RecoveryState
+from .. import ROBOT_CONFIG, GapNavigator
+from ..RecoveryState import RecoveryState
 from ..StateEstimation import RobotState
 from ..SensorData import SensorData
 from ..Command import Command, CommandType, MotorCommand

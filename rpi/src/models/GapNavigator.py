@@ -247,7 +247,6 @@ class GapNavigator:
     
     @staticmethod
     def find_gaps(column_depths: np.ndarray, threshold: float) -> List[Gap]:
-        print(column_depths)
         navigable = column_depths > threshold  # True = passable column
         gaps = []
     
@@ -301,7 +300,7 @@ class GapNavigator:
         smoothed_1d = np.convolve(raw_simulated_depths, kernel, mode='same')
 
         # 3. Apply Vectorized Obstacle Erosion while open space is still inf
-        buffer = 12
+        buffer = 10
         window_width = (2 * buffer) + 1
         padded = np.pad(smoothed_1d, buffer, mode='edge')
 

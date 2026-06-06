@@ -389,7 +389,7 @@ class Robot:
                     self.gap_navigator.update_grid(self.state_estimator.state) # Does nothing if not in virtual obstacle mode
                     
                 # Smooth ultrasonic readings
-                ultrasonic_left, ultrasonic_right = self.handle_obstacle(sensor_data)
+                ultrasonic_left, ultrasonic_right = await self.handle_obstacle(sensor_data)
                 self.left_distance_history.append(ultrasonic_left)
                 self.right_distance_history.append(ultrasonic_right)
                 update_gap_navigator = True
@@ -440,7 +440,7 @@ class Robot:
                     elif isinstance(self.cur_path, DWA):
                         if update_gap_navigator: # Using this as marker to make DWA run at 20hz
                             command = self.cur_path.calculate_control_command(self.state_estimator.state)
-                            
+                            print(command)
                             if not command:
                                 exit_path = True
                             else:
@@ -503,6 +503,7 @@ class Robot:
                     self.state = Mode.PATH_FOLLOWING
                 elif data["path_type"] == "point_dwa":
                     self.cur_path = DWA((data["path"]["x"], data["path"]["y"]), virtual_obstacles=self.gap_navigator.virtual_obstacles)
+                    self.state = Mode.PATH_FOLLOWING
                 else:
                     self._logger.error(f"Unknown path type: {data['type']}")
                     self.state = Mode.MANUAL
@@ -636,7 +637,6 @@ class Robot:
                 return
         
         if mode == 'twist':
-            print(f"linear: {v1}, angular: {v2}")
             vl, vr = twist_to_wheel_speeds(v1, v2)
             
             async with self.motor_lock:

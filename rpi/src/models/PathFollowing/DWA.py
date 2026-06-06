@@ -23,8 +23,8 @@ class DWA:
         candidate_omega = np.linspace(omega_min, omega_max, ROBOT_CONFIG.OMEGA_SAMPLES)
         
         best_score = 0
-        best_v = robot_state.v
-        best_omega = robot_state.omega
+        best_v = robot_state.linear_velocity
+        best_omega = robot_state.angular_velocity
         
         for v in candidate_v:
             for omega in candidate_omega:
@@ -64,10 +64,10 @@ class DWA:
     def find_dynamic_window(robot_state: RobotState):
         # Calculate the dynamic window based on current velocity and acceleration limits
         dt = 1 / ROBOT_CONFIG.CHECK_OBSTACLE_FREQ
-        v_min = max(0, robot_state.v - ROBOT_CONFIG.MAX_LONG_ACCEL * dt)
-        v_max = min(ROBOT_CONFIG.MAX_LINEAR_VEL_POS, robot_state.v + ROBOT_CONFIG.MAX_LONG_ACCEL * dt)
-        omega_min = max(-ROBOT_CONFIG.MAX_ALPHA, robot_state.omega - ROBOT_CONFIG.MAX_ALPHA * dt)
-        omega_max = min(ROBOT_CONFIG.MAX_ALPHA, robot_state.omega + ROBOT_CONFIG.MAX_ALPHA * dt)
+        v_min = max(0, robot_state.linear_velocity - ROBOT_CONFIG.MAX_LONG_ACCEL * dt)
+        v_max = min(ROBOT_CONFIG.MAX_LINEAR_VEL_POS, robot_state.linear_velocity + ROBOT_CONFIG.MAX_LONG_ACCEL * dt)
+        omega_min = max(-ROBOT_CONFIG.MAX_ALPHA, robot_state.angular_velocity - ROBOT_CONFIG.MAX_ALPHA * dt)
+        omega_max = min(ROBOT_CONFIG.MAX_ALPHA, robot_state.angular_velocity + ROBOT_CONFIG.MAX_ALPHA * dt)
         
         return v_min, v_max, omega_min, omega_max
     

@@ -34,18 +34,19 @@ class DWA:
                 stopping_dist = v*v/(2*ROBOT_CONFIG.MAX_LONG_ACCEL)
                 
                 # Restrict search space to admissible velocities
-                if stopping_dist < min_dist:
+                if stopping_dist > min_dist:
                     continue
                     
                 score = ROBOT_CONFIG.DWA_SIGMA * (
-                    ROBOT_CONFIG.DWA_ALPHA * self.heading(v, omega, robot_state) +
+                    ROBOT_CONFIG.DWA_ALPHA * self.heading(v, omega, robot_state) / 60 +
                     ROBOT_CONFIG.DWA_BETA * min_dist +
-                    ROBOT_CONFIG.DWA_Y * self.velocity(v)
+                    ROBOT_CONFIG.DWA_Y * self.velocity(v) * 10
                 )
                 
                 if score > best_score:
                     best_v = v
                     best_omega = omega
+                    best_score = score
 
         vl, vr = twist_to_wheel_speeds(best_v, best_omega)
 
@@ -77,7 +78,7 @@ class DWA:
 
         x = robot_state.x
         y = robot_state.y
-        theta = robot_state.theta
+        theta = robot_state.yaw
         
         dt = 1 / ROBOT_CONFIG.CHECK_OBSTACLE_FREQ
         for _ in range(ROBOT_CONFIG.DWA_STEPS):
@@ -105,7 +106,7 @@ class DWA:
             if collision:
                 return dist
         
-        return 300
+        return 3
         
         
     @staticmethod
@@ -155,7 +156,7 @@ class DWA:
         
         x = robot_state.x
         y = robot_state.y
-        theta = robot_state.theta
+        theta = robot_state.yaw
         
         dt = 1 / ROBOT_CONFIG.CHECK_OBSTACLE_FREQ
         

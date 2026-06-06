@@ -200,7 +200,7 @@ class GapNavigator:
             collapsed_1d = np.nanmedian(filtered_depths, axis=0)
 
         # 7. Replace entirely clear columns (which result in NaN from nanmedian) with your max range (3.0m)
-        collapsed_1d = np.nan_to_num(collapsed_1d, nan=300.0)
+        collapsed_1d = np.nan_to_num(collapsed_1d, nan=3.0)
 
         # 8. 1D Horizontal Smoothing (3-degree moving average)
         # Drops pixel-to-pixel jitter between adjacent columns
@@ -314,7 +314,7 @@ class GapNavigator:
         # 4. CRITICAL: Now turn remaining open spaces/inf into your maximum range threshold
         simulated_min_depth_per_column = np.where(
             simulated_min_depth_per_column > ROBOT_CONFIG.OBSTACLE_DETECTED_THRESHOLD, 
-            300.0, 
+            3.0, 
             simulated_min_depth_per_column
         )
     

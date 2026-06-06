@@ -258,7 +258,7 @@ class Robot:
         min_depth = min(self.gap_navigator.column_depths[self.gap_navigator.column_depths < np.inf], default=np.inf)
             
         if min_depth > ROBOT_CONFIG.OBSTACLE_DETECTED_THRESHOLD or cur_state != Mode.MANUAL: # Only proceed to stop if in MANUAL
-            # No obstacle detected , so reset obstacle_clear
+            # No obstacle detected, so reset obstacle_clear
             self.obstacle_clear.set()
             return distance_left, distance_right
     

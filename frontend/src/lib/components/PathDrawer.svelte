@@ -1926,10 +1926,10 @@
             <Rect
               x={cx}
               y={cy}
-              width={robotRectWidth}
-              height={robotRectHeight}
-              offsetX={robotRectWidth / 2}
-              offsetY={robotRectHeight / 2}
+              height={robotRectWidth}
+              width={robotRectHeight}
+              offsetY={robotRectWidth / 2}
+              offsetX={robotRectHeight / 2}
               rotation={-(displayRobotPos.theta * 180) / Math.PI}
               stroke="#16a34a"
               strokeWidth={2 / zoom}

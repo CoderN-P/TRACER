@@ -257,7 +257,9 @@ class Robot:
             
         min_depth = min(self.gap_navigator.column_depths[self.gap_navigator.column_depths < np.inf], default=np.inf)
             
-        if min_depth > ROBOT_CONFIG.OBSTACLE_DETECTED_THRESHOLD or not self.obstacle_clear.is_set() or cur_state != Mode.MANUAL: # Only proceed to stop if in MANUAL
+        if min_depth > ROBOT_CONFIG.OBSTACLE_DETECTED_THRESHOLD or cur_state != Mode.MANUAL: # Only proceed to stop if in MANUAL
+            # No obstacle detected , so reset obstacle_clear
+            self.obstacle_clear.set()
             return distance_left, distance_right
     
         await self.socketio.emit('obstacle_detected', {"distance_left": distance_left, "distance_right": distance_right})
@@ -266,7 +268,6 @@ class Robot:
             self.obstacle_clear.clear()
             await self.send_safe_command(Command.stop())
 
-            
         return distance_left, distance_right
         
     def process_sensor_data(self, data: bytes):
@@ -402,9 +403,6 @@ class Robot:
                 else:
                     self.state_estimator.update(sensor_data, prev_data, None)
                     
-                    
-            
-
             if cur_state == Mode.PATH_FOLLOWING and asyncio.get_event_loop().time() - self.last_path_time >= path_following_dt:
                 if self.cur_path is None:
                     async with self.state_lock:
@@ -440,7 +438,7 @@ class Robot:
                     elif isinstance(self.cur_path, DWA):
                         if update_gap_navigator: # Using this as marker to make DWA run at 20hz
                             command = self.cur_path.calculate_control_command(self.state_estimator.state)
-                            print(command)
+                            
                             if not command:
                                 exit_path = True
                             else:

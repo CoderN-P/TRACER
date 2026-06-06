@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { browser } from "$app/environment";
   import * as Card from "$lib/components/ui/card";
   import { io as socket } from "$lib/api/socket";
   import {
@@ -38,6 +39,12 @@
     a: number;
     b: number;
   };
+  type StoredProfileState = {
+    mode?: unknown;
+    durationSeconds?: unknown;
+    points?: unknown;
+    snapEnabled?: unknown;
+  };
 
   type CurveMeta = {
     key: CurveKey;
@@ -54,6 +61,7 @@
   const PADDING = { top: 10, right: 52, bottom: 20, left: 52 };
   const TICK_COUNT = 5;
   const MIN_POINT_SPACING = 0.02;
+  const STORAGE_KEY = "tracer.velocity-command-widget.profile.v1";
   const DEFAULT_POINTS: ProfilePoint[] = [
     { id: 1, t: 0, a: 0, b: 0 },
     { id: 2, t: 0.25, a: 0.18, b: 0.18 },
@@ -131,15 +139,102 @@
     ],
   };
 
-  let mode = $state<CommandMode>("wheel");
-  let durationSeconds = $state(4);
-  let points = $state<ProfilePoint[]>(structuredClone(DEFAULT_POINTS));
+  function isCommandMode(value: unknown): value is CommandMode {
+    return value === "wheel" || value === "twist" || value === "pwm";
+  }
+
+  function normalizeStoredPoints(value: unknown): ProfilePoint[] | null {
+    if (!Array.isArray(value) || value.length < 2) return null;
+
+    const nextPoints = value
+      .map((point, index) => {
+        if (!point || typeof point !== "object") return null;
+        const candidate = point as Record<string, unknown>;
+        const id = Number(candidate.id ?? index + 1);
+        const t = Number(candidate.t);
+        const a = Number(candidate.a);
+        const b = Number(candidate.b);
+
+        if (
+          !Number.isFinite(id) ||
+          !Number.isFinite(t) ||
+          !Number.isFinite(a) ||
+          !Number.isFinite(b)
+        ) {
+          return null;
+        }
+
+        return {
+          id,
+          t: clamp(t, 0, 1),
+          a,
+          b,
+        };
+      })
+      .filter((point): point is ProfilePoint => point !== null)
+      .sort((left, right) => left.t - right.t);
+
+    return nextPoints.length >= 2 ? nextPoints : null;
+  }
+
+  function loadStoredProfileState() {
+    if (!browser) {
+      return null;
+    }
+
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw) as StoredProfileState;
+      const storedPoints = normalizeStoredPoints(parsed.points);
+
+      return {
+        mode: isCommandMode(parsed.mode) ? parsed.mode : "wheel",
+        durationSeconds:
+          typeof parsed.durationSeconds === "number" &&
+          Number.isFinite(parsed.durationSeconds)
+            ? clamp(parsed.durationSeconds, 0.5, 60)
+            : 4,
+        points: storedPoints ?? structuredClone(DEFAULT_POINTS),
+        snapEnabled:
+          typeof parsed.snapEnabled === "boolean" ? parsed.snapEnabled : true,
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  function persistProfileState() {
+    if (!browser) return;
+
+    try {
+      localStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify({
+          mode,
+          durationSeconds,
+          points,
+          snapEnabled,
+        }),
+      );
+    } catch {
+      // The editor should keep working even if browser storage is unavailable.
+    }
+  }
+
+  const initialProfileState = loadStoredProfileState();
+
+  let mode = $state<CommandMode>(initialProfileState?.mode ?? "wheel");
+  let durationSeconds = $state(initialProfileState?.durationSeconds ?? 4);
+  let points = $state<ProfilePoint[]>(
+    initialProfileState?.points ?? structuredClone(DEFAULT_POINTS),
+  );
   let dragTarget = $state<{ id: number; key: CurveKey } | null>(null);
   let hoverTarget = $state<{ id: number; key: CurveKey } | null>(null);
   let graphFrame = $state<HTMLDivElement | null>(null);
   let svgElement = $state<SVGSVGElement | null>(null);
   let graphWidth = $state(1280);
-  let snapEnabled = $state(true);
+  let snapEnabled = $state(initialProfileState?.snapEnabled ?? true);
   let isRunning = $state(false);
   let progress = $state(0);
   let startedAt = $state(0);
@@ -226,6 +321,23 @@
   );
 
   let previewValues = $derived(sampleProfile(progress));
+
+  let slopeStats = $derived(
+    curves.map((curve) => {
+      let maxSlope = 0;
+
+      for (let index = 1; index < displayPoints.length; index += 1) {
+        const previous = displayPoints[index - 1];
+        const next = displayPoints[index];
+        const dt = (next.t - previous.t) * durationSeconds;
+        if (dt <= 0) continue;
+        const slope = Math.abs((next[curve.key] - previous[curve.key]) / dt);
+        maxSlope = Math.max(maxSlope, slope);
+      }
+
+      return { ...curve, maxSlope };
+    }),
+  );
 
   let snapGuides = $derived(
     curves.flatMap((curve) =>
@@ -432,6 +544,34 @@
     progress = 0;
   }
 
+  function endpointPointId(edge: "start" | "end") {
+    const ordered = sortedPoints;
+    const point = edge === "start" ? ordered[0] : ordered.at(-1);
+    return point?.id ?? null;
+  }
+
+  function endpointValue(edge: "start" | "end", key: CurveKey) {
+    const ordered = displayPoints;
+    const point = edge === "start" ? ordered[0] : ordered.at(-1);
+    return point?.[key] ?? 0;
+  }
+
+  function setEndpointValue(
+    edge: "start" | "end",
+    key: CurveKey,
+    value: number,
+  ) {
+    const pointId = endpointPointId(edge);
+    const curve = curves.find((entry) => entry.key === key);
+    if (pointId === null || !curve || !Number.isFinite(value)) return;
+
+    points = points.map((point) =>
+      point.id === pointId
+        ? { ...point, [key]: clamp(value, curve.min, curve.max) }
+        : point,
+    );
+  }
+
   function sampleProfile(t: number) {
     const clampedT = clamp(t, 0, 1);
     const ordered = displayPoints;
@@ -507,6 +647,10 @@
     isRunning = false;
     progress = finished ? 1 : progress;
   }
+
+  $effect(() => {
+    persistProfileState();
+  });
 
   $effect(() => {
     if (!graphFrame) return;
@@ -805,6 +949,58 @@
           </g>
         {/if}
       </svg>
+    </div>
+
+    <div
+      class="grid shrink-0 gap-1.5 border-t border-gray-100 pt-1.5 sm:grid-cols-3"
+    >
+      {#each ["start", "end"] as edge}
+        <div class="flex flex-wrap items-center gap-1.5">
+          <span class="w-10 text-xs font-semibold capitalize text-gray-500">
+            {edge}
+          </span>
+          {#each curves as curve}
+            <label
+              class="flex min-w-28 items-center gap-1.5 text-xs font-medium text-gray-600"
+            >
+              <span
+                class="h-2 w-2 shrink-0 rounded-full"
+                style:background={curve.color}
+              ></span>
+              <input
+                class="h-7 w-20 rounded-md border border-gray-200 bg-white px-2 text-sm text-gray-900 outline-none focus:border-gray-400"
+                type="number"
+                min={curve.min}
+                max={curve.max}
+                step={curve.unit === "rad/s" ? 0.1 : 0.01}
+                value={endpointValue(edge as "start" | "end", curve.key)}
+                oninput={(event) =>
+                  setEndpointValue(
+                    edge as "start" | "end",
+                    curve.key,
+                    Number(event.currentTarget.value),
+                  )}
+              />
+              <span class="text-gray-400">{curve.unit}</span>
+            </label>
+          {/each}
+        </div>
+      {/each}
+
+      <div
+        class="flex flex-wrap items-center gap-2 text-xs font-medium text-gray-500 sm:justify-end"
+      >
+        {#each slopeStats as stat}
+          <span class="inline-flex items-center gap-1.5">
+            <span
+              class="h-2 w-2 rounded-full"
+              style:background={stat.color}
+            ></span>
+            max slope {stat.maxSlope.toFixed(stat.unit === "rad/s" ? 2 : 3)}
+            {stat.unit ? `${stat.unit}/s` : "/s"}
+          </span>
+        {/each}
+      </div>
     </div>
 
     <div

@@ -9,7 +9,7 @@ from typing import List, Dict
 
 import numpy as np
 
-from . import SerialManager, SensorData,  StateEstimator, Mode, ROBOT_CONFIG, MagnetometerData, MetaMode, Path, PurePursuit, LidarData, GapNavigator, ObstacleMode, VirtualObstacle
+from . import SerialManager, SensorData,  StateEstimator, Mode, ROBOT_CONFIG, MagnetometerData, MetaMode, Path, PurePursuit, LidarData, GapNavigator, ObstacleMode, VirtualObstacle, DWA
 from .PathFollowing import GoToGoal, twist_to_wheel_speeds
 from .Command import PIDCommand, MotorCommand, MotorPWMCommand, Command, CommandType, LCDCommand
 from ..ai.get_commands import text_to_command
@@ -388,6 +388,10 @@ class Robot:
                 else:
                     self.gap_navigator.update_grid(self.state_estimator.state) # Does nothing if not in virtual obstacle mode
                     
+                # Smooth ultrasonic readings
+                ultrasonic_left, ultrasonic_right = self.handle_obstacle(sensor_data)
+                self.left_distance_history.append(ultrasonic_left)
+                self.right_distance_history.append(ultrasonic_right)
                 update_gap_navigator = True
                 self.last_obstacle_detect_time = asyncio.get_event_loop().time()
             
@@ -397,6 +401,9 @@ class Robot:
                     self.lidar_data = None
                 else:
                     self.state_estimator.update(sensor_data, prev_data, None)
+                    
+                    
+            
 
             if cur_state == Mode.PATH_FOLLOWING and asyncio.get_event_loop().time() - self.last_path_time >= path_following_dt:
                 if self.cur_path is None:
@@ -429,6 +436,15 @@ class Robot:
                             exit_path = True
                         else:
                             await self.send_safe_command(command)
+                            
+                    elif isinstance(self.cur_path, DWA):
+                        if update_gap_navigator: # Using this as marker to make DWA run at 20hz
+                            command = self.cur_path.calculate_control_command(self.state_estimator.state)
+                            
+                            if not command:
+                                exit_path = True
+                            else:
+                                await self.send_safe_command(command)
                     else:
                         self._logger.error(f"Unknown path type: {type(self.cur_path)}")
                         exit_path = True
@@ -485,6 +501,8 @@ class Robot:
                 elif data["path_type"] == "point":
                     self.cur_path = GoToGoal((data["path"]["x"], data["path"]["y"]))
                     self.state = Mode.PATH_FOLLOWING
+                elif data["path_type"] == "point_dwa":
+                    self.cur_path = DWA((data["path"]["x"], data["path"]["y"]), virtual_obstacles=self.gap_navigator.virtual_obstacles)
                 else:
                     self._logger.error(f"Unknown path type: {data['type']}")
                     self.state = Mode.MANUAL

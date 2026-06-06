@@ -5,6 +5,8 @@ from dataclasses import dataclass
 class RobotConfig:
     WHEEL_BASE: float
     WHEEL_DIAMETER: float
+    ROBOT_WIDTH: float
+    ROBOT_HEIGHT: float
     MAX_RPM: int
     REDUCTION_RATIO: float
     JOYSTICK_DEADZONE: float
@@ -14,6 +16,14 @@ class RobotConfig:
     MAGNETOMETER_HARD_IRON_OFFSETS: tuple[float, float, float]
     MAGNETOMETER_SOFT_IRON_MATRIX: tuple[tuple[float, float, float], tuple[float, float, float], tuple[float, float, float]]
     CHECK_OBSTACLE_FREQ: float
+    V_SAMPLES: int
+    OMEGA_SAMPLES: int
+    DWA_STEPS: int
+    MAX_ALPHA: float
+    DWA_SIGMA: float
+    DWA_ALPHA: float
+    DWA_BETA: float
+    DWA_Y: float
     MIN_GAP_WIDTH: float
     MAX_LINEAR_VEL_POS: float
     MAX_LINEAR_VEL_NEG: float 

@@ -125,6 +125,18 @@
           step: "0.0001",
           min: 0,
         },
+        {
+          key: "ROBOT_WIDTH",
+          label: "ROBOT_WIDTH",
+          step: "0.001",
+          min: 0,
+        },
+        {
+          key: "ROBOT_HEIGHT",
+          label: "ROBOT_HEIGHT",
+          step: "0.001",
+          min: 0,
+        },
       ],
     },
     {
@@ -250,6 +262,60 @@
         {
           key: "K_WIDTH",
           label: "K_WIDTH",
+          step: "0.01",
+          min: 0,
+        },
+      ],
+    },
+    {
+      title: "Dynamic Window",
+      subtitle: "DWA sampling, acceleration, and scoring weights.",
+      fields: [
+        {
+          key: "V_SAMPLES",
+          label: "V_SAMPLES",
+          step: "1",
+          min: 1,
+        },
+        {
+          key: "OMEGA_SAMPLES",
+          label: "OMEGA_SAMPLES",
+          step: "1",
+          min: 1,
+        },
+        {
+          key: "DWA_STEPS",
+          label: "DWA_STEPS",
+          step: "1",
+          min: 1,
+        },
+        {
+          key: "MAX_ALPHA",
+          label: "MAX_ALPHA",
+          step: "0.01",
+          min: 0,
+        },
+        {
+          key: "DWA_SIGMA",
+          label: "DWA_SIGMA",
+          step: "0.01",
+          min: 0,
+        },
+        {
+          key: "DWA_ALPHA",
+          label: "DWA_ALPHA",
+          step: "0.01",
+          min: 0,
+        },
+        {
+          key: "DWA_BETA",
+          label: "DWA_BETA",
+          step: "0.01",
+          min: 0,
+        },
+        {
+          key: "DWA_Y",
+          label: "DWA_Y",
           step: "0.01",
           min: 0,
         },

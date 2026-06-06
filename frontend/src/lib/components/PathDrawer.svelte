@@ -29,7 +29,10 @@
         type: "spline";
         path: ReturnType<SplinePathSvelte["exportToJSON"]>;
       }
-    | { type: "point"; path: { x: number; y: number } };
+    | {
+        type: "point" | "point_dwa";
+        path: { x: number; y: number };
+      };
 
   /** Robot position in meters, updated at ~10 Hz. Pass null to hide the robot. */
   let {
@@ -239,7 +242,13 @@
   });
 
   // ── Mode ──────────────────────────────────────────────────────────────────
-  type Mode = "spline" | "freehand" | "point" | "svg" | "obstacle";
+  type Mode =
+    | "spline"
+    | "freehand"
+    | "point"
+    | "point_dwa"
+    | "svg"
+    | "obstacle";
   let mode = $state<Mode>("spline");
 
   // ── Point mode ────────────────────────────────────────────────────────────
@@ -327,6 +336,8 @@
 
     if (nextMode === "virtual") {
       emitVirtualObstacles(virtualObstacles);
+    } else if (mode === "point_dwa") {
+      mode = "point";
     }
   }
 
@@ -501,7 +512,7 @@
   }
 
   function pointModeClick(e) {
-    if (mode !== "point" || running) return;
+    if ((mode !== "point" && mode !== "point_dwa") || running) return;
     // Only select on left mouse button
     if (e.evt.button !== 0) return;
     const world = pointerToWorld(e.target.getStage());
@@ -657,7 +668,7 @@
   // ── Run mode ──────────────────────────────────────────────────────────────
   // When running, we record which type of path is active and a UI offset so
   // spline/freehand-style paths appear to start at the robot's current position.
-  type RunSource = "spline" | "freehand" | "point" | "svg";
+  type RunSource = "spline" | "freehand" | "point" | "point_dwa" | "svg";
   let running = $state(false);
   let runSource = $state<RunSource>("spline");
   // Offset in meters applied only for rendering while running.
@@ -669,6 +680,10 @@
       x: point.x + runOffsetX,
       y: point.y + runOffsetY,
     };
+  }
+
+  function modeToRunSource(currentMode: Mode): RunSource | null {
+    return currentMode === "obstacle" ? null : currentMode;
   }
 
   function translateSplineJSON(
@@ -708,14 +723,18 @@
         ? freehandPath.length > 0
         : mode === "point"
           ? selectedPoint !== null
-          : mode === "svg"
-            ? svgPath.length > 1
-            : false,
+          : mode === "point_dwa"
+            ? obstacleAvoidanceMode === "virtual" && selectedPoint !== null
+            : mode === "svg"
+              ? svgPath.length > 1
+              : false,
   );
 
   function startRun() {
     if (!canRun) return;
-    runSource = mode;
+    const nextRunSource = modeToRunSource(mode);
+    if (nextRunSource === null) return;
+    runSource = nextRunSource;
     runOffsetX = 0;
     runOffsetY = 0;
     robotTrajectory = displayRobotPos
@@ -778,7 +797,7 @@
     } else {
       // Point mode
       payload = {
-        type: "point",
+        type: runSource === "point_dwa" ? "point_dwa" : "point",
         path: {
           x: selectedPoint?.x ?? 0,
           y: selectedPoint?.y ?? 0,
@@ -797,6 +816,10 @@
 
   function clearTrajectory() {
     robotTrajectory = [];
+  }
+
+  function runSourceLabel(source: RunSource) {
+    return source === "point_dwa" ? "DWA point" : source;
   }
 
   // Exit run mode automatically when parent signals completion.
@@ -829,46 +852,88 @@
   };
 
   const CONSTANTS_STORAGE_KEY = "tracer.constant-tuner.constants.v1";
-  const DEFAULT_LOOKAHEAD_DISTANCE = 0.4;
+  const DEFAULT_LOOKAHEAD_DISTANCE = 0.2;
+  const DEFAULT_ROBOT_WIDTH = 0.22;
+  const DEFAULT_ROBOT_HEIGHT = 0.3;
 
   let lookaheadDistance = $state(DEFAULT_LOOKAHEAD_DISTANCE);
+  let robotWidth = $state(DEFAULT_ROBOT_WIDTH);
+  let robotHeight = $state(DEFAULT_ROBOT_HEIGHT);
 
-  function readStoredLookaheadDistance() {
-    if (!browser) return DEFAULT_LOOKAHEAD_DISTANCE;
+  function readStoredConstants() {
+    if (!browser) return null;
 
     try {
       const raw = localStorage.getItem(CONSTANTS_STORAGE_KEY);
-      if (!raw) return DEFAULT_LOOKAHEAD_DISTANCE;
+      if (!raw) return null;
 
-      const parsed = JSON.parse(raw) as { LOOKAHEAD_DISTANCE?: unknown };
-      return typeof parsed.LOOKAHEAD_DISTANCE === "number" &&
-        Number.isFinite(parsed.LOOKAHEAD_DISTANCE) &&
-        parsed.LOOKAHEAD_DISTANCE > 0
-        ? parsed.LOOKAHEAD_DISTANCE
-        : DEFAULT_LOOKAHEAD_DISTANCE;
+      return JSON.parse(raw);
     } catch {
-      return DEFAULT_LOOKAHEAD_DISTANCE;
+      return null;
     }
   }
 
-  function syncLookaheadFromConstants(constants: unknown) {
+  function readPositiveNumber(
+    constants: unknown,
+    key: string,
+    fallback: number,
+  ) {
     const value =
       constants &&
       typeof constants === "object" &&
-      "LOOKAHEAD_DISTANCE" in constants
-        ? (constants as { LOOKAHEAD_DISTANCE?: unknown }).LOOKAHEAD_DISTANCE
+      key in constants
+        ? (constants as Record<string, unknown>)[key]
         : null;
 
-    if (typeof value === "number" && Number.isFinite(value) && value > 0) {
-      lookaheadDistance = value;
+    return typeof value === "number" && Number.isFinite(value) && value > 0
+      ? value
+      : fallback;
+  }
+
+  function syncRobotConstants(constants: unknown) {
+    const nextLookaheadDistance = readPositiveNumber(
+      constants,
+      "LOOKAHEAD_DISTANCE",
+      lookaheadDistance,
+    );
+    const nextRobotWidth = readPositiveNumber(
+      constants,
+      "ROBOT_WIDTH",
+      robotWidth,
+    );
+    const nextRobotHeight = readPositiveNumber(
+      constants,
+      "ROBOT_HEIGHT",
+      robotHeight,
+    );
+
+    if (nextLookaheadDistance !== lookaheadDistance) {
+      lookaheadDistance = nextLookaheadDistance;
+    }
+    if (nextRobotWidth !== robotWidth) {
+      robotWidth = nextRobotWidth;
+    }
+    if (nextRobotHeight !== robotHeight) {
+      robotHeight = nextRobotHeight;
+    }
+  }
+
+  function loadStoredRobotConstants() {
+    const storedConstants = readStoredConstants();
+    if (storedConstants) {
+      syncRobotConstants(storedConstants);
+    } else {
+      lookaheadDistance = DEFAULT_LOOKAHEAD_DISTANCE;
+      robotWidth = DEFAULT_ROBOT_WIDTH;
+      robotHeight = DEFAULT_ROBOT_HEIGHT;
     }
   }
 
   onMount(() => {
-    lookaheadDistance = readStoredLookaheadDistance();
+    loadStoredRobotConstants();
 
     function handleConstantsUpdated(event: Event) {
-      syncLookaheadFromConstants((event as CustomEvent).detail);
+      syncRobotConstants((event as CustomEvent).detail);
     }
 
     window.addEventListener("tracer:constants-updated", handleConstantsUpdated);
@@ -906,7 +971,9 @@
 
     if (mode === "freehand") return freehandPath;
     if (mode === "svg") return svgPath;
-    if (mode === "point") return selectedPoint ? [selectedPoint] : [];
+    if (mode === "point" || mode === "point_dwa") {
+      return selectedPoint ? [selectedPoint] : [];
+    }
     return plannedSplinePoints();
   }
 
@@ -1079,6 +1146,21 @@
         </button>
         <button
           onclick={() => {
+            if (obstacleAvoidanceMode === "virtual") mode = "point_dwa";
+          }}
+          disabled={running || obstacleAvoidanceMode !== "virtual"}
+          class="flex items-center gap-1 px-3 py-2 text-xs transition-colors border-l border-gray-200 {mode ===
+          'point_dwa'
+            ? 'bg-red-600 text-white'
+            : 'bg-gray-50 text-black hover:bg-gray-100'} disabled:opacity-40 disabled:cursor-not-allowed"
+          title={obstacleAvoidanceMode === "virtual"
+            ? "Select a DWA point target"
+            : "Enable virtual obstacles to use DWA"}
+        >
+          <Square class="w-3.5 h-3.5" /> DWA
+        </button>
+        <button
+          onclick={() => {
             mode = "svg";
           }}
           disabled={running}
@@ -1187,7 +1269,7 @@
       {/if}
 
       <!-- Point-mode controls -->
-      {#if mode === "point"}
+      {#if mode === "point" || mode === "point_dwa"}
         <button
           onclick={() => {
             selectedPoint = null;
@@ -1200,7 +1282,9 @@
         <span class="text-xs text-gray-400">
           {selectedPoint
             ? `(${selectedPoint.x.toFixed(2)}, ${selectedPoint.y.toFixed(2)})`
-            : "Click to select point"}
+            : mode === "point_dwa"
+              ? "Click to select DWA target"
+              : "Click to select point"}
         </span>
       {/if}
 
@@ -1371,7 +1455,7 @@
           <span
             class="inline-block w-2 h-2 rounded-full bg-amber-400 animate-pulse"
           ></span>
-          Running {runSource} path… waiting for robot confirmation
+          Running {runSourceLabel(runSource)} path… waiting for robot confirmation
         {/if}
       </div>
     {/if}
@@ -1383,7 +1467,7 @@
         ? isDrawing
           ? 'crosshair'
           : 'crosshair'
-        : mode === 'point' || mode === 'obstacle'
+        : mode === 'point' || mode === 'point_dwa' || mode === 'obstacle'
           ? 'crosshair'
           : 'default'}"
     >
@@ -1398,7 +1482,7 @@
         onwheel={handleWheel}
         ondragend={handleDragEnd}
         onmousedown={(e) => {
-          if (mode === "point") {
+          if (mode === "point" || mode === "point_dwa") {
             pointModeClick(e);
           } else if (mode === "obstacle") {
             obstacleModeClick(e);
@@ -1788,7 +1872,7 @@
         {/if}
 
         <!-- Selected point (point mode) — hidden while running -->
-        {#if mode === "point" && selectedPoint !== null}
+        {#if (mode === "point" || mode === "point_dwa") && selectedPoint !== null}
           {@const px = selectedPoint.x * SCALE}
           {@const py = -selectedPoint.y * SCALE}
           <Layer>
@@ -1830,20 +1914,27 @@
         {#if displayRobotPos !== null}
           {@const cx = displayRobotPos.x * SCALE}
           {@const cy = -displayRobotPos.y * SCALE}
+          {@const robotRectWidth = robotWidth * SCALE}
+          {@const robotRectHeight = robotHeight * SCALE}
           {@const arrowLen = 18}
           {@const tipX =
             cx + (Math.cos(displayRobotPos.theta) * arrowLen) / zoom}
           {@const tipY =
             cy - (Math.sin(displayRobotPos.theta) * arrowLen) / zoom}
           <Layer>
-            <!-- Outer ring -->
-            <Circle
+            <!-- Robot footprint -->
+            <Rect
               x={cx}
               y={cy}
-              radius={10 / zoom}
+              width={robotRectWidth}
+              height={robotRectHeight}
+              offsetX={robotRectWidth / 2}
+              offsetY={robotRectHeight / 2}
+              rotation={-(displayRobotPos.theta * 180) / Math.PI}
               stroke="#16a34a"
               strokeWidth={2 / zoom}
               fill="rgba(22,163,74,0.2)"
+              cornerRadius={2 / zoom}
             />
             <!-- Heading arrow -->
             <Line

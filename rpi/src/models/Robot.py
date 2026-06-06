@@ -21,6 +21,7 @@ class Robot:
         self.serial: SerialManager = serial_manager
         self.last_emit_time: float = 0.0
         self.last_path_time: float = 0.0
+        self.last_dwa_time: float = 0.0
         self.last_manual_time: float = 0.0
         self.last_obstacle_detect_time: float = 0.0  # Last time ultrasonic data was processed for obstacle detection
  
@@ -340,6 +341,7 @@ class Robot:
         """Main loop to continuously read sensor data and update state estimator."""
         dt = 1/ROBOT_CONFIG.MAIN_LOOP_FREQ
         path_following_dt = 1 / ROBOT_CONFIG.PATH_FOLLOWING_FREQ
+        dwa_dt = 1 / 20
         manual_dt = 1 / ROBOT_CONFIG.MANUAL_FREQ
         obstacle_dt = 1 / ROBOT_CONFIG.CHECK_OBSTACLE_FREQ
         
@@ -436,13 +438,15 @@ class Robot:
                             await self.send_safe_command(command)
                             
                     elif isinstance(self.cur_path, DWA):
-                        if update_gap_navigator: # Using this as marker to make DWA run at 20hz
+                        if asyncio.get_event_loop().time() - self.last_dwa_time >= dwa_dt:
                             command = self.cur_path.calculate_control_command(self.state_estimator.state)
                             
                             if not command:
                                 exit_path = True
                             else:
                                 await self.send_safe_command(command)
+                                
+                            self.last_dwa_time = asyncio.get_event_loop().time()
                     else:
                         self._logger.error(f"Unknown path type: {type(self.cur_path)}")
                         exit_path = True
@@ -466,6 +470,7 @@ class Robot:
                         self.pending_motor_command = None
                 self.last_manual_time = asyncio.get_event_loop().time()
                 self.last_path_time = 0
+                self.last_dwa_time = 0
             
             duration_ms = 1000*(asyncio.get_event_loop().time() - start)
             

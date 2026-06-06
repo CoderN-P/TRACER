@@ -1,7 +1,7 @@
 from typing import List
 import math, numpy as np
 from shapely.geometry import box
-from shapely.affinity import rotate
+from shapely.affinity import rotate, translate
 from .utils import twist_to_wheel_speeds
 from ..Command import Command, CommandType, MotorCommand
 from ..StateEstimation import RobotState
@@ -95,16 +95,22 @@ class DWA:
         for i in range(1, len(trajectory)):
             x, y, theta = trajectory[i]
             dist += math.hypot(x - trajectory[i-1][0], y - trajectory[i - 1][1])
-            collision = False
             
             for obstacle in self.virtual_obstacles:
                 if obstacle.obstacle_type == VirtualObstacleType.CIRCLE:
-                    collision = self.check_collision_circle(x, y, theta, obstacle.position[0], obstacle.position[1], obstacle.radius)
+                    collision = self.check_collision_circle(
+                        x, y, theta,
+                        obstacle.position[0], obstacle.position[1], obstacle.radius
+                    )
                 else:
-                    collision = self.check_collision_rect(x, y, theta, obstacle.position[0], obstacle.position[1],obstacle.width, obstacle.height, obstacle.rotation)
-                    
-            if collision:
-                return dist
+                    collision = self.check_collision_rect(
+                        x, y, theta,
+                        obstacle.position[0], obstacle.position[1],
+                        obstacle.width, obstacle.height, obstacle.rotation
+                    )
+
+                if collision:
+                    return dist
         
         return 3
         
@@ -120,10 +126,10 @@ class DWA:
     
         # 2. Rotate them around their centers and shift to true coordinates
         rect1 = rotate(b1, theta, origin=(0, 0), use_radians=True)
-        rect1 = rotate(rect1, 0, origin=(-x, -y), use_radians=True) # Fast offset transformation
+        rect1 = translate(rect1, xoff=x, yoff=y)
     
         rect2 = rotate(b2, rot, origin=(0, 0), use_radians=True)
-        rect2 = rotate(rect2, 0, origin=(-a, -b), use_radians=True)
+        rect2 = translate(rect2, xoff=a, yoff=b)
     
         # 3. Check for geometric overlap
         return rect1.intersects(rect2)

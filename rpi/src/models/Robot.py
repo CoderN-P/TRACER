@@ -358,18 +358,6 @@ class Robot:
                 continue
                 
             sensor_data = self.sensor_queue.get_nowait()
-
-            async with self.state_lock:
-                # Only check this if we have not recently recieved a resume command (since it might take a moment for the ESTOP command to be processed and for the state estimator to reset, we want to avoid immediately switching back to STOPPED mode if we receive sensor data with motors disabled right after a resume command)
-                if self.state != Mode.STOPPED and sensor_data.motors_enabled == False and self.previous_sensor_data and self.previous_sensor_data.motors_enabled == True:
-                    self._logger.warning("Motors manually disabled via ESTOP button, switching to STOPPED mode")
-                    self.state = Mode.STOPPED
-                if self.state == Mode.STOPPED and sensor_data.motors_enabled == True and self.previous_sensor_data and self.previous_sensor_data.motors_enabled == False:
-                    self._logger.warning("Motors manually re-enabled via ESTOP button, switching to MANUAL mode")
-                    self.state = Mode.MANUAL
-                    
-                cur_state = self.state
-
             update_gap_navigator = False
             
             # Only handle obstacle stopping and detection if in manual mode, since path following uses potential field control.
@@ -399,7 +387,18 @@ class Robot:
                     sensor_data = self.sensor_queue.get_nowait()
                     self.state_estimator.update(sensor_data, self.previous_sensor_data, None)
                     self.previous_sensor_data = sensor_data
-                    
+
+            async with self.state_lock:
+                # Only check this if we have not recently recieved a resume command (since it might take a moment for the ESTOP command to be processed and for the state estimator to reset, we want to avoid immediately switching back to STOPPED mode if we receive sensor data with motors disabled right after a resume command)
+                if self.state != Mode.STOPPED and sensor_data.motors_enabled == False and self.previous_sensor_data and self.previous_sensor_data.motors_enabled == True:
+                    self._logger.warning("Motors manually disabled via ESTOP button, switching to STOPPED mode")
+                    self.state = Mode.STOPPED
+                if self.state == Mode.STOPPED and sensor_data.motors_enabled == True and self.previous_sensor_data and self.previous_sensor_data.motors_enabled == False:
+                    self._logger.warning("Motors manually re-enabled via ESTOP button, switching to MANUAL mode")
+                    self.state = Mode.MANUAL
+
+                cur_state = self.state
+
             if cur_state == Mode.PATH_FOLLOWING and asyncio.get_event_loop().time() - self.last_path_time >= path_following_dt:
                 if self.cur_path is None:
                     async with self.state_lock:

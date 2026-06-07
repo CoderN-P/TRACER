@@ -374,7 +374,7 @@ class Robot:
                 update_gap_navigator = True
                 self.last_obstacle_detect_time = asyncio.get_event_loop().time()
             
-            if cur_state != Mode.STOPPED: # Only update state estimator if not stopped
+            if self.state != Mode.STOPPED: # Only update state estimator if not stopped
                 if ROBOT_CONFIG.USE_VIO:
                     self.state_estimator.update(sensor_data, self.previous_sensor_data, self.lidar_data)
                     self.lidar_data = None

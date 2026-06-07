@@ -6,6 +6,7 @@ import struct
 from collections import deque
 import asyncio
 from typing import List, Dict
+import queue
 
 import numpy as np
 
@@ -41,9 +42,8 @@ class Robot:
         self.state_lock: asyncio.Lock = asyncio.Lock()  # Lock to protect access to the robot's state (manual, autonomous, stopped)
         self.lidar_lock: asyncio.Lock = asyncio.Lock()   # Lock to protect access to lidar data (written and read by both socketio server and main loop)
 
-        self.sensor_lock: threading.Lock = threading.Lock()          # shared between serial thread and asyncio
+        self.sensor_queue = queue.Queue()
         self.previous_sensor_data: SensorData | None = None             # for any processing that needs to compare current and previous sensor data, only accessed within main loop
-        self.latest_sensor_data: SensorData | None = None               # written by serial thread, read by pose loop
         self.lidar_data: LidarData | None = None
         self.repulsive_vector: tuple[float, float] = (0, 0) # repulsive vector calculated from lidar data for obstacle avoidance, updated in main loop after processing new lidar data, and used in path following to modify the target point for obstacle avoidance
         self.main_loop_task: asyncio.Task | None = None
@@ -276,11 +276,7 @@ class Robot:
             new_data = self.bytes_to_sensor_data(data)
             
             self.last_sensor_receive_time = time.monotonic()
-    
-            with self.sensor_lock: # Ensure thread-safe access to latest_sensor_data
-                self.previous_sensor_data = self.latest_sensor_data
-                self.latest_sensor_data = new_data
-                    
+            self.sensor_queue.put(new_data)
         except Exception as e:
             self._logger.error(f"Error processing sensor data: {e}")
             return
@@ -355,28 +351,20 @@ class Robot:
                 elapsed = asyncio.get_event_loop().time() - start
                 await asyncio.sleep(max(0.0001, dt - elapsed))
                 continue
-                    
-            if self.sensor_lock.acquire(timeout=0.001):
-                try:
-                    sensor_data = self.latest_sensor_data
-                    prev_data = self.previous_sensor_data
-                finally:
-                    self.sensor_lock.release()
-            else:
-                self._logger.warning("Sensor lock timeout")
-                continue
 
-            if not sensor_data:
+            if self.sensor_queue.empty():
                 elapsed = asyncio.get_event_loop().time() - start
                 await asyncio.sleep(max(0.0001, dt - elapsed)) # 100Hz loop
                 continue
+                
+            sensor_data = self.sensor_queue.get_nowait()
 
             async with self.state_lock:
                 # Only check this if we have not recently recieved a resume command (since it might take a moment for the ESTOP command to be processed and for the state estimator to reset, we want to avoid immediately switching back to STOPPED mode if we receive sensor data with motors disabled right after a resume command)
-                if self.state != Mode.STOPPED and sensor_data.motors_enabled == False and prev_data and prev_data.motors_enabled == True:
+                if self.state != Mode.STOPPED and sensor_data.motors_enabled == False and self.previous_sensor_data and self.previous_sensor_data.motors_enabled == True:
                     self._logger.warning("Motors manually disabled via ESTOP button, switching to STOPPED mode")
                     self.state = Mode.STOPPED
-                if self.state == Mode.STOPPED and sensor_data.motors_enabled == True and prev_data and prev_data.motors_enabled == False:
+                if self.state == Mode.STOPPED and sensor_data.motors_enabled == True and self.previous_sensor_data and self.previous_sensor_data.motors_enabled == False:
                     self._logger.warning("Motors manually re-enabled via ESTOP button, switching to MANUAL mode")
                     self.state = Mode.MANUAL
                     
@@ -400,10 +388,17 @@ class Robot:
             
             if cur_state != Mode.STOPPED: # Only update state estimator if not stopped
                 if ROBOT_CONFIG.USE_VIO:
-                    self.state_estimator.update(sensor_data, prev_data, self.lidar_data)
+                    self.state_estimator.update(sensor_data, self.previous_sensor_data, self.lidar_data)
                     self.lidar_data = None
                 else:
-                    self.state_estimator.update(sensor_data, prev_data, None)
+                    self.state_estimator.update(sensor_data, self.previous_sensor_data, None)
+                    
+                # Update EKF with missed packets
+                self.previous_sensor_data = sensor_data
+                while not self.sensor_queue.empty():
+                    sensor_data = self.sensor_queue.get_nowait()
+                    self.state_estimator.update(sensor_data, self.previous_sensor_data, None)
+                    self.previous_sensor_data = sensor_data
                     
             if cur_state == Mode.PATH_FOLLOWING and asyncio.get_event_loop().time() - self.last_path_time >= path_following_dt:
                 if self.cur_path is None:

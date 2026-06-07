@@ -120,16 +120,23 @@ class QuinticHermiteSpline:
             x_double_prime, y_double_prime = self.evaluate_second_derivative(t)
             curvature = (x_prime * y_double_prime - y_prime * x_double_prime) / ((x_prime**2 + y_prime**2)**1.5)
             self.curvature_lut[i] = curvature
-    
+
     @staticmethod
     def calculate_max_velocity(curvature):
         eps = 1e-6
-        
+    
         if abs(curvature) < eps:
             return ROBOT_CONFIG.MAX_LINEAR_VEL_POS
         else:
-            v = np.sqrt(ROBOT_CONFIG.MAX_LATERAL_ACCEL / abs(curvature))
-            return min(v, ROBOT_CONFIG.MAX_LINEAR_VEL_POS)
+            # Lateral accel constraint
+            v_lateral = np.sqrt(ROBOT_CONFIG.MAX_LATERAL_ACCEL / abs(curvature))
+    
+            # Wheel speed constraint: v + |omega| * wheelbase/2 <= v_max_wheel
+            # omega = v * curvature, so: v + |v * curvature| * wheelbase/2 <= v_max_wheel
+            # v * (1 + |curvature| * wheelbase/2) <= v_max_wheel
+            v_wheel = ROBOT_CONFIG.MAX_LINEAR_VEL_POS / (1 + abs(curvature) * ROBOT_CONFIG.WHEELBASE / 2)
+    
+            return min(v_lateral, v_wheel, ROBOT_CONFIG.MAX_LINEAR_VEL_POS)
             
     def build_velocity_profile(self, start_velocity=0, end_velocity=None):
         self.velocity_profile[0] = start_velocity

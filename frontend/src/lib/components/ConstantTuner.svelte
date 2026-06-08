@@ -119,11 +119,17 @@
       subtitle: "Wheelbase and calibration corrections.",
       fields: [
         {
-          key: "WHEEL_BASE",
-          label: "WHEEL_BASE",
+          key: "WHEEL_BASE_PID",
+          label: "WHEEL_BASE_PID",
           step: "0.001",
           min: 0,
         },
+        {
+          key: "WHEEL_BASE_EKF",
+          label: "WHEEL_BASE_EKF",
+          step: "0.001",
+          min: 0,
+        },   
         {
           key: "WHEEL_DIAMETER",
           label: "WHEEL_DIAMETER",

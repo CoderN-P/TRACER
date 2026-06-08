@@ -3,7 +3,8 @@ from dataclasses import dataclass
 
 @dataclass
 class RobotConfig:
-    WHEEL_BASE: float
+    WHEEL_BASE_PID: float
+    WHEEL_BASE_EKF: float
     WHEEL_DIAMETER: float
     ROBOT_WIDTH: float
     ROBOT_HEIGHT: float

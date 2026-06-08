@@ -139,6 +139,9 @@ class Robot:
         
     async def update_virtual_obstacles(self, data):
         self.gap_navigator.virtual_obstacles = [VirtualObstacle.model_validate(obstacle) for obstacle in data]
+        
+        if isinstance(self.cur_path, DWA):
+            self.cur_path.virtual_obstacles = self.gap_navigator.virtual_obstacles
 
     async def update_obstacle_mode(self, data):
         raw_mode = data.get("mode") if isinstance(data, dict) else data

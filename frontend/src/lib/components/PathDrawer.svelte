@@ -1478,7 +1478,7 @@
         y={stageY}
         scaleX={zoom}
         scaleY={zoom}
-        draggable={mode === "spline" && !running}
+        draggable={mode === "spline"}
         onwheel={handleWheel}
         ondragend={handleDragEnd}
         onmousedown={(e) => {
@@ -1541,7 +1541,6 @@
                   stroke={selected ? "#dc2626" : "#f97316"}
                   strokeWidth={(selected ? 2.5 : 1.5) / zoom}
                   dash={selected ? [] : [8 / zoom, 6 / zoom]}
-                  draggable={!running}
                   onclick={() => {
                     selectedObstacleId = obstacle.id;
                   }}
@@ -1558,7 +1557,7 @@
                     );
                   }}
                 />
-                {#if selected && !running}
+                {#if selected}
                   <Circle
                     x={(obstacle.x + obstacle.radius) * SCALE}
                     y={-obstacle.y * SCALE}
@@ -1626,7 +1625,6 @@
                   stroke={selected ? "#dc2626" : "#f97316"}
                   strokeWidth={(selected ? 2.5 : 1.5) / zoom}
                   dash={selected ? [] : [8 / zoom, 6 / zoom]}
-                  draggable={!running}
                   onclick={() => {
                     selectedObstacleId = obstacle.id;
                   }}
@@ -1643,7 +1641,7 @@
                     );
                   }}
                 />
-                {#if selected && !running}
+                {#if selected}
                   <Line
                     points={[
                       rotationStem.x * SCALE,

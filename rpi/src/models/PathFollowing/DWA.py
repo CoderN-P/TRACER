@@ -1,7 +1,5 @@
 from typing import List
 import math, numpy as np
-from shapely.geometry import box
-from shapely.affinity import rotate, translate
 from .utils import twist_to_wheel_speeds
 from ..Command import Command, CommandType, MotorCommand
 from ..StateEstimation import RobotState
@@ -88,14 +86,56 @@ class DWA:
             trajectory.append((x, y, theta))
         
         return trajectory
-    
+
     def distance(self, trajectory):
-        dist = 0
+        if not trajectory:
+            return 3
+
+        # --- STEP 1: Broad-phase filtering ---
+        # Find the bounding box of the entire trajectory
+        xs = [pt[0] for pt in trajectory]
+        ys = [pt[1] for pt in trajectory]
+        traj_min_x, traj_max_x = min(xs), max(xs)
+        # Pad by a reasonable safety margin (e.g., max obstacle size + robot radius)
+        margin = 2.0
+    
+        relevant_obstacles = []
+        for obstacle in self.virtual_obstacles:
+            ox, oy = obstacle.position[0], obstacle.position[1]
+            # Quick AABB proximity check
+            if (traj_min_x - margin <= ox <= traj_max_x + margin and
+                    min(ys) - margin <= oy <= max(ys) + margin):
+                relevant_obstacles.append(obstacle)
+    
+        # If no obstacles are anywhere near this trajectory, skip all collision checks
+        if not relevant_obstacles:
+            # Just calculate total length up to max of 3
+            total_dist = 0
+            for i in range(1, len(trajectory)):
+                dx = trajectory[i][0] - trajectory[i-1][0]
+                dy = trajectory[i][1] - trajectory[i-1][1]
+                total_dist += (dx*dx + dy*dy) ** 0.5
+                if total_dist >= 3:
+                    return 3
+            return min(total_dist, 3)
+    
+        # --- STEP 2: Narrow-phase with early exits ---
+        dist = 0.0
+        prev_x, prev_y, _ = trajectory[0]
+    
         for i in range(1, len(trajectory)):
             x, y, theta = trajectory[i]
-            dist += math.hypot(x - trajectory[i-1][0], y - trajectory[i - 1][1])
-            
-            for obstacle in self.virtual_obstacles:
+    
+            # Optimized distance calculation
+            dx = x - prev_x
+            dy = y - prev_y
+            dist += (dx * dx + dy * dy) ** 0.5
+    
+            # Early exit if we are already past the max window
+            if dist >= 3:
+                return 3
+    
+            for obstacle in relevant_obstacles:
                 if obstacle.obstacle_type == VirtualObstacleType.CIRCLE:
                     collision = self.check_collision_circle(
                         x, y, theta,
@@ -105,34 +145,36 @@ class DWA:
                     collision = self.check_collision_rect(
                         x, y, theta,
                         obstacle.position[0], obstacle.position[1],
-                        obstacle.width, obstacle.height, obstacle.rotation
+                        obstacle.width, obstacle.height,
                     )
-
+    
                 if collision:
                     return dist
-        
+    
+            prev_x, prev_y = x, y
+    
         return 3
         
         
     @staticmethod
-    def check_collision_rect(x, y, theta, a, b, w, h, rot):
-        # 1. Create unrotated bounding boxes centered at (0,0)
-        rw = ROBOT_CONFIG.ROBOT_WIDTH
-        rh = ROBOT_CONFIG.ROBOT_HEIGHT
-        
-        b1 = box(-rw/2, -rh/2, rw/2, rh/2)
-        b2 = box(-w/2, -h/2, w/2, h/2)
-    
-        # 2. Rotate them around their centers and shift to true coordinates
-        rect1 = rotate(b1, theta, origin=(0, 0), use_radians=True)
-        rect1 = translate(rect1, xoff=x, yoff=y)
-    
-        rect2 = rotate(b2, rot, origin=(0, 0), use_radians=True)
-        rect2 = translate(rect2, xoff=a, yoff=b)
-    
-        # 3. Check for geometric overlap
-        return rect1.intersects(rect2)
-    
+    def check_collision_rect(x, y, a, b, w, h, rot):
+        dx = x - a
+        dy = y - b
+
+        local_x = dx * math.cos(rot) + dy * math.sin(rot)
+        local_y = -dx * math.sin(rot) + dy * math.cos(rot)
+
+        closest_x = min(max(local_x, -w/2), w/2)
+        closest_y = min(max(local_y, -h/2), h/2)
+
+        dist_sq = (
+                (local_x - closest_x)**2 +
+                (local_y - closest_y)**2
+        )
+
+        # assume robot to be a circumcircle of actual rectangle footprint
+        # r = sqrt(l^2+w^2)/2
+        return dist_sq <= ((ROBOT_CONFIG.ROBOT_WIDTH/2)**2 + (ROBOT_CONFIG.ROBOT_HEIGHT/2)**2)
         
     @staticmethod 
     def check_collision_circle(x, y, theta, a, b, r):

@@ -137,7 +137,7 @@ class QuinticHermiteSpline:
             # Wheel speed constraint: v + |omega| * wheelbase/2 <= v_max_wheel
             # omega = v * curvature, so: v + |v * curvature| * wheelbase/2 <= v_max_wheel
             # v * (1 + |curvature| * wheelbase/2) <= v_max_wheel
-            v_wheel = ROBOT_CONFIG.MAX_LINEAR_VEL_POS / (1 + abs(curvature) * ROBOT_CONFIG.WHEEL_BASE_PID / 2)
+            v_wheel = ROBOT_CONFIG.MAX_LINEAR_VEL_POS / (1 + abs(curvature) * ROBOT_CONFIG.WHEEL_BASE_TRAJ / 2)
     
             return min(v_lateral, v_wheel, ROBOT_CONFIG.MAX_LINEAR_VEL_POS)
 

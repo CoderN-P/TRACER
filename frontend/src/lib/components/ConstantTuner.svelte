@@ -125,8 +125,8 @@
           min: 0,
         },
         {
-          key: "WHEEL_BASE_EKF",
-          label: "WHEEL_BASE_EKF",
+          key: "WHEEL_BASE_TRAJ",
+          label: "WHEEL_BASE_TRAJ",
           step: "0.001",
           min: 0,
         },   

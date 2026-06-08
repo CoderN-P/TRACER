@@ -244,4 +244,4 @@ class StateEstimator:
             if right_ticks >= 0
             else ROBOT_CONFIG.METERS_PER_TICK_RIGHT_NEG
         )
-        return (delta_right - delta_left) / ROBOT_CONFIG.WHEEL_BASE_EKF
+        return (delta_right - delta_left) / ROBOT_CONFIG.WHEEL_BASE_PID

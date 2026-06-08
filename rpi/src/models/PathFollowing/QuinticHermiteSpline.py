@@ -112,13 +112,16 @@ class QuinticHermiteSpline:
             current = self.evaluate(t)
             self.arc_length_lut[i] = self.arc_length_lut[i-1] + np.hypot(current[0] - prev[0], current[1] - prev[1])
             prev = current
-            
-    def build_curvature(self): 
+
+    def build_curvature(self):
         for i in range(0, ROBOT_CONFIG.SPLINE_SAMPLES + 1):
             t = i / ROBOT_CONFIG.SPLINE_SAMPLES
             x_prime, y_prime = self.evaluate_derivative(t)
             x_double_prime, y_double_prime = self.evaluate_second_derivative(t)
-            curvature = (x_prime * y_double_prime - y_prime * x_double_prime) / ((x_prime**2 + y_prime**2)**1.5)
+
+            # Added 1e-9 to prevent ZeroDivisionError at standstills
+            denominator = (x_prime**2 + y_prime**2)**1.5 + 1e-9
+            curvature = (x_prime * y_double_prime - y_prime * x_double_prime) / denominator
             self.curvature_lut[i] = curvature
 
     @staticmethod
@@ -137,20 +140,23 @@ class QuinticHermiteSpline:
             v_wheel = ROBOT_CONFIG.MAX_LINEAR_VEL_POS / (1 + abs(curvature) * ROBOT_CONFIG.WHEEL_BASE_PID / 2)
     
             return min(v_lateral, v_wheel, ROBOT_CONFIG.MAX_LINEAR_VEL_POS)
-            
+
     def build_velocity_profile(self, start_velocity=0, end_velocity=None):
         self.velocity_profile[0] = start_velocity
-        
+
+        # Forward pass: Acceleration limits
         for i in range(1, ROBOT_CONFIG.SPLINE_SAMPLES + 1):
             curvature = self.curvature_lut[i]
             max_vel = self.calculate_max_velocity(curvature)
             ds = self.arc_length_lut[i] - self.arc_length_lut[i-1]
             v_allowed = np.sqrt(self.velocity_profile[i-1]**2 + 2*ROBOT_CONFIG.MAX_LONG_ACCEL*ds)
             self.velocity_profile[i] = min(max_vel, v_allowed)
-            
+
+        # FIX: Clip the requested end velocity to the physical max allowed velocity at that point
         if end_velocity is not None:
-            self.velocity_profile[-1] = end_velocity
-        
+            self.velocity_profile[-1] = min(end_velocity, self.velocity_profile[-1])
+
+        # Backward pass: Deceleration limits
         for i in range(ROBOT_CONFIG.SPLINE_SAMPLES - 1, -1, -1):
             ds = self.arc_length_lut[i+1] - self.arc_length_lut[i]
             v_allowed = np.sqrt(self.velocity_profile[i+1]**2 + 2*ROBOT_CONFIG.MAX_LONG_ACCEL*ds)
@@ -178,32 +184,38 @@ class QuinticHermiteSpline:
         j = 0
 
         trajectory = []
-        
+
         for k in range(0, num_points):
-            t = k * ROBOT_CONFIG.TRAJECTORY_DT
-            
-            # Find the index with the closest time in the LUT
-            while i < ROBOT_CONFIG.SPLINE_SAMPLES - 2 and self.time_lut[i] < t:
+            t = min(k * ROBOT_CONFIG.TRAJECTORY_DT, total_time)
+
+            # 1. Invert time to find our lower-bound LUT index
+            while i < ROBOT_CONFIG.SPLINE_SAMPLES - 1 and self.time_lut[i+1] < t:
                 i += 1
-            
-            dt = max(self.time_lut[i] - self.time_lut[i-1], 1e-6)
-            
+
+            dt = max(self.time_lut[i+1] - self.time_lut[i], 1e-6)
             alpha = (t - self.time_lut[i]) / dt
-            s_k = self.arc_length_lut[i] + alpha * (self.arc_length_lut[i+1] - self.arc_length_lut[i])
-            curvature_k = self.curvature_lut[i] + alpha * (self.curvature_lut[i+1] - self.curvature_lut[i])
+
+            # 2. Linear interpolate ONLY the velocity profile 
             velocity_k = self.velocity_profile[i] + alpha * (self.velocity_profile[i+1] - self.velocity_profile[i])
-            
-            while j < ROBOT_CONFIG.SPLINE_SAMPLES - 2 and self.arc_length_lut[j] < s_k:
-                j += 1
-                
-            ds = max((self.arc_length_lut[j+1] - self.arc_length_lut[j]), 1e-6)  # Avoid division by zero
-            alpha_s = (s_k - self.arc_length_lut[j]) / ds
-            u_k = (j + alpha_s) / ROBOT_CONFIG.SPLINE_SAMPLES
-            
+
+            # 3. Map directly to our exact continuous parameter u
+            u_k = (i + alpha) / ROBOT_CONFIG.SPLINE_SAMPLES
+
+            # 4. Recalculate exact, non-linear quantities analytically
             position = self.evaluate(u_k)
-            heading = np.arctan2(self.evaluate_derivative(u_k)[1], self.evaluate_derivative(u_k)[0])
+            x_prime, y_prime = self.evaluate_derivative(u_k)
+            x_double_prime, y_double_prime = self.evaluate_second_derivative(u_k)
+
+            # Exact heading
+            heading = np.arctan2(y_prime, x_prime)
+
+            # Exact curvature calculation at this exact u_k
+            denom = (x_prime**2 + y_prime**2)**1.5 + 1e-9
+            curvature_k = (x_prime * y_double_prime - y_prime * x_double_prime) / denom
+
+            # Exact omega
             omega = curvature_k * velocity_k
-            
+
             trajectory.append(TrajectoryState(
                 x=position[0],
                 y=position[1],

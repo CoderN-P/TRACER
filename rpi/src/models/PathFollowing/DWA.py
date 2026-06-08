@@ -21,11 +21,10 @@ class DWA:
         v_min, v_max, omega_min, omega_max = self.find_dynamic_window(robot_state)
         candidate_v = np.linspace(v_min, v_max, ROBOT_CONFIG.V_SAMPLES)
         candidate_omega = np.linspace(omega_min, omega_max, ROBOT_CONFIG.OMEGA_SAMPLES)
-        
         best_score = 0
         best_v = robot_state.linear_velocity
         best_omega = robot_state.angular_velocity
-        
+
         for v in candidate_v:
             for omega in candidate_omega:
                 trajectory = self.simulate_trajectory(robot_state, v, omega)
@@ -36,18 +35,18 @@ class DWA:
                 # Restrict search space to admissible velocities
                 if stopping_dist > min_dist:
                     continue
-                    
+                
                 score = ROBOT_CONFIG.DWA_SIGMA * (
                     ROBOT_CONFIG.DWA_ALPHA * self.heading(v, omega, robot_state) / 60 +
                     ROBOT_CONFIG.DWA_BETA * min_dist +
                     ROBOT_CONFIG.DWA_Y * self.velocity(v) * 10
                 )
-                
+
                 if score > best_score:
                     best_v = v
                     best_omega = omega
                     best_score = score
-
+        
         vl, vr = twist_to_wheel_speeds(best_v, best_omega)
 
         return Command(
@@ -64,8 +63,8 @@ class DWA:
     @staticmethod
     def find_dynamic_window(robot_state: RobotState):
         # Calculate the dynamic window based on current velocity and acceleration limits
-        dt = 1 / ROBOT_CONFIG.CHECK_OBSTACLE_FREQ
-        v_min = max(0, robot_state.linear_velocity - ROBOT_CONFIG.MAX_LONG_ACCEL * dt)
+        dt = 1 / ROBOT_CONFIG.DWA_FREQ
+        v_min = max(0., robot_state.linear_velocity - ROBOT_CONFIG.MAX_LONG_ACCEL * dt)
         v_max = min(ROBOT_CONFIG.MAX_LINEAR_VEL_POS, robot_state.linear_velocity + ROBOT_CONFIG.MAX_LONG_ACCEL * dt)
         omega_min = max(-ROBOT_CONFIG.MAX_ALPHA, robot_state.angular_velocity - ROBOT_CONFIG.MAX_ALPHA * dt)
         omega_max = min(ROBOT_CONFIG.MAX_ALPHA, robot_state.angular_velocity + ROBOT_CONFIG.MAX_ALPHA * dt)
@@ -80,7 +79,7 @@ class DWA:
         y = robot_state.y
         theta = robot_state.yaw
         
-        dt = 1 / ROBOT_CONFIG.CHECK_OBSTACLE_FREQ
+        dt = 1 / ROBOT_CONFIG.DWA_FREQ
         for _ in range(ROBOT_CONFIG.DWA_STEPS):
             x += v * math.cos(theta) * dt
             y += v * math.sin(theta) * dt
@@ -164,7 +163,7 @@ class DWA:
         y = robot_state.y
         theta = robot_state.yaw
         
-        dt = 1 / ROBOT_CONFIG.CHECK_OBSTACLE_FREQ
+        dt = 1 / ROBOT_CONFIG.DWA_FREQ
         
         while v_stop > 0:
             x += v_stop * math.cos(theta) * dt

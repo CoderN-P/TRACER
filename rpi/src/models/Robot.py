@@ -337,7 +337,7 @@ class Robot:
         """Main loop to continuously read sensor data and update state estimator."""
         dt = 1/ROBOT_CONFIG.MAIN_LOOP_FREQ
         path_following_dt = 1 / ROBOT_CONFIG.PATH_FOLLOWING_FREQ
-        dwa_dt = 1 / 20
+        dwa_dt = 1 / ROBOT_CONFIG.DWA_FREQ
         manual_dt = 1 / ROBOT_CONFIG.MANUAL_FREQ
         obstacle_dt = 1 / ROBOT_CONFIG.CHECK_OBSTACLE_FREQ
         
@@ -356,8 +356,7 @@ class Robot:
                 elapsed = asyncio.get_event_loop().time() - start
                 await asyncio.sleep(max(0.0001, dt - elapsed)) # 100Hz loop
                 continue
-                
-            sensor_data = self.sensor_queue.get_nowait()
+            sensor_data = self.sensor_queue.get()
             update_gap_navigator = False
             
             # Only handle obstacle stopping and detection if in manual mode, since path following uses potential field control.
@@ -380,11 +379,12 @@ class Robot:
                     self.lidar_data = None
                 else:
                     self.state_estimator.update(sensor_data, self.previous_sensor_data, None)
-                    
+
                 # Update EKF with missed packets
+                count = 0
                 self.previous_sensor_data = sensor_data
                 while not self.sensor_queue.empty():
-                    sensor_data = self.sensor_queue.get_nowait()
+                    sensor_data = self.sensor_queue.get()
                     self.state_estimator.update(sensor_data, self.previous_sensor_data, None)
                     self.previous_sensor_data = sensor_data
 

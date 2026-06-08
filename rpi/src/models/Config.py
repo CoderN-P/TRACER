@@ -19,6 +19,7 @@ class RobotConfig:
     V_SAMPLES: int
     OMEGA_SAMPLES: int
     DWA_STEPS: int
+    DWA_FREQ: float
     MAX_ALPHA: float
     DWA_SIGMA: float
     DWA_ALPHA: float

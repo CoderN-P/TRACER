@@ -2,7 +2,7 @@
   import { browser } from "$app/environment";
   import { io as socket } from "$lib/api/socket";
   import * as Card from "$lib/components/ui/card";
-  import DEFAULT_CONSTANTS from "$calibration/constants/constants.json"
+  import DEFAULT_CONSTANTS from "$calibration/constants/constants.json";
   import { onMount } from "svelte";
   import { SlidersHorizontal, RotateCcw, Save } from "lucide-svelte";
 
@@ -106,7 +106,12 @@
           min: 0,
         },
         { key: "R_POSITION", label: "R_POSITION", step: "0.001", min: 0 },
-        { key: "STATE_HISTORY_SIZE", label: "STATE_HISTORY_SIZE", step: "1", min: 5},
+        {
+          key: "STATE_HISTORY_SIZE",
+          label: "STATE_HISTORY_SIZE",
+          step: "1",
+          min: 5,
+        },
       ],
     },
     {
@@ -192,7 +197,7 @@
           label: "MAX_LINEAR_VEL_NEG",
           step: "0.001",
           min: 0,
-        }
+        },
       ],
     },
     {
@@ -239,7 +244,7 @@
           key: "CLEAR_FRAMES_THRESHOLD",
           label: "CLEAR_FRAMES_THRESHOLD",
           step: "1",
-          min: 0
+          min: 0,
         },
         {
           key: "LIDAR_HEIGHT",
@@ -342,6 +347,12 @@
           label: "EMIT_SENSOR_FREQ",
           step: "0.1",
           min: 0,
+        },
+        {
+          key: "DWA_FREQ",
+          label: "DWA_FREQ",
+          step: "1",
+          min: 1,
         },
         {
           key: "SENSOR_TIMEOUT",

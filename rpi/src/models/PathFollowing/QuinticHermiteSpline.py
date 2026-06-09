@@ -2,6 +2,7 @@ import numpy as np
 from typing import List
 from .. import ROBOT_CONFIG
 from .TrajectoryState import TrajectoryState
+from .utils import get_planning_track_width
 
 
 class QuinticHermiteSpline:
@@ -137,7 +138,9 @@ class QuinticHermiteSpline:
             # Wheel speed constraint: v + |omega| * wheelbase/2 <= v_max_wheel
             # omega = v * curvature, so: v + |v * curvature| * wheelbase/2 <= v_max_wheel
             # v * (1 + |curvature| * wheelbase/2) <= v_max_wheel
-            v_wheel = ROBOT_CONFIG.MAX_LINEAR_VEL_POS / (1 + abs(curvature) * ROBOT_CONFIG.WHEEL_BASE_TRAJ / 2)
+            
+            w_eff = get_planning_track_width(abs(curvature))
+            v_wheel = ROBOT_CONFIG.MAX_LINEAR_VEL_POS / (1 + abs(curvature) * w_eff / 2)
     
             return min(v_lateral, v_wheel, ROBOT_CONFIG.MAX_LINEAR_VEL_POS)
 

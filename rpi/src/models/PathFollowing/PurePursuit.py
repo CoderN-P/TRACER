@@ -3,7 +3,7 @@ from typing import List
 import logging
 
 from .GoToGoal import GoToGoal
-from .utils import twist_to_wheel_speeds, get_local_target
+from .utils import twist_to_wheel_speeds, get_local_target, get_planning_track_width
 from .. import ROBOT_CONFIG, GapNavigator
 from ..Command import Command, CommandType, MotorCommand
 from ..StateEstimation import RobotState
@@ -135,7 +135,16 @@ class PurePursuit:
         local_target = get_local_target(robot_state, goal_point)
         lateral_y = local_target[1]
         curvature = 2*lateral_y / (math.hypot(*local_target) ** 2)
-        linear_velocity = ROBOT_CONFIG.MAX_LINEAR_VEL_POS / (1 + ROBOT_CONFIG.K_CURVE * abs(curvature))
+
+        w_eff = get_planning_track_width(abs(curvature))
+        v_motor_cap = ROBOT_CONFIG.MAX_LINEAR_VEL_POS / (1 + abs(curvature) * w_eff / 2)
+        
+        if abs(curvature) < 1e-6:
+            v_lateral_cap = ROBOT_CONFIG.MAX_LINEAR_VEL_POS
+        else:
+            v_lateral_cap = np.sqrt(ROBOT_CONFIG.MAX_LATERAL_ACCEL / abs(curvature))
+
+        linear_velocity = min(ROBOT_CONFIG.MAX_LINEAR_VEL_POS, v_motor_cap, v_lateral_cap)
         angular_velocity = curvature * linear_velocity 
         
         motor_speeds = twist_to_wheel_speeds(linear_velocity, angular_velocity)

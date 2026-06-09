@@ -37,7 +37,6 @@
   const GRAPH_WIDTH = 900;
   const GRAPH_HEIGHT = 260;
   const PADDING = { top: 12, right: 16, bottom: 22, left: 48 };
-  const WHEEL_BASE_METERS = 0.255;
   const VELOCITY_MIN = -0.4;
   const VELOCITY_MAX = 0.4;
   const OMEGA_MIN = -Math.PI;
@@ -52,8 +51,8 @@
 
   let vLin = $derived(robotState ? robotState.linear_velocity : 0);
   let omega = $derived(robotState ? robotState.angular_velocity : 0);
-  let vLeft = $derived(vLin - (omega * WHEEL_BASE_METERS) / 2);
-  let vRight = $derived(vLin + (omega * WHEEL_BASE_METERS) / 2);
+  let vLeft = $derived(robotState ? robotState.v_left : 0);
+  let vRight = $derived(robotState ? robotState.v_right : 0);
 
   let latestValues = $derived([
     {
@@ -95,12 +94,14 @@
 
     const nextOmega = robotState.angular_velocity;
     const nextLin = robotState.linear_velocity;
+    const nextVLeft = robotState.v_left;
+    const nextVRight = robotState.v_right;
     const sample: VelocitySample = {
       timestamp: lastSensorUpdateTime,
       vLin: nextLin,
       omega: nextOmega,
-      vLeft: nextLin - (nextOmega * WHEEL_BASE_METERS) / 2,
-      vRight: nextLin + (nextOmega * WHEEL_BASE_METERS) / 2,
+      vLeft: nextVLeft,
+      vRight: nextVRight,
     };
 
     history = [...history, sample]

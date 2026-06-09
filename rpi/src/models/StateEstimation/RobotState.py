@@ -18,5 +18,8 @@ class RobotState(BaseModel):
     roll: float = Field(..., description="Roll of the robot in radians") # Not used currently
     
     
-    linear_velocity: float = Field(..., description="Linear velocity of the robot in cm/s in its forward direction")
+    linear_velocity: float = Field(..., description="Linear velocity of the robot in m/s in its forward direction")
     angular_velocity: float = Field(..., description="Angular velocity of the robot in radians/s")
+    
+    v_left: float = Field(..., description="Velocity of the left motor in m/s")
+    v_right: float = Field(..., description="Velocity of the left motor in m/s")

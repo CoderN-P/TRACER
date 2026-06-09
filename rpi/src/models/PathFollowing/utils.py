@@ -2,6 +2,10 @@ from .. import ROBOT_CONFIG
 import math
 from typing import List
 
+def get_planning_track_width(curvature: float) -> float:
+    """Computes track width based purely on geometry for velocity profiling."""
+    return ROBOT_CONFIG.WHEEL_BASE_MAX_MAX - (ROBOT_CONFIG.WHEEL_BASE_MAX - ROBOT_CONFIG.WHEEL_BASE_MIN) * math.exp(-ROBOT_CONFIG.ALPHA * abs(curvature))
+
 def scale_to_max(left, right) -> tuple:
     abs_left = abs(left)
     abs_right = abs(right)
@@ -28,9 +32,17 @@ def scale_to_max(left, right) -> tuple:
     return final_left, final_right
 
 
-def twist_to_wheel_speeds(v, w):
-    left = v - (w * ROBOT_CONFIG.WHEEL_BASE_PID / 2.0)
-    right = v + (w * ROBOT_CONFIG.WHEEL_BASE_PID / 2.0)
+def twist_to_wheel_speeds(v, omega):
+    if abs(v) > 1e-5:
+        curvature = omega / v
+    else:
+        curvature = 0.0  # High curvature limit handles pure spins cleanly
+
+    # 2. Get the exact track width the planner assumed for this specific curve shape
+    w_eff = get_planning_track_width(curvature)
+    
+    left = v - (omega * w_eff / 2.0)
+    right = v + (omega * w_eff / 2.0)
 
     return scale_to_max(left, right)
 
@@ -42,3 +54,11 @@ def get_local_target(robot_state, goal_point) -> List[float]:
     local_y = -math.sin(robot_state.yaw) * dx + math.cos(robot_state.yaw) * dy
 
     return [local_x, local_y]
+
+def get_ekf_track_width(v_prev: float, omega_prev: float) -> float:
+    """Computes track width based on physical forces felt during the last timestep."""
+    lateral_accel = abs(omega_prev * v_prev)
+    w_eff = ROBOT_CONFIG.WHEEL_BASE_MIN + ROBOT_CONFIG.K_SCRUB * lateral_accel
+
+    # Strictly bound the output between calibrated limits
+    return max(ROBOT_CONFIG.WHEEL_BASE_MIN, min(w_eff, ROBOT_CONFIG.WHEEL_BASE_MAX))

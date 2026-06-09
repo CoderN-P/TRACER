@@ -119,14 +119,14 @@
       subtitle: "Wheelbase and calibration corrections.",
       fields: [
         {
-          key: "WHEEL_BASE_PID",
-          label: "WHEEL_BASE_PID",
+          key: "WHEEL_BASE_MAX",
+          label: "WHEEL_BASE_MAX",
           step: "0.001",
           min: 0,
         },
         {
-          key: "WHEEL_BASE_TRAJ",
-          label: "WHEEL_BASE_TRAJ",
+          key: "WHEEL_BASE_MAX",
+          label: "WHEEL_BASE_MIN",
           step: "0.001",
           min: 0,
         },   

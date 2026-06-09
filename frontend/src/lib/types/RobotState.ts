@@ -8,6 +8,8 @@ export const RobotStateSchema = z.object({
   roll: z.number().describe("Roll of the robot in radians"),
   linear_velocity: z.number().describe("Linear velocity of the robot in cm/s in its forward direction"),
   angular_velocity: z.number().describe("Angular velocity of the robot in radians/s"),
+  v_left: z.number().describe("Velocity of the left motor"),
+  v_right: z.number().describe("Velocity of the right motor"),
 });
 
 export type RobotState = z.infer<typeof RobotStateSchema>;

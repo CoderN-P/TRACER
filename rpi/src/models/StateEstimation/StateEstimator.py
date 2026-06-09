@@ -2,6 +2,7 @@ import math
 import numpy as np
 import time
 from collections import deque
+from ..PathFollowing.utils import get_ekf_track_width
 from . import RobotState, HeadingFilter, PoseFilter, EKFSnapshot
 from .. import SensorData, LidarData, ROBOT_CONFIG
 
@@ -16,7 +17,9 @@ class StateEstimator:
             pitch=0.0,
             roll=0.0,
             linear_velocity=0.0,
-            angular_velocity=0.0
+            angular_velocity=0.0,
+            v_left=0.0,
+            v_right=0.0
         )
         
         self.history: deque[EKFSnapshot] = deque(maxlen=ROBOT_CONFIG.STATE_HISTORY_SIZE)
@@ -39,7 +42,9 @@ class StateEstimator:
             pitch=0.0, # Not used
             roll=0.0,  # Not used
             linear_velocity=0.0,
-            angular_velocity=0.0 
+            angular_velocity=0.0,
+            v_left=0.0,
+            v_right=0.0
         )
         self.theta_encoders = 0.0
         self.initial_mag_heading = None
@@ -67,7 +72,12 @@ class StateEstimator:
         return dt
 
     @staticmethod
-    def estimate_linear_velocity(left_ticks, right_ticks, dt):
+    def estimate_linear_velocity(v_left, v_right):
+        linear_velocity = (v_left + v_right) / 2
+        return linear_velocity
+    
+    @staticmethod
+    def get_wheel_velocities(left_ticks, right_ticks, dt):
         delta_left = left_ticks * (
             ROBOT_CONFIG.METERS_PER_TICK_LEFT_POS
             if left_ticks >= 0
@@ -78,8 +88,8 @@ class StateEstimator:
             if right_ticks >= 0
             else ROBOT_CONFIG.METERS_PER_TICK_RIGHT_NEG
         )
-        linear_velocity = (delta_left + delta_right) / (2 * dt)
-        return linear_velocity
+        
+        return delta_left / dt, delta_right / dt
 
     @staticmethod
     def _wrap_to_pi(angle: float) -> float:
@@ -148,7 +158,9 @@ class StateEstimator:
             self._logger.error(f"Left encoder tick jump detected: {previous_sensor_data.left_encoder} -> {sensor_data.left_encoder} (max expected: {max_pulses:.2f})")
             return
         
-        self.theta_encoders += self.heading_delta_from_encoders(delta_left_ticks, delta_right_ticks)
+        v_prev = self.history[-1].robot_state.v
+        omega_prev = self.history[-1].robot_state.omega
+        self.theta_encoders += self.heading_delta_from_encoders(delta_left_ticks, delta_right_ticks, v_prev, omega_prev)
         
         if sensor_data.magnetometer.new and sensor_data.magnetometer.is_available():
             mag_heading_rad = math.radians(sensor_data.magnetometer.heading)
@@ -163,7 +175,8 @@ class StateEstimator:
             
         self.state.yaw = (self.heading_filter.step(self.theta_encoders, sensor_data.imu.gyroscope_z, dt, mag_heading_rad)) % (2 * math.pi)
     
-        self.state.linear_velocity = self.estimate_linear_velocity(delta_left_ticks, delta_right_ticks, dt)
+        self.state.v_left, self.state.v_right = self.get_wheel_velocities(delta_left_ticks, delta_right_ticks, dt)
+        self.state.linear_velocity = self.estimate_linear_velocity(self.state.v_left, self.state.v_right)
         self.state.angular_velocity = sensor_data.imu.gyroscope_z - self.heading_filter.state[1]
 
         position_delta_x, position_delta_y = self.get_position_delta(delta_left_ticks, delta_right_ticks, self.state.yaw, self.history[-1].robot_state.yaw)
@@ -233,7 +246,7 @@ class StateEstimator:
         
         
     @staticmethod
-    def heading_delta_from_encoders(left_ticks, right_ticks):
+    def heading_delta_from_encoders(left_ticks, right_ticks, v_prev, omega_prev):
         delta_left = left_ticks * (
             ROBOT_CONFIG.METERS_PER_TICK_LEFT_POS
             if left_ticks >= 0
@@ -244,4 +257,6 @@ class StateEstimator:
             if right_ticks >= 0
             else ROBOT_CONFIG.METERS_PER_TICK_RIGHT_NEG
         )
-        return (delta_right - delta_left) / ROBOT_CONFIG.WHEEL_BASE_PID
+        
+        w_eff = get_ekf_track_width(v_prev, omega_prev)
+        return (delta_right - delta_left) / w_eff

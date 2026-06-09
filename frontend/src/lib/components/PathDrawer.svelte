@@ -1544,6 +1544,7 @@
                   onclick={() => {
                     selectedObstacleId = obstacle.id;
                   }}
+                  draggable
                   ondragmove={(e) => {
                     const pos = e.target.position();
                     updateObstacle(obstacle.id, (current) =>
@@ -1624,6 +1625,7 @@
                   fill="rgba(239, 68, 68, 0.16)"
                   stroke={selected ? "#dc2626" : "#f97316"}
                   strokeWidth={(selected ? 2.5 : 1.5) / zoom}
+                  draggable
                   dash={selected ? [] : [8 / zoom, 6 / zoom]}
                   onclick={() => {
                     selectedObstacleId = obstacle.id;

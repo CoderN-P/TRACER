@@ -125,11 +125,11 @@
           min: 0,
         },
         {
-          key: "WHEEL_BASE_MAX",
+          key: "WHEEL_BASE_MIN",
           label: "WHEEL_BASE_MIN",
           step: "0.001",
           min: 0,
-        },   
+        },
         {
           key: "WHEEL_DIAMETER",
           label: "WHEEL_DIAMETER",
@@ -205,14 +205,14 @@
           min: 0,
         },
         {
-          key: "K_SCRUB",
-          label: "K_SCRUB",
-          step: "0.001",
+          key: "ALPHA",
+          label: "ALPHA",
+          step: "0.01",
           min: 0,
         },
         {
-          key: "ALPHA",
-          label: "ALPHA",
+          key: "K_SCRUB",
+          label: "K_SCRUB",
           step: "0.001",
           min: 0,
         },

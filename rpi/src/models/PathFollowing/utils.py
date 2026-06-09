@@ -4,7 +4,7 @@ from typing import List
 
 def get_planning_track_width(curvature: float) -> float:
     """Computes track width based purely on geometry for velocity profiling."""
-    return ROBOT_CONFIG.WHEEL_BASE_MAX_MAX - (ROBOT_CONFIG.WHEEL_BASE_MAX - ROBOT_CONFIG.WHEEL_BASE_MIN) * math.exp(-ROBOT_CONFIG.ALPHA * abs(curvature))
+    return ROBOT_CONFIG.WHEEL_BASE_MAX - (ROBOT_CONFIG.WHEEL_BASE_MAX - ROBOT_CONFIG.WHEEL_BASE_MIN) * math.exp(-ROBOT_CONFIG.ALPHA * abs(curvature))
 
 def scale_to_max(left, right) -> tuple:
     abs_left = abs(left)

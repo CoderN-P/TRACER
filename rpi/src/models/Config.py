@@ -26,8 +26,8 @@ class RobotConfig:
     DWA_ALPHA: float
     DWA_BETA: float
     DWA_Y: float
-    K_SCRUB = 0.0159     # Exact scalar for 200Hz EKF physics model
-    ALPHA = 3.0
+    K_SCRUB: float
+    ALPHA: float
     MIN_GAP_WIDTH: float
     MAX_LINEAR_VEL_POS: float
     MAX_LINEAR_VEL_NEG: float 

@@ -204,6 +204,18 @@
           step: "0.001",
           min: 0,
         },
+        {
+          key: "K_SCRUB",
+          label: "K_SCRUB",
+          step: "0.001",
+          min: 0,
+        },
+        {
+          key: "ALPHA",
+          label: "ALPHA",
+          step: "0.001",
+          min: 0,
+        },
       ],
     },
     {

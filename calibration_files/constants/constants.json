@@ -1,4 +1,5 @@
 {
+  "ALPHA": 3.0,
   "BETA": 3.2,
   "CHECK_OBSTACLE_FREQ": 20,
   "CLEARANCE_HEIGHT": 0.06,
@@ -22,6 +23,7 @@
   "K_OMEGA": 3.14,
   "K_V": 6,
   "K_WIDTH": 2.5,
+  "K_SCRUB": 0.0159,
   "LEFT_CORRECTION_NEG": 0.95,
   "LEFT_CORRECTION_POS": 0.97,
   "LIDAR_FOV": 61.1,

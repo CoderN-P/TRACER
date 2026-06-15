@@ -15,7 +15,7 @@ private:
     std::atomic<float> pendingKp, pendingKi, pendingKd;
     float lastError;
     float integral;
-
+    float prevInput;
 public:
     PIDController(float kp, float ki, float kd);
     void setPendingPIDConstants(float kp, float ki, float kd);

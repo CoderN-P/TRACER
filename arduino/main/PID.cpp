@@ -11,6 +11,7 @@ PIDController::PIDController(float kp, float ki, float kd)
     this->setpoint = 0;
     this->pendingSetpoint.store(0);
     this->lastError = 0;
+    this->prevInput = 0;
     this->integral = 0;
 }
 
@@ -50,8 +51,8 @@ float PIDController::compute(float input, float feedforward)
     float error = this->setpoint - input;
     
     float proportional_t = _kp * error;
-    float derivative_t = _kd * (error - lastError) / PID_INTERVAL;
-    float baseOutput = feedforward + proportional_t + derivative_t;
+    float derivative_t = _kd * (input - prevInput) / PID_INTERVAL;
+    float baseOutput = feedforward + proportional_t - derivative_t;
     
     if (abs(error) < I_ZONE){
         this->integral += error;
@@ -75,7 +76,7 @@ float PIDController::compute(float input, float feedforward)
     
     float integral_t = _ki * integral;
     this->lastError = error;
-
+    this->prevInput = input;
     return feedforward + proportional_t + integral_t + derivative_t;
 }
 
@@ -84,4 +85,5 @@ void PIDController::reset()
     this->lastError = 0;
     this->integral = 0;
     this->setpoint = 0;
+    this->prevInput = 0;
 }

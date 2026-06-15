@@ -37,8 +37,8 @@
     ) as Record<PidKey, string>,
   );
 
-  function emitPid() {
-    socket.emit("update_pid", { ...pidValues });
+  function emitPid(save = false) {
+    socket.emit("update_pid", { ...pidValues, save });
   }
 
   function updateField(key: PidKey, rawValue: string) {
@@ -144,6 +144,14 @@
         >
           <Send class="h-4 w-4" />
           Send PID Gains
+        </button>
+        <button
+                type="button"
+                onclick={() => emitPid(true)}
+                class="inline-flex max-w-full items-center gap-2 rounded-md border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-semibold text-blue-700 transition-colors hover:bg-blue-100 active:bg-blue-200"
+        >
+          <Send class="h-4 w-4" />
+          Save PID Gains
         </button>
       </div>
     </div>

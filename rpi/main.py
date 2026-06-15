@@ -3,6 +3,8 @@ import argparse
 import asyncio
 import logging
 from dotenv import load_dotenv
+from pathlib import Path
+import json
 
 load_dotenv()
 from src import text_to_command
@@ -41,6 +43,16 @@ async def main(p):
     )
     serial_manager = SerialManager(port, 921600)
     robot = Robot(serial_manager, socketio)
+    
+    # Set saved PID gains
+    PID_CONFIG_FILE = (
+            Path(__file__).resolve().parents[3]
+            / "calibration_files"
+            / "pid"
+            / "gains.json"
+    )
+    pid_data = json.load(open(PID_CONFIG_FILE, "r"))
+    await robot.set_pid(pid_data)
     logging.getLogger('socketio').setLevel(logging.ERROR)
     logging.getLogger('engineio').setLevel(logging.ERROR)
     robot._logger.setLevel(logging.INFO)        

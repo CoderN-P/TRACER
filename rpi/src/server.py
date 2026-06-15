@@ -114,6 +114,19 @@ def setup_routes(robot):
         
     @sio.on('update_pid')
     async def update_pid(sid, data):
+        save_requested = bool(data.get("save", False))
+
+        PID_CONFIG_FILE = (
+                Path(__file__).resolve().parents[3]
+                / "calibration_files"
+                / "pid"
+                / "gains.json"
+        )
+        
+        if save_requested:
+            with open(PID_CONFIG_FILE, "w") as pid_config:
+                json.dump(data, pid_config)
+                
         await on_robot_loop(robot.set_pid(data))
         
     @sio.on('vel_command')

@@ -2,7 +2,7 @@ import logging
 import time
 import threading
 from . import ROBOT_CONFIG
-from .models import SerialManager, Robot, Command, CommandType, MotorPWMCommand, StateEstimator
+from .models import SerialManager, Robot, Command, CommandType, MotorPWMCommand
 
 
 def calibrate_max_speed(backwards, port=None):
@@ -36,6 +36,7 @@ def calibrate_max_speed(backwards, port=None):
     serial_manager.start_read(callback=callback)
 
     cur_time = time.time()
+
 
     # Create motor command for full speed
     motor_command = Command(

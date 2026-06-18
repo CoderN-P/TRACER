@@ -15,6 +15,8 @@ uint8_t expectedCommandLength(uint8_t cmd)
         return 3;
     if (cmd == CMD_PWM)
         return 7;
+    if (cmd == CMD_TWIST)
+        return 7;
     
     return 0; // invalid
 }
@@ -138,7 +140,7 @@ void handleCommand(byte *buffer, size_t length)
         pidLeft.setPendingSetpoint(v_raw / 1000.0f);
         pidRight.setPendingSetpoint(omega_raw / 1000.0f);
         
-        strncpy(line1, "Twist mode");
+        strncpy(line1, "Twist mode", 16);
     }
     else if (cmd == CMD_CONFIG && length > 2 && length == buffer[2])
     {
@@ -149,111 +151,131 @@ void handleCommand(byte *buffer, size_t length)
         } else {
             while (i < buffer[2]){
                 // Key is uint8_t, so only 1 byte
-                int key;
-                memcpy(&key, &buffer[i++], 1);
+                int rawKey;
+                memcpy(&rawKey, &buffer[i++], 1);
                 
-                switch key {
+                ConfigReg key = static_cast<ConfigReg>(rawKey);
+                
+                switch (key) {
                     case ConfigReg::PID_L_P:
                         int16_t pLeft;
                         memcpy(&pLeft, &buffer[i], 2); // PID constants are floats but sent as int16 to save space
-                        cfg.pLeft = (float) pLeft / 1000.0;
+                        config.pLeft = (float) pLeft / 1000.0;
                         i += 2;
                         break;
                     case ConfigReg::PID_L_I:
                         int16_t iLeft;
                         memcpy(&iLeft, &buffer[i], 2); // PID constants are floats but sent as int16 to save space
-                        cfg.iLeft = (float) iLeft / 1000.0;
+                        config.iLeft = (float) iLeft / 1000.0;
                         i += 2;
                         break;
                     case ConfigReg::PID_L_D:
                         int16_t dLeft;
                         memcpy(&dLeft, &buffer[i], 2); // PID constants are floats but sent as int16 to save space
-                        cfg.dLeft = (float) dLeft / 1000.0;
+                        config.dLeft = (float) dLeft / 1000.0;
                         i += 2;
                         break;
                     case ConfigReg::PID_R_P:
                         int16_t pRight;
                         memcpy(&pRight, &buffer[i], 2); // PID constants are floats but sent as int16 to save space
-                        cfg.pRight = (float) pRight / 1000.0;
+                        config.pRight = (float) pRight / 1000.0;
                         i += 2;
                     case ConfigReg::PID_R_I:
                         int16_t iRight;
                         memcpy(&iRight, &buffer[i], 2); // PID constants are floats but sent as int16 to save space
-                        cfg.iRight = (float) iRight / 1000.0;
+                        config.iRight = (float) iRight / 1000.0;
                         i += 2;
                         break;
                     case ConfigReg::PID_R_D:
                         int16_t dRight;
                         memcpy(&dRight, &buffer[i], 2); // PID constants are floats but sent as int16 to save space
-                        cfg.dRight = (float) dRight / 1000.0;
+                        config.dRight = (float) dRight / 1000.0;
                         i += 2;
                         break;
                     case ConfigReg::WHEEL_BASE_MAX:
                         uint16_t maxWheelBase;
                         memcpy(&maxWheelBase, &buffer[i], 2); 
-                        cfg.maxWheelBase = (float) maxWheelBase / 1000.0;
+                        config.maxWheelBase = (float) maxWheelBase / 1000.0;
                         i += 2;
                         break;
                     case ConfigReg::WHEEL_BASE_MIN:
                         uint16_t minWheelBase;
                         memcpy(&minWheelBase, &buffer[i], 2); 
-                        cfg.minWheelBase = (float) minWheelBase / 1000.0;
+                        config.minWheelBase = (float) minWheelBase / 1000.0;
                         i += 2;
                         break;
                     case ConfigReg::ALPHA:
                         int16_t alpha;
                         memcpy(&alpha, &buffer[i], 2);
-                        cfg.alpha = (float) alpha / 1000.0;
+                        config.alpha = (float) alpha / 1000.0;
                         i += 2;
                         break;
                     case ConfigReg::NOMINAL_WHEEL_BASE:
                         uint16_t nominalWheelBase;
                         memcpy(&nominalWheelBase, &buffer[i], 2); 
-                        cfg.nominalWheelBase = (float) nominalWheelBase / 1000.0;
+                        config.nominalWheelBase = (float) nominalWheelBase / 1000.0;
                         i += 2;
                         break;
                     case ConfigReg::LEFT_CORRECTION_POS:
                         int16_t leftCorrectionPos;
                         memcpy(&leftCorrectionPos, &buffer[i], 2);
-                        cfg.leftCorrectionPos = (float) leftCorrectionPos / 1000.0;
+                        config.leftCorrectionPos = (float) leftCorrectionPos / 1000.0;
                         i += 2;
                         break;
                     case ConfigReg::LEFT_CORRECTION_NEG:
                         int16_t leftCorrectionNeg;
                         memcpy(&leftCorrectionNeg, &buffer[i], 2);
-                        cfg.leftCorrectionNeg = (float) leftCorrectionNeg / 1000.0;
+                        config.leftCorrectionNeg = (float) leftCorrectionNeg / 1000.0;
                         i += 2;  
                         break;   
                     case ConfigReg::RIGHT_CORRECTION_POS:
                         int16_t rightCorrectionPos;
                         memcpy(&rightCorrectionPos, &buffer[i], 2);
-                        cfg.rightCorrectionPos = (float) rightCorrectionPos / 1000.0;
+                        config.rightCorrectionPos = (float) rightCorrectionPos / 1000.0;
                         i += 2;
                         break;
                     case ConfigReg::RIGHT_CORRECTION_NEG:
                         int16_t rightCorrectionNeg;
                         memcpy(&rightCorrectionNeg, &buffer[i], 2);
-                        cfg.rightCorrectionNeg = (float) rightCorrectionNeg / 1000.0;
+                        config.rightCorrectionNeg = (float) rightCorrectionNeg / 1000.0;
                         i += 2;
                         break;
                     case ConfigReg::I_ZONE:
                         uint16_t iZone;
                         memcpy(&iZone, &buffer[i], 2);
-                        cfg.iZone = (float) iZone / 1000.0;
+                        config.iZone = (float) iZone / 1000.0;
                         i += 2;
                         break;
                     case ConfigReg::USE_GYRO_CORRECTION:                                    
                         uint8_t useGyroCorrection;
                         memcpy(&useGyroCorrection, &buffer[i], 1);
-                        cfg.useGyroCorrection = (bool) useGyroCorrection;
+                        config.useGyroCorrection = (bool) useGyroCorrection;
                         i += 1;
                         break;
                     case ConfigReg::USE_ADAPTIVE_WHEEL_BASE:
                         uint8_t useAdaptiveWheelBase;
                         memcpy(&useAdaptiveWheelBase, &buffer[i], 1);
-                        cfg.useAdaptiveWheelBase = (bool) useAdaptiveWheelBase;
+                        config.useAdaptiveWheelBase = (bool) useAdaptiveWheelBase;
                         i += 1;
                         break;
+                    case ConfigReg::OMEGA_P:
+                        uint16_t omegaP;
+                        memcpy(&omegaP, &buffer[i], 2);
+                        config.omegaP = (float)  omegaP / 1000.0;
+                        i += 2;
+                        break;
+                    case ConfigReg::MAX_LINEAR_VEL_POS:
+                        uint16_t maxLinearVelPos;
+                        memcpy(&maxLinearVelPos, &buffer[i], 2);
+                        config.maxLinearVelPos = (float) maxLinearVelPos / 1000.0;
+                        i += 2;
+                        break;
+                    case ConfigReg::MAX_LINEAR_VEL_NEG:
+                        uint16_t maxLinearVelNeg;
+                        memcpy(&maxLinearVelNeg, &buffer[i], 2);
+                        config.maxLinearVelNeg = (float) maxLinearVelNeg / 1000.0;
+                        i += 2;
+                        break;      
                     default:
                         strncpy(line1, "Invalid cfg key", 16);
                 }

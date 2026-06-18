@@ -25,6 +25,9 @@
     "RIGHT_CORRECTION_POS",
     "LEFT_CORRECTION_NEG",
     "RIGHT_CORRECTION_NEG",
+    "OMEGA_P",
+    "MAX_LINEAR_VEL_POS",
+    "MAX_LINEAR_VEL_NEG"
   ] as const satisfies readonly ConstantKey[];
 
   type ConstantKey = keyof typeof DEFAULT_CONSTANTS;
@@ -276,6 +279,7 @@
         { key: "I_RIGHT", label: "I_RIGHT", step: "0.01", min: 0 },
         { key: "D_RIGHT", label: "D_RIGHT", step: "0.01", min: 0 },
         { key: "I_ZONE", label: "I_ZONE", step: "0.001", min: 0 },
+        { key: "OMEGA_P", label: "OMEGA_P", step: "0.001", min: 0 },      
       ],
     },
     {

@@ -23,6 +23,7 @@ extern QueueHandle_t sensorQueue;
 extern pcnt_unit_t pcnt_unit_left;
 extern pcnt_unit_t pcnt_unit_right;
 extern std::atomic<uint8_t> pageIndex;
+extern GeneralConfig config;
 extern std::atomic<int16_t> distanceFront;
 extern std::atomic<uint8_t> pendingPIDMode; // 0 = PID control mode, 1 = open-loop PWM control mode, 2 = twist control mode
 

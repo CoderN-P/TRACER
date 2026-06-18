@@ -20,7 +20,7 @@ from collections import deque
 from datetime import datetime
 
 from . import ROBOT_CONFIG
-from .models import SerialManager, Robot, Command, CommandType, MotorCommand, MotorPWMCommand, ConfigCommand
+from .models import SerialManager, Robot, Command, CommandType, MotorCommand, TwistCommand, MotorPWMCommand, ConfigCommand
 from .models.PathFollowing import twist_to_wheel_speeds
 # Interval (seconds) between repeated sends while a command is active
 SEND_INTERVAL = 0.05
@@ -745,8 +745,8 @@ def interactive_test(port=None):
                     
                     active_command = Command(
                         ID="",
-                        command_type=CommandType.MOTOR,
-                        command=MotorCommand(left_motor=left_speed, right_motor=right_speed),
+                        command_type=CommandType.TWIST,
+                        command=TwistCommand(v=linear, omega=angular),
                         duration=0,
                         pause_duration=0
                     )

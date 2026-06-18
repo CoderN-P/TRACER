@@ -106,5 +106,6 @@
   "I_LEFT": 0.2,
   "I_RIGHT": 0.2,
   "D_LEFT": 0.3,
-  "D_RIGHT": 0.3
+  "D_RIGHT": 0.3,
+  "OMEGA_P": 0.5
 }

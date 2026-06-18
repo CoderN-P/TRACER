@@ -12,12 +12,20 @@ const int REDUCTION_RATIO = 56;
 const int ENCODER_PPR = 11;
 const int ENCODER_TICKS_PER_REV = ENCODER_PPR * REDUCTION_RATIO * 4;          // Total ticks per wheel revolution with 4x quadrature decoding
 const float METERS_PER_TICK = WHEEL_CIRCUMFERENCE / ENCODER_TICKS_PER_REV;    // Distance traveled per encoder tick
+
+// Default config values (overwritten by rpi)
 const float LEFT_CORRECTION_POS = 0.99f;                                         // Correction factor for left motor positive speed (accounts for slight differences in motors/wheels)
 const float RIGHT_CORRECTION_POS = 0.984f;                                          // Correction factor for right motor postive speed (accounts for slight differences in motors/wheels)
 const float LEFT_CORRECTION_NEG = 0.95f;
 const float RIGHT_CORRECTION_NEG = 1.07f;
 const float MAX_WHEEL_BASE = 0.26f;
 const float MIN_WHEEL_BASE = 0.26f;
+const float NOMINAL_WHEEL_BASE = 0.26f;
+const bool USE_ADAPTIVE_WHEEL_BASE = true;
+const bool USE_GYRO_CORRECTION = true;
+const float ALPHA = 3.0f;
+const float MAX_LINEAR_VEL_POS = 0.45f;
+const float MAX_LINEAR_VEL_NEG = 0.44f;
 
 // Pin definitions
 const int EN1 = 44;             // Enable pin for motor 1
@@ -138,6 +146,7 @@ const float I_RIGHT = 0.5;
 const float D_LEFT = 0.5;
 const float D_RIGHT = 0.5;
 const float I_ZONE = 0.05; // Error zone for integral control in PID (in m/s, so 5 cm/s)
+const float OMEGA_P = 0.5;
 
 // I2C addresses and Register addresses
 const int LSM_ADDRESS = 0x6B;    // I2C address for LSM6DOS
@@ -167,15 +176,15 @@ const uint8_t CMD_CONFIG = 0x06;
 const uint8_t CMD_TWIST = 0x07;
 const int NUM_TYPES = 7; // Number of command types (MOVE, OLED_UPDATE, ENABLE, STOP, PWM, CONFIG, TWIST)
 
-const enum class ConfigReg {
-   PID_L_P = 0
-   PID_L_I = 1
-   PID_L_D = 2
-   PID_R_P = 3
-   PID_R_I = 4
-   PID_R_D = 5
-   WHEEL_BASE_MAX = 6
-   WHEEL_BASE_MIN = 7
+enum class ConfigReg {
+   PID_L_P = 0,
+   PID_L_I = 1,
+   PID_L_D = 2,
+   PID_R_P = 3,
+   PID_R_I = 4,
+   PID_R_D = 5,
+   WHEEL_BASE_MAX = 6,
+   WHEEL_BASE_MIN = 7,  
    ALPHA = 8,
    LEFT_CORRECTION_POS = 9,
    RIGHT_CORRECTION_POS = 10,
@@ -183,9 +192,35 @@ const enum class ConfigReg {
    RIGHT_CORRECTION_NEG = 12,
    USE_GYRO_CORRECTION = 13,
    USE_ADAPTIVE_WHEEL_BASE = 14,
-   NOMINAL_WHEEL_BASE = 15;
-   I_ZONE = 16;
-}
+   NOMINAL_WHEEL_BASE = 15,
+   I_ZONE = 16,
+   OMEGA_P = 17,
+   MAX_LINEAR_VEL_POS = 18,
+   MAX_LINEAR_VEL_NEG = 19,
+};
+
+struct GeneralConfig {
+    float pLeft = P_LEFT;
+    float iLeft = I_LEFT;
+    float dLeft = D_LEFT;
+    float pRight = P_RIGHT;
+    float iRight = I_RIGHT;
+    float dRight = D_RIGHT;
+    float maxWheelBase = MAX_WHEEL_BASE;
+    float minWheelBase = MIN_WHEEL_BASE;
+    float nominalWheelBase = NOMINAL_WHEEL_BASE;
+    float alpha = ALPHA;
+    bool useGyroCorrection = USE_GYRO_CORRECTION;
+    bool useAdaptiveWheelBase = USE_GYRO_CORRECTION;
+    float leftCorrectionPos = LEFT_CORRECTION_POS;
+    float rightCorrectionPos = RIGHT_CORRECTION_POS;
+    float leftCorrectionNeg = LEFT_CORRECTION_NEG;
+    float rightCorrectionNeg = RIGHT_CORRECTION_NEG;
+    float iZone = I_ZONE; 
+    float omegaP = OMEGA_P;
+    float maxLinearVelPos = MAX_LINEAR_VEL_POS;
+    float maxLinearVelNeg = MAX_LINEAR_VEL_NEG;
+};
 
 // Timing intervals (in milliseconds)
 const int ULTRASONIC_INTERVAL = 50;            // Sample ultrasonic sensor every 50 ms (20 hz)

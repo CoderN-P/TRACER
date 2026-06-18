@@ -3,14 +3,6 @@
 #include <cmath>
 #include <algorithm>
 
-PIDController::PIDController(float kp, float ki, float kd)
-{
-    this->setpoint = 0;
-    this->pendingSetpoint.store(0);
-    this->lastError = 0;
-    this->prevInput = 0;
-    this->integral = 0;
-}
 void PIDController::setSetpoint(float setpoint)
 {
     this->setpoint = setpoint;
@@ -31,7 +23,7 @@ float PIDController::getPendingSetpoint()
     return this->pendingSetpoint.load();
 }
 
-float PIDController::compute(float input, float feedforward, float _kp, float _ki, float_kd, float iZone)
+float PIDController::compute(float input, float feedforward, float _kp, float _ki, float _kd, float iZone)
 {
     float error = this->setpoint - input;
     

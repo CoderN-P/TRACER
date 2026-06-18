@@ -20,6 +20,9 @@ EMBEDDED_CONFIG_KEYS: Dict[str, int] = {
     "RIGHT_CORRECTION_POS": 10,
     "LEFT_CORRECTION_NEG": 11,
     "RIGHT_CORRECTION_NEG": 12,
+    "OMEGA_P": 17,
+    "MAX_LINEAR_VEL_POS": 18,
+    "MAX_LINEAR_VEL_NEG": 19,
 }
 
 @dataclass
@@ -112,6 +115,7 @@ class RobotConfig:
     P_RIGHT: float
     I_RIGHT: float
     D_RIGHT: float
+    OMEGA_P: float
 
     @property
     def WHEEL_RADIUS(self) -> float:

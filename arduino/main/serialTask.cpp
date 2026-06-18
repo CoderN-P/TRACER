@@ -33,8 +33,8 @@ void vSerialTask(void *pvParameters) {
             
             if (cmdBuf[1] == CMD_CONFIG && cmdIdx > 2){
                 expected = cmdBuf[2];  // Third byte encodes length
-            } else
-                uint8_t expected = expectedCommandLength(cmdBuf[1]); // Other commands have fixed length
+            } else {
+                expected = expectedCommandLength(cmdBuf[1]); // Other commands have fixed length
             }
     
             // guard against expectedCommandLength returning 0 or 1

@@ -28,8 +28,8 @@ static_assert(PID_INTERVAL == MAIN_INTERVAL, "PID and main loop intervals must m
 
 // PID Controllers
 // Start with only feedforward for tuning
-PIDController pidLeft();
-PIDController pidRight();
+PIDController pidLeft;
+PIDController pidRight;
 
 RobotState robot_state;
 SemaphoreHandle_t state_mutex;

@@ -2,16 +2,42 @@
   import { browser } from "$app/environment";
   import { io as socket } from "$lib/api/socket";
   import * as Card from "$lib/components/ui/card";
-  import DEFAULT_CONSTANTS from "$calibration/constants/constants.json";
+  import DEFAULT_CONSTANTS from "../../../../calibration_files/constants/constants.json";
   import { onMount } from "svelte";
-  import { SlidersHorizontal, RotateCcw, Save } from "lucide-svelte";
+  import { SlidersHorizontal, RotateCcw, Save, Cpu } from "lucide-svelte";
 
   const STORAGE_KEY = "tracer.constant-tuner.constants.v1";
+  const EMBEDDED_CONFIG_KEYS = [
+    "WHEEL_BASE_MAX",
+    "WHEEL_BASE_MIN",
+    "P_LEFT",
+    "P_RIGHT",
+    "I_LEFT",
+    "I_RIGHT",
+    "D_LEFT",
+    "D_RIGHT",
+    "I_ZONE",
+    "NOMINAL_WHEEL_BASE",
+    "ALPHA",
+    "USE_GYRO_CORRECTION",
+    "USE_ADAPTIVE_WHEEL_BASE",
+    "LEFT_CORRECTION_POS",
+    "RIGHT_CORRECTION_POS",
+    "LEFT_CORRECTION_NEG",
+    "RIGHT_CORRECTION_NEG",
+  ] as const satisfies readonly ConstantKey[];
 
   type ConstantKey = keyof typeof DEFAULT_CONSTANTS;
+  type ConstantValue = (typeof DEFAULT_CONSTANTS)[ConstantKey];
+  type EditableConstantKey = {
+    [K in ConstantKey]: (typeof DEFAULT_CONSTANTS)[K] extends number | boolean
+      ? K
+      : never;
+  }[ConstantKey];
+  type EditableConstantValue = number | boolean;
 
   type ConstantField = {
-    key: ConstantKey;
+    key: EditableConstantKey;
     label: string;
     step?: string;
     min?: number;
@@ -23,13 +49,27 @@
     fields: ConstantField[];
   };
 
-  function createDraftValues(source: Record<ConstantKey, number>) {
-    return Object.fromEntries(
-      Object.entries(source).map(([key, value]) => [key, String(value)]),
-    ) as Record<ConstantKey, string>;
+  function isEditableConstantValue(
+    value: ConstantValue,
+  ): value is EditableConstantValue {
+    return typeof value === "number" || typeof value === "boolean";
   }
 
-  function loadStoredConstants(): Partial<Record<ConstantKey, number>> {
+  function isEmbeddedConstant(key: EditableConstantKey) {
+    return EMBEDDED_CONFIG_KEYS.includes(
+      key as (typeof EMBEDDED_CONFIG_KEYS)[number],
+    );
+  }
+
+  function createDraftValues(source: Record<ConstantKey, ConstantValue>) {
+    return Object.fromEntries(
+      Object.entries(source)
+        .filter(([, value]) => isEditableConstantValue(value as ConstantValue))
+        .map(([key, value]) => [key, String(value)]),
+    ) as Record<EditableConstantKey, string>;
+  }
+
+  function loadStoredConstants(): Partial<Record<ConstantKey, ConstantValue>> {
     if (!browser) {
       return {};
     }
@@ -44,9 +84,10 @@
       return Object.fromEntries(
         Object.entries(parsed).filter(
           ([key, value]) =>
-            key in DEFAULT_CONSTANTS && typeof value === "number",
+            key in DEFAULT_CONSTANTS &&
+            (typeof value === "number" || typeof value === "boolean"),
         ),
-      ) as Partial<Record<ConstantKey, number>>;
+      ) as Partial<Record<ConstantKey, ConstantValue>>;
     } catch {
       return {};
     }
@@ -56,10 +97,10 @@
     return {
       ...DEFAULT_CONSTANTS,
       ...loadStoredConstants(),
-    } satisfies Record<ConstantKey, number>;
+    } satisfies Record<ConstantKey, ConstantValue>;
   }
 
-  function persistConstants(nextConstants: Record<ConstantKey, number>) {
+  function persistConstants(nextConstants: Record<ConstantKey, ConstantValue>) {
     if (!browser) {
       return;
     }
@@ -67,7 +108,7 @@
     localStorage.setItem(STORAGE_KEY, JSON.stringify(nextConstants));
   }
 
-  function publishConstants(nextConstants: Record<ConstantKey, number>) {
+  function publishConstants(nextConstants: Record<ConstantKey, ConstantValue>) {
     if (!browser) {
       return;
     }
@@ -118,6 +159,12 @@
       title: "Physical Dimensions",
       subtitle: "Wheelbase and calibration corrections.",
       fields: [
+        {
+          key: "NOMINAL_WHEEL_BASE",
+          label: "NOMINAL_WHEEL_BASE",
+          step: "0.001",
+          min: 0,
+        },
         {
           key: "WHEEL_BASE_MAX",
           label: "WHEEL_BASE_MAX",
@@ -219,6 +266,19 @@
       ],
     },
     {
+      title: "Embedded PID",
+      subtitle: "Motor PID gains sent through the embedded config channel.",
+      fields: [
+        { key: "P_LEFT", label: "P_LEFT", step: "0.01", min: 0 },
+        { key: "I_LEFT", label: "I_LEFT", step: "0.01", min: 0 },
+        { key: "D_LEFT", label: "D_LEFT", step: "0.01", min: 0 },
+        { key: "P_RIGHT", label: "P_RIGHT", step: "0.01", min: 0 },
+        { key: "I_RIGHT", label: "I_RIGHT", step: "0.01", min: 0 },
+        { key: "D_RIGHT", label: "D_RIGHT", step: "0.01", min: 0 },
+        { key: "I_ZONE", label: "I_ZONE", step: "0.001", min: 0 },
+      ],
+    },
+    {
       title: "Obstacle Settings",
       subtitle: "Additional obstacle detection and avoidance tuning.",
       fields: [
@@ -268,6 +328,12 @@
           key: "LIDAR_HEIGHT",
           label: "LIDAR_HEIGHT",
           step: "0.01",
+          min: 0,
+        },
+        {
+          key: "LIDAR_FOV",
+          label: "LIDAR_FOV",
+          step: "0.1",
           min: 0,
         },
         {
@@ -346,13 +412,21 @@
     },
     {
       title: "Controls",
-      subtitle: "Manual control deadzones and input settings.",
+      subtitle: "Manual control, wheelbase mode, and correction toggles.",
       fields: [
         {
           key: "JOYSTICK_DEADZONE",
           label: "JOYSTICK_DEADZONE",
           step: "0.01",
           min: 0,
+        },
+        {
+          key: "USE_ADAPTIVE_WHEEL_BASE",
+          label: "USE_ADAPTIVE_WHEEL_BASE",
+        },
+        {
+          key: "USE_GYRO_CORRECTION",
+          label: "USE_GYRO_CORRECTION",
         },
       ],
     },
@@ -391,6 +465,7 @@
         { key: "LSB_uT", label: "LSB_uT", step: "1e-6", min: 0 },
         { key: "LSB_C", label: "LSB_C", step: "1e-6", min: 0 },
         { key: "TEMP_OFFSET", label: "TEMP_OFFSET", step: "0.1", min: -100 },
+        { key: "USE_VIO", label: "USE_VIO" },
       ],
     },
     {
@@ -465,10 +540,11 @@
 
   let { class: className = "" } = $props();
   let activeSection = $state<number>(0);
+  const initialConstants = createInitialConstants();
 
-  let constants = $state<Record<ConstantKey, number>>(createInitialConstants());
-  let draftValues = $state<Record<ConstantKey, string>>(
-    createDraftValues(constants),
+  let constants = $state<Record<ConstantKey, ConstantValue>>(initialConstants);
+  let draftValues = $state<Record<EditableConstantKey, string>>(
+    createDraftValues(initialConstants),
   );
 
   onMount(() => {
@@ -488,7 +564,19 @@
     emitConstants({ save: true });
   }
 
-  function syncConstant(key: ConstantKey, rawValue: string) {
+  function setConstantValue(
+    key: EditableConstantKey,
+    value: EditableConstantValue,
+    options: { syncDraft?: boolean } = {},
+  ) {
+    constants = { ...constants, [key]: value };
+    if (options.syncDraft ?? true) {
+      draftValues[key] = String(value);
+    }
+    emitConstants();
+  }
+
+  function syncConstant(key: EditableConstantKey, rawValue: string) {
     draftValues[key] = rawValue;
 
     if (rawValue.trim() === "") {
@@ -500,15 +588,18 @@
       return;
     }
 
-    constants[key] = parsed;
-    emitConstants();
+    setConstantValue(key, parsed, { syncDraft: false });
   }
 
-  function resetConstant(key: ConstantKey) {
+  function syncBooleanConstant(key: EditableConstantKey, checked: boolean) {
+    setConstantValue(key, checked);
+  }
+
+  function resetConstant(key: EditableConstantKey) {
     const defaultValue = DEFAULT_CONSTANTS[key];
-    constants[key] = defaultValue;
-    draftValues[key] = String(defaultValue);
-    emitConstants();
+    if (isEditableConstantValue(defaultValue)) {
+      setConstantValue(key, defaultValue);
+    }
   }
 
   function resetAllConstants() {
@@ -518,7 +609,7 @@
     emitConstants();
   }
 
-  function normalizeField(key: ConstantKey) {
+  function normalizeField(key: EditableConstantKey) {
     if (draftValues[key].trim() === "") {
       draftValues[key] = String(constants[key]);
     }
@@ -539,7 +630,7 @@
         </Card.Title>
         <Card.Description>
           Adjust these tuning values live. Every valid change emits the
-          update_constants socket event.
+          update_constants socket event. Embedded constants are marked.
         </Card.Description>
       </div>
 
@@ -593,14 +684,25 @@
 
       <div class="grid gap-3 sm:grid-cols-2">
         {#each section.fields as field}
-          <label class="space-y-1">
+          <div class="space-y-1">
             <div
               class="flex items-center justify-between gap-2 text-xs font-medium text-gray-700"
             >
-              <span class="font-mono">{field.label}</span>
+              <div class="flex min-w-0 items-center gap-1.5">
+                <span class="truncate font-mono">{field.label}</span>
+                {#if isEmbeddedConstant(field.key)}
+                  <span
+                    class="inline-flex shrink-0 items-center gap-1 rounded border border-amber-200 bg-amber-50 px-1.5 py-px text-[9px] font-bold uppercase leading-4 text-amber-700"
+                    title="Also sent to the embedded controller config"
+                  >
+                    <Cpu class="h-2.5 w-2.5" />
+                    emb
+                  </span>
+                {/if}
+              </div>
               <button
                 type="button"
-                class="text-[11px] font-semibold text-gray-500 hover:text-gray-900"
+                class="shrink-0 text-[11px] font-semibold text-gray-500 hover:text-gray-900"
                 onclick={() => resetConstant(field.key)}
                 title={`Reset ${field.label} to its default value`}
               >
@@ -608,20 +710,54 @@
               </button>
             </div>
 
-            <input
-              type="number"
-              step={field.step ?? "any"}
-              min={field.min}
-              value={draftValues[field.key]}
-              oninput={(event) =>
-                syncConstant(
-                  field.key,
-                  (event.currentTarget as HTMLInputElement).value,
-                )}
-              onblur={() => normalizeField(field.key)}
-              class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 font-mono text-sm text-gray-900 outline-none transition-colors placeholder:text-gray-400 focus:border-gray-500 focus:ring-2 focus:ring-gray-200"
-            />
-          </label>
+            {#if typeof constants[field.key] === "boolean"}
+              <button
+                type="button"
+                role="switch"
+                aria-checked={Boolean(constants[field.key])}
+                onclick={() =>
+                  syncBooleanConstant(field.key, constants[field.key] !== true)}
+                class="flex h-10 w-full items-center justify-between rounded-md border px-3 text-sm font-semibold transition-colors {constants[
+                  field.key
+                ] === true
+                  ? 'border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100'
+                  : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'}"
+              >
+                <span class="font-mono">
+                  {constants[field.key] === true ? "true" : "false"}
+                </span>
+                <span
+                  class="relative h-5 w-9 rounded-full transition-colors {constants[
+                    field.key
+                  ] === true
+                    ? 'bg-emerald-500'
+                    : 'bg-gray-300'}"
+                >
+                  <span
+                    class="absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform {constants[
+                      field.key
+                    ] === true
+                      ? ''
+                      : '-translate-x-4'}"
+                  ></span>
+                </span>
+              </button>
+            {:else}
+              <input
+                type="number"
+                step={field.step ?? "any"}
+                min={field.min}
+                value={draftValues[field.key]}
+                oninput={(event) =>
+                  syncConstant(
+                    field.key,
+                    (event.currentTarget as HTMLInputElement).value,
+                  )}
+                onblur={() => normalizeField(field.key)}
+                class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 font-mono text-sm text-gray-900 outline-none transition-colors placeholder:text-gray-400 focus:border-gray-500 focus:ring-2 focus:ring-gray-200"
+              />
+            {/if}
+          </div>
         {/each}
       </div>
     </section>

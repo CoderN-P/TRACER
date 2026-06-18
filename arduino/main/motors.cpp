@@ -10,24 +10,24 @@
 
 std::atomic<uint8_t> pendingPIDMode{0}; // 0 = PID control mode, 1 = open-loop PWM control mode
 
-float getLeftMotorSpeed(int32_t deltaLeftTicks)
+float getLeftMotorSpeed(int32_t deltaLeftTicks, GeneralConfig cfg)
 {
     float deltaLeft;
     if (deltaLeftTicks <= 0){
-        deltaLeft = deltaLeftTicks * METERS_PER_TICK_LEFT_NEG;
+        deltaLeft = deltaLeftTicks * METERS_PER_TICK * cfg.leftCorrectionNeg;
     } else {
-        deltaLeft = deltaLeftTicks * METERS_PER_TICK_LEFT_POS;
+        deltaLeft = deltaLeftTicks * METERS_PER_TICK * cfg.leftCorrectionPos;
     }
     return deltaLeft / (MAIN_INTERVAL / 1000.0); // Convert to m/s
 }
 
-float getRightMotorSpeed(int32_t deltaRightTicks)
+float getRightMotorSpeed(int32_t deltaRightTicks, GeneralConfig cfg)
 {
     float deltaRight;
     if (deltaRightTicks <= 0){
-        deltaRight = deltaRightTicks * METERS_PER_TICK_RIGHT_NEG;
+        deltaRight = deltaRightTicks * METERS_PER_TICK * cfg.rightCorrectionNeg;
     } else {
-        deltaRight = deltaRightTicks * METERS_PER_TICK_RIGHT_POS;
+        deltaRight = deltaRightTicks * METERS_PER_TICK * cfg.rightCorrectionPos;
     }
     return deltaRight / (MAIN_INTERVAL / 1000.0); // Convert to m/s
 }
@@ -176,7 +176,62 @@ float compute_right_feedforward(float target){
     return 0;
 }
 
-std::pair<float, float> pidLoop(float leftSpeed, float rightSpeed, uint8_t mode)
+float getTrackWidthFromCurvature(float curvature){
+    return MAX_WHEEL_BASE - (MAX_WHEEL_BASE - MIN_WHEEL_BASE) * exp(-ALPHA * abs(curvature));
+}
+
+std:pair<float, float> scaleToMax(float left, float right, GeneralConfig cfg){
+    float left_limit = cfg.maxLinearVelPos;
+    float right_limit = cfg.maxLinearVelPos;
+    
+    if (left < 0) left_limit = cfg.maxLinearVelNeg;
+    if (right < 0) right_limit = cfg.maxLinearVelNeg;
+
+    float left_scale = 1.0; 
+    float right_scale = 1.0;
+    if (abs(left) > 0) left_scale = left_limit / abs(left);
+    if (abs(right) > 0) right_scale = right_limit / abs(right);
+
+    float scale = min(left_scale, right_scale);
+    scale = min(scale, 1);
+    
+    float scaled_left = left * scale;
+    float scaled_right = right * scale;
+    
+    float final_left = max(-cfg.maxLinearVelNeg, min(scaled_left, cfg.maxLinearVelPos));
+    float final_right = max(-cfg.maxLinearVelNeg, min(scaled_right, cfg.maxLinearVelPos));
+
+    return {final_left, final_right};
+}
+
+float getTrackWidth(float v, float omega, GeneralConfig cfg){
+    float w_eff;
+        
+    if (cfg.useAdaptiveWheelBase){
+        float curvature;
+        if (abs(v) > 1e-5){
+            curvature = omega / v;
+        } else {
+            curvature = 0;
+        }
+        w_eff = getControlTrackWidth(curvature);
+    } else {
+        w_eff = cfg.nominalWheelBase;
+    }
+    return w_eff;
+}
+std::pair<float, float> twistToWheelSpeeds(float v, float omega, float w, GeneralConfig cfg) {
+    left = v - (omega * w / 2.0);
+    right = v + (omega * w / 2.0);
+    
+    return scaleToMax(left, right, cfg);
+}
+
+float getOmega(float vl, float vr, float w){
+    return (vr - vl) / w;
+}
+
+std::pair<float, float> pidLoop(float leftSpeed, float rightSpeed, uint8_t mode, float omega, GeneralConfig cfg)
 {
     // Simple feedforward model
 
@@ -187,12 +242,44 @@ std::pair<float, float> pidLoop(float leftSpeed, float rightSpeed, uint8_t mode)
         handleMovement(pidLeft.getSetpoint(), pidRight.getSetpoint());
         return {pidLeft.getSetpoint(), pidRight.getSetpoint()};
     }
+    
+    float leftSetpoint = pidLeft.getPendingSetpoint();
+    float rightSetpoint = pidRight.getPendingSetpoint()
+    
+    if (cfg.useGyroCorrection) {
+        float wheelCorrection;
+        if (mode == 2){
+            float targetOmega = rightSetpoint;
+            float w = getTrackWidth(leftSetpoint, rightSetpoint, cfg);
+            std::tie(leftSetpoint, rightSetpoint) = twistToWheelSpeeds(leftSetpoint, rightSetpoint, w, cfg);
+            float omegaError = targetOmega - omega;
+            float correction = cfg.omegaP * omegaError;
+            wheelCorrection = correction * w / 2.0;
+        } else {
+            float targetOmega = getOmega(leftSetpoint, rightSetpoint, cfg.nominalWheelBase);
+            float omegaError = targetOmega - omega;
+            float correction = cfg.omegaP * omegaError;
+            wheelCorrection = correction * cfg.nominalWheelBase / 2.0;
+        }
+        
+        leftSetpoint -= wheelCorrection;
+        rightSetpoint += wheelCorrection;
+        
+        std::tie(leftSetpoint, rightSetpoint) = scaleToMax(leftSetpoint, rightSetpoint, cfg);
+    } else {
+        if (mode == 2){
+            std::tie(leftSetpoint, rightSetpoint) = twistToWheelSpeeds(leftSetpoint, rightSetpoint, cfg);
+        } 
+    }
+    
+    pidLeft.setSetpoint(leftSetpoint);
+    pidRight.setSetpoint(rightSetpoint);
 
     float leftFeedforward = compute_left_feedforward(pidLeft.getSetpoint());
     float rightFeedforward = compute_right_feedforward(pidRight.getSetpoint());
 
-    float outputLeft = constrain(pidLeft.compute(leftSpeed, leftFeedforward), -MAX_PWM, MAX_PWM);
-    float outputRight = constrain(pidRight.compute(rightSpeed, rightFeedforward), -MAX_PWM, MAX_PWM);
+    float outputLeft = constrain(pidLeft.compute(leftSpeed, leftFeedforward, cfg.pLeft, cfg.iLeft, cfg.dLeft, cfg.iZone), -MAX_PWM, MAX_PWM);
+    float outputRight = constrain(pidRight.compute(rightSpeed, rightFeedforward, cfg.pRight, cfg.iRight, cfg.dRight, cfg.Izone), -MAX_PWM, MAX_PWM);
 
     handleMovement(outputLeft, outputRight);
 

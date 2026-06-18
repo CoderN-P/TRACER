@@ -1,10 +1,34 @@
 import math
+from typing import Dict
 from dataclasses import dataclass
+
+EMBEDDED_CONFIG_KEYS: Dict[str, int] = {
+    "WHEEL_BASE_MAX": 6,
+    "WHEEL_BASE_MIN": 7, 
+    "P_LEFT": 0,
+    "P_RIGHT": 3,
+    "I_LEFT": 1,
+    "I_RIGHT": 4,
+    "D_LEFT": 2,
+    "D_RIGHT": 5,
+    "I_ZONE": 16,
+    "NOMINAL_WHEEL_BASE": 15,
+    "ALPHA":8 ,
+    "USE_GYRO_CORRECTION": 13,
+    "USE_ADAPTIVE_WHEEL_BASE": 14, 
+    "LEFT_CORRECTION_POS": 9,
+    "RIGHT_CORRECTION_POS": 10,
+    "LEFT_CORRECTION_NEG": 11,
+    "RIGHT_CORRECTION_NEG": 12,
+}
 
 @dataclass
 class RobotConfig:
     WHEEL_BASE_MAX: float
     WHEEL_BASE_MIN: float
+    NOMINAL_WHEEL_BASE: float
+    USE_ADAPTIVE_WHEEL_BASE: bool
+    USE_GYRO_CORRECTION: bool 
     WHEEL_DIAMETER: float
     ROBOT_WIDTH: float
     ROBOT_HEIGHT: float
@@ -81,6 +105,13 @@ class RobotConfig:
     K_OMEGA: float
     K_V: float
     K_D: float
+    I_ZONE: float
+    P_LEFT: float
+    I_LEFT: float
+    D_LEFT: float
+    P_RIGHT: float
+    I_RIGHT: float
+    D_RIGHT: float
 
     @property
     def WHEEL_RADIUS(self) -> float:

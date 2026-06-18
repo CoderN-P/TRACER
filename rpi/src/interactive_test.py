@@ -20,26 +20,70 @@ from collections import deque
 from datetime import datetime
 
 from . import ROBOT_CONFIG
-from .models import SerialManager, Robot, Command, CommandType, MotorCommand, MotorPWMCommand, PIDCommand
+from .models import SerialManager, Robot, Command, CommandType, MotorCommand, MotorPWMCommand, ConfigCommand
 from .models.PathFollowing import twist_to_wheel_speeds
 # Interval (seconds) between repeated sends while a command is active
 SEND_INTERVAL = 0.05
 # Display update frequency (Hz)
 DISPLAY_HZ = 10
 DISPLAY_INTERVAL = 1.0 / DISPLAY_HZ
+CONFIG_FIELDS = tuple(ConfigCommand.model_fields.keys())
+CONFIG_FIELD_TYPES = {
+    key: field.annotation
+    for key, field in ConfigCommand.model_fields.items()
+}
+
+
+def _unwrap_optional(annotation):
+    return next(
+        (arg for arg in getattr(annotation, "__args__", ()) if arg is not type(None)),
+        annotation,
+    )
+
+
+def _parse_config_value(key, raw_value):
+    expected_type = _unwrap_optional(CONFIG_FIELD_TYPES[key])
+    if expected_type is bool:
+        value = raw_value.strip().lower()
+        if value in {"1", "true", "t", "yes", "y", "on"}:
+            return True
+        if value in {"0", "false", "f", "no", "n", "off"}:
+            return False
+        raise ValueError(f"{key} expects a boolean value")
+
+    return expected_type(raw_value)
+
+
+def _format_config_value(key):
+    return getattr(ROBOT_CONFIG, key, None)
+
+
+def _send_config(serial_manager, updates):
+    config_command = ConfigCommand.model_validate(updates)
+    serial_manager.send(Command(
+        ID="",
+        command_type=CommandType.CONFIG,
+        command=config_command,
+        pause_duration=0,
+        duration=0,
+    ))
+
+    for key, value in updates.items():
+        if hasattr(ROBOT_CONFIG, key):
+            setattr(ROBOT_CONFIG, key, value)
 
 
 class InteractiveTesterState:
     """Encapsulates the state of the interactive tester."""
     
     def __init__(self):
-        # PID gains (initialize with reasonable defaults)
-        self.kp_left = 1.5
-        self.ki_left = 0.0
-        self.kd_left = 0.2
-        self.kp_right = 1.8
-        self.ki_right = 0.0
-        self.kd_right = 0.25
+        # PID gains are now part of the embedded config command.
+        self.kp_left = ROBOT_CONFIG.P_LEFT
+        self.ki_left = ROBOT_CONFIG.I_LEFT
+        self.kd_left = ROBOT_CONFIG.D_LEFT
+        self.kp_right = ROBOT_CONFIG.P_RIGHT
+        self.ki_right = ROBOT_CONFIG.I_RIGHT
+        self.kd_right = ROBOT_CONFIG.D_RIGHT
         
         # Target velocity for both wheels (m/s)
         self.target_vel_left = 0.0
@@ -182,12 +226,12 @@ class InteractiveTesterState:
             filepath = gains_dir / filename
             
             gains = {
-                'kp_left': self.kp_left,
-                'ki_left': self.ki_left,
-                'kd_left': self.kd_left,
-                'kp_right': self.kp_right,
-                'ki_right': self.ki_right,
-                'kd_right': self.kd_right,
+                'P_LEFT': self.kp_left,
+                'I_LEFT': self.ki_left,
+                'D_LEFT': self.kd_left,
+                'P_RIGHT': self.kp_right,
+                'I_RIGHT': self.ki_right,
+                'D_RIGHT': self.kd_right,
                 'timestamp': datetime.now().isoformat()
             }
             with open(filepath, 'w') as f:
@@ -209,12 +253,12 @@ class InteractiveTesterState:
             
             with open(filepath, 'r') as f:
                 gains = json.load(f)
-            self.kp_left = gains.get('kp_left', self.kp_left)
-            self.ki_left = gains.get('ki_left', self.ki_left)
-            self.kd_left = gains.get('kd_left', self.kd_left)
-            self.kp_right = gains.get('kp_right', self.kp_right)
-            self.ki_right = gains.get('ki_right', self.ki_right)
-            self.kd_right = gains.get('kd_right', self.kd_right)
+            self.kp_left = gains.get('P_LEFT', gains.get('kp_left', self.kp_left))
+            self.ki_left = gains.get('I_LEFT', gains.get('ki_left', self.ki_left))
+            self.kd_left = gains.get('D_LEFT', gains.get('kd_left', self.kd_left))
+            self.kp_right = gains.get('P_RIGHT', gains.get('kp_right', self.kp_right))
+            self.ki_right = gains.get('I_RIGHT', gains.get('ki_right', self.ki_right))
+            self.kd_right = gains.get('D_RIGHT', gains.get('kd_right', self.kd_right))
             print(f"Gains loaded from {filepath}")
             self.print_gains()
         except (IOError, json.JSONDecodeError) as e:
@@ -274,8 +318,11 @@ def interactive_test(port=None):
     Interactive control CLI for differential drive robot.
     
     Commands:
-    - pid <kp> <ki> <kd>              — set same gains for both wheels
-    - pid <kpl> <kil> <kdl> <kpr> <kir> <kdr> — set independent gains
+    - pid <kp> <ki> <kd>              — set same embedded PID gains for both wheels
+    - pid <kpl> <kil> <kdl> <kpr> <kir> <kdr> — set independent embedded PID gains
+    - config                          — list editable embedded config constants
+    - config get <key>                — show one embedded config constant
+    - config set <key> <value>        — update one embedded config constant
     - vel <speed> [duration]          — command equal velocity to both motors (m/s, default 10s)
     - vel <left_speed> <right_speed> <duration> — command different speeds per motor (m/s)
     - twist <linear> <angular> [duration] — command using linear and angular velocity (default 10s)
@@ -330,7 +377,7 @@ def interactive_test(port=None):
     print("\n" + "="*100)
     print("Interactive Control CLI - Differential Drive Robot")
     print("="*100)
-    print("Commands: pid, vel, twist, pwm, step, stop, log, save, load, gains, quit")
+    print("Commands: pid, config, vel, twist, pwm, step, stop, log, save, load, gains, quit")
     print("Type 'help' for detailed command information.")
     print("="*100 + "\n")
     
@@ -418,9 +465,15 @@ def interactive_test(port=None):
             elif cmd_name == "help":
                 print("\nAvailable Commands:")
                 print("  pid <kp> <ki> <kd>")
-                print("      - Set same PID gains for both wheels")
+                print("      - Set same embedded PID gains for both wheels")
                 print("  pid <kpl> <kil> <kdl> <kpr> <kir> <kdr>")
-                print("      - Set independent PID gains for each wheel")
+                print("      - Set independent embedded PID gains for each wheel")
+                print("  config")
+                print("      - List all ConfigCommand constants and current values")
+                print("  config get <key>")
+                print("      - Show one ConfigCommand constant")
+                print("  config set <key> <value>")
+                print("      - Update one ConfigCommand constant (booleans accept true/false, on/off, 1/0)")
                 print("  vel <speed> [duration]")
                 print("      - Command equal velocity to both motors (m/s, default 10s)")
                 print("  vel <left_speed> <right_speed> <duration>")
@@ -459,23 +512,14 @@ def interactive_test(port=None):
                             state.kp_right = kp
                             state.ki_right = ki
                             state.kd_right = kd
-                        
-                        # Send PID command
-                        pid_cmd = Command(
-                            ID="",
-                            command_type=CommandType.PID,
-                            command=PIDCommand(
-                                p_left=state.kp_left,
-                                i_left=state.ki_left,
-                                d_left=state.kd_left,
-                                p_right=state.kp_right,
-                                i_right=state.ki_right,
-                                d_right=state.kd_right
-                            ),
-                            pause_duration=0,
-                            duration=0
-                        )
-                        serial_manager.send(pid_cmd)
+                        _send_config(serial_manager, {
+                            "P_LEFT": state.kp_left,
+                            "I_LEFT": state.ki_left,
+                            "D_LEFT": state.kd_left,
+                            "P_RIGHT": state.kp_right,
+                            "I_RIGHT": state.ki_right,
+                            "D_RIGHT": state.kd_right,
+                        })
                         print(f"✓ PID gains set (both wheels): kP={kp:.2f} kI={ki:.2f} kD={kd:.2f}\n")
                     except ValueError:
                         print("✗ Invalid number format. Example: pid 1.5 0.0 0.2\n")
@@ -490,23 +534,14 @@ def interactive_test(port=None):
                             state.kp_right = kpr
                             state.ki_right = kir
                             state.kd_right = kdr
-                        
-                        # Send PID command
-                        pid_cmd = Command(
-                            ID="",
-                            command_type=CommandType.PID,
-                            command=PIDCommand(
-                                p_left=state.kp_left,
-                                i_left=state.ki_left,
-                                d_left=state.kd_left,
-                                p_right=state.kp_right,
-                                i_right=state.ki_right,
-                                d_right=state.kd_right
-                            ),
-                            pause_duration=0,
-                            duration=0
-                        )
-                        serial_manager.send(pid_cmd)
+                        _send_config(serial_manager, {
+                            "P_LEFT": state.kp_left,
+                            "I_LEFT": state.ki_left,
+                            "D_LEFT": state.kd_left,
+                            "P_RIGHT": state.kp_right,
+                            "I_RIGHT": state.ki_right,
+                            "D_RIGHT": state.kd_right,
+                        })
                         print(f"✓ PID gains set independently:")
                         print(f"  Left:  kP={kpl:.2f} kI={kil:.2f} kD={kdl:.2f}")
                         print(f"  Right: kP={kpr:.2f} kI={kir:.2f} kD={kdr:.2f}\n")
@@ -514,6 +549,63 @@ def interactive_test(port=None):
                         print("✗ Invalid number format. Example: pid 1.5 0.0 0.2 1.8 0.0 0.25\n")
                 else:
                     print("✗ PID requires either 3 or 6 arguments\n")
+
+            elif cmd_name == "config":
+                if not args:
+                    print("\nConfigCommand constants:")
+                    for key in CONFIG_FIELDS:
+                        print(f"  {key:<24} {_format_config_value(key)}")
+                    print("\nUse: config set <key> <value>\n")
+                    continue
+
+                action = args[0].lower()
+                if action == "get":
+                    if len(args) != 2:
+                        print("✗ config get requires a key\n")
+                        continue
+                    key = args[1].upper()
+                    if key not in CONFIG_FIELDS:
+                        print(f"✗ Unknown ConfigCommand key: {key}\n")
+                        continue
+                    print(f"{key} = {_format_config_value(key)}\n")
+                    continue
+
+                if action == "set":
+                    if len(args) != 3:
+                        print("✗ config set requires a key and value\n")
+                        continue
+                    key = args[1].upper()
+                    raw_value = args[2]
+                elif len(args) == 2:
+                    key = args[0].upper()
+                    raw_value = args[1]
+                else:
+                    print("✗ config usage: config, config get <key>, config set <key> <value>\n")
+                    continue
+
+                if key not in CONFIG_FIELDS:
+                    print(f"✗ Unknown ConfigCommand key: {key}\n")
+                    continue
+
+                try:
+                    value = _parse_config_value(key, raw_value)
+                    _send_config(serial_manager, {key: value})
+                    with lock:
+                        if key == "P_LEFT":
+                            state.kp_left = value
+                        elif key == "I_LEFT":
+                            state.ki_left = value
+                        elif key == "D_LEFT":
+                            state.kd_left = value
+                        elif key == "P_RIGHT":
+                            state.kp_right = value
+                        elif key == "I_RIGHT":
+                            state.ki_right = value
+                        elif key == "D_RIGHT":
+                            state.kd_right = value
+                    print(f"✓ {key} set to {value}\n")
+                except ValueError as exc:
+                    print(f"✗ {exc}\n")
             
             elif cmd_name == "vel":
                 if len(args) < 1 or len(args) > 3:

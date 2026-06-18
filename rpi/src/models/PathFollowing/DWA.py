@@ -1,7 +1,7 @@
 from typing import List
 import math, numpy as np
 from .utils import twist_to_wheel_speeds
-from ..Command import Command, CommandType, MotorCommand
+from ..Command import Command, CommandType, TwistCommand
 from ..StateEstimation import RobotState
 from ..VirtualObstacle import VirtualObstacle
 from ..VirtualObstacleType import VirtualObstacleType
@@ -44,15 +44,13 @@ class DWA:
                     best_v = v
                     best_omega = omega
                     best_score = score
-        
-        vl, vr = twist_to_wheel_speeds(best_v, best_omega)
 
         return Command(
             ID="",
-            command_type=CommandType.MOTOR,
-            command=MotorCommand(
-                left_motor=vl,
-                right_motor=vr,
+            command_type=CommandType.TWIST,
+            command=TwistCommand(
+                v=best_v,
+                omega=best_omega,
             ),
             pause_duration=0,
             duration=0

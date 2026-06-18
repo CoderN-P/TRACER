@@ -28,12 +28,14 @@ static_assert(PID_INTERVAL == MAIN_INTERVAL, "PID and main loop intervals must m
 
 // PID Controllers
 // Start with only feedforward for tuning
-PIDController pidLeft(P_LEFT, I_LEFT, D_LEFT);
-PIDController pidRight(P_RIGHT, I_RIGHT, D_RIGHT);
+PIDController pidLeft();
+PIDController pidRight();
 
 RobotState robot_state;
 SemaphoreHandle_t state_mutex;
 SensorPacket packet;
+GeneralConfig config;
+SemaphoreHandle_t config_mutex;
 SemaphoreHandle_t i2c_mutex;
 
 QueueHandle_t commandQueue;
@@ -71,6 +73,7 @@ void setup()
 
     state_mutex = xSemaphoreCreateMutex();
     i2c_mutex = xSemaphoreCreateMutex();
+    config_mutex = xSemaphoreCreateMutex();
     
 
     if (state_mutex == NULL || i2c_mutex == NULL)

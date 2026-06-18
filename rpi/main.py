@@ -10,7 +10,7 @@ load_dotenv()
 from src import text_to_command
 import os
 
-from src import Robot, SerialManager, run_socket_server, socketio, ROBOT_CONFIG, serial_test, calibrate_feedforward, calibrate_max_speed, interactive_test, calibrate_mag, visualize_feedforward
+from src import Robot, SerialManager, run_socket_server, socketio, ROBOT_CONFIG, serial_test, calibrate_feedforward, calibrate_max_speed, interactive_test, calibrate_mag, visualize_feedforward, EMBEDDED_CONFIG_KEYS
 
 parser = argparse.ArgumentParser(
     prog="TRACER RPI",
@@ -44,18 +44,14 @@ async def main(p):
     serial_manager = SerialManager(port, 921600)
     robot = Robot(serial_manager, socketio)
     
-    # Set saved PID gains
-    PID_CONFIG_FILE = (
-            Path(__file__).resolve().parents[3]
-            / "calibration_files"
-            / "pid"
-            / "gains.json"
-    )
-    pid_data = json.load(open(PID_CONFIG_FILE, "r"))
-    await robot.set_pid(pid_data)
+    # Initialize embedded side by sending saved config values on startup; this ensures the embedded config is always in sync with the loaded constants, even if the constants have been updated since the last run. Only send keys that are actually embedded to minimize unnecessary serial communication.
+    data = {attr: getattr(ROBOT_CONFIG, attr) for attr in EMBEDDED_CONFIG_KEYS.keys()}
+    await robot.update_embedded_config(data)
+    
     logging.getLogger('socketio').setLevel(logging.ERROR)
     logging.getLogger('engineio').setLevel(logging.ERROR)
-    robot._logger.setLevel(logging.INFO)        
+    robot._logger.setLevel(logging.INFO)  
+    
     serial_manager.start(robot, robot.loop)  # Start background serial read thread; dispatch sensor packets on robot loop
     robot.start()
 

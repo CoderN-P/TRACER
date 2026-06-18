@@ -6,7 +6,7 @@ from .. import ROBOT_CONFIG, GapNavigator
 from ..RecoveryState import RecoveryState
 from ..StateEstimation import RobotState
 from ..SensorData import SensorData
-from ..Command import Command, CommandType, MotorCommand
+from ..Command import Command, CommandType, TwistCommand
 
 from .utils import twist_to_wheel_speeds, get_local_target
 
@@ -48,15 +48,13 @@ class GoToGoal:
             v = ROBOT_CONFIG.MAX_LINEAR_VEL_POS * (1 - np.exp(-ROBOT_CONFIG.K_V * (distance_to_goal ** 1.25)))
     
             omega = ROBOT_CONFIG.K_OMEGA * heading_error * (1 - np.exp(-ROBOT_CONFIG.K_D * (distance_to_goal ** 1.25))) 
-        
-        vl, vr = twist_to_wheel_speeds(v, omega)
 
         return Command(
             ID="",
-            command_type=CommandType.MOTOR,
-            command=MotorCommand(
-                left_motor=vl,
-                right_motor=vr,
+            command_type=CommandType.TWIST,
+            command=TwistCommand(
+                v=v,
+                omega=omega
             ),
             pause_duration=0,
             duration=0

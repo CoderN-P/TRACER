@@ -9,7 +9,6 @@ const float WHEEL_DIAMETER = 0.054112680651; // wheel diameter in meters
 const float WHEEL_CIRCUMFERENCE = WHEEL_DIAMETER * PI;
 const float MAX_PWM = 1.0; // Max PWM Value (scaled 0-1)
 const int REDUCTION_RATIO = 56;
-const int MAX_OUTPUT_RPM = 167;
 const int ENCODER_PPR = 11;
 const int ENCODER_TICKS_PER_REV = ENCODER_PPR * REDUCTION_RATIO * 4;          // Total ticks per wheel revolution with 4x quadrature decoding
 const float METERS_PER_TICK = WHEEL_CIRCUMFERENCE / ENCODER_TICKS_PER_REV;    // Distance traveled per encoder tick
@@ -17,10 +16,8 @@ const float LEFT_CORRECTION_POS = 0.99f;                                        
 const float RIGHT_CORRECTION_POS = 0.984f;                                          // Correction factor for right motor postive speed (accounts for slight differences in motors/wheels)
 const float LEFT_CORRECTION_NEG = 0.95f;
 const float RIGHT_CORRECTION_NEG = 1.07f;
-const float METERS_PER_TICK_LEFT_POS = METERS_PER_TICK * LEFT_CORRECTION_POS;
-const float METERS_PER_TICK_RIGHT_POS = METERS_PER_TICK * RIGHT_CORRECTION_POS;
-const float METERS_PER_TICK_LEFT_NEG = METERS_PER_TICK * LEFT_CORRECTION_NEG;
-const float METERS_PER_TICK_RIGHT_NEG = METERS_PER_TICK * RIGHT_CORRECTION_NEG;
+const float MAX_WHEEL_BASE = 0.26f;
+const float MIN_WHEEL_BASE = 0.26f;
 
 // Pin definitions
 const int EN1 = 44;             // Enable pin for motor 1
@@ -50,7 +47,6 @@ const uint32_t MAIN_WINDOW_SIZE_MS = 500; // Window size for max loop time calcu
 
 // Feedforward LUTs (3S LiPo) - Corrected MPT factors
 const int LOOKUP_TABLE_SIZE = 47;
-
 
 // Forward Left Calibration (PWM from 0.08 to 1.0)
 static const CalibrationPoint_t calibration_forward_left[LOOKUP_TABLE_SIZE] = {
@@ -141,7 +137,6 @@ const float I_LEFT = 0.5;
 const float I_RIGHT = 0.5;
 const float D_LEFT = 0.5;
 const float D_RIGHT = 0.5;
-
 const float I_ZONE = 0.05; // Error zone for integral control in PID (in m/s, so 5 cm/s)
 
 // I2C addresses and Register addresses
@@ -157,6 +152,8 @@ const int LSM_DATA_REG = 0x20;   // Starting register for temp + accel + gyro da
 const int MAG_DATA_REG = 0x00;   // Starting register for magnetometer data
 const int MAG_CTRL_REG = 0x09;   // Control register for magnetometer
 
+const float LSB_RAD = 8.75 / 1000.0 * PI / 180.0;
+
 // Sensor constants
 const int TOF_TIMING_BUDGET = 70000; // Timing budget for VL53L0X in microseconds (longer timing budget increases accuracy and max range but reduces update rate)
 
@@ -166,8 +163,29 @@ const uint8_t CMD_PWM = 0x05;
 const uint8_t CMD_OLED_UPDATE = 0x02;
 const uint8_t CMD_ENABLE = 0x03;
 const uint8_t CMD_STOP = 0x04;
-const uint8_t CMD_PID = 0x06;
-const int NUM_TYPES = 6; // Number of command types (MOVE, OLED_UPDATE, ENABLE, STOP, PWM, PID)
+const uint8_t CMD_CONFIG = 0x06;
+const uint8_t CMD_TWIST = 0x07;
+const int NUM_TYPES = 7; // Number of command types (MOVE, OLED_UPDATE, ENABLE, STOP, PWM, CONFIG, TWIST)
+
+const enum class ConfigReg {
+   PID_L_P = 0
+   PID_L_I = 1
+   PID_L_D = 2
+   PID_R_P = 3
+   PID_R_I = 4
+   PID_R_D = 5
+   WHEEL_BASE_MAX = 6
+   WHEEL_BASE_MIN = 7
+   ALPHA = 8,
+   LEFT_CORRECTION_POS = 9,
+   RIGHT_CORRECTION_POS = 10,
+   LEFT_CORRECTION_NEG = 11,
+   RIGHT_CORRECTION_NEG = 12,
+   USE_GYRO_CORRECTION = 13,
+   USE_ADAPTIVE_WHEEL_BASE = 14,
+   NOMINAL_WHEEL_BASE = 15;
+   I_ZONE = 16;
+}
 
 // Timing intervals (in milliseconds)
 const int ULTRASONIC_INTERVAL = 50;            // Sample ultrasonic sensor every 50 ms (20 hz)

@@ -14,7 +14,7 @@ void mainLoop(void *pvParameters)
 
     uint8_t loopCounter = 0;
     uint8_t packetSeq = 0;
-    uint8_t lastPIDMode = 0;      // 0 = PID control mode, 1 = open-loop PWM control mode
+    uint8_t lastPIDMode = 0;      // 0 = PID control mode, 1 = open-loop PWM control mode, 2 = Twist
     uint32_t windowStartTime = 0; // Start time of the rolling window for max loop time calculation
     
     float maxLoopTimeMs = 0.0f; // Max loop time in the rolling window
@@ -31,6 +31,13 @@ void mainLoop(void *pvParameters)
         static int16_t magX, magY, magZ; // Keep magnetometer data in static variables since it updates at 50 Hz
 
         int16_t pcntLeftRaw, pcntRightRaw;
+        GeneralConfig configCopy;
+        
+        if (xSemaphoreTake(config_mutex, pdMS_TO_TICKS(0.5))){
+            memcpy(&configCopy, &config, sizeof(config));
+        } else {
+            continue;
+        }
         
         pcnt_counter_pause(pcnt_unit_left);
         pcnt_get_counter_value(pcnt_unit_left, &pcntLeftRaw);
@@ -80,15 +87,16 @@ void mainLoop(void *pvParameters)
             uint32_t lastMotorCommandMsCopy = lastMotorCommandMs.load();
             const bool motorCmdFresh = (uint32_t)(millis() - lastMotorCommandMsCopy) <= MOTOR_COMMAND_TIMEOUT_MS;
 
-            leftSpeed = getLeftMotorSpeed(pcntLeft);
-            rightSpeed = getRightMotorSpeed(pcntRight);
+            leftSpeed = getLeftMotorSpeed(pcntLeft, configCopy);
+            rightSpeed = getRightMotorSpeed(pcntRight, configCopy);
 
             if (motorCmdFresh)
             {
                 pidLeft.setSetpoint(pidLeft.getPendingSetpoint());
                 pidRight.setSetpoint(pidRight.getPendingSetpoint());
 
-                auto [leftPWM_CPY, rightPWM_CPY] = pidLoop(leftSpeed, rightSpeed, lastPIDMode);
+                float curOmega = gz * LSB_RAD;
+                auto [leftPWM_CPY, rightPWM_CPY] = pidLoop(leftSpeed, rightSpeed, lastPIDMode, curOmega, configCopy);
                 leftPWM = leftPWM_CPY;
                 rightPWM = rightPWM_CPY;
             }

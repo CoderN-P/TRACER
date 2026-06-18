@@ -5,7 +5,7 @@ import logging
 from .GoToGoal import GoToGoal
 from .utils import twist_to_wheel_speeds, get_local_target, get_planning_track_width
 from .. import ROBOT_CONFIG, GapNavigator
-from ..Command import Command, CommandType, MotorCommand
+from ..Command import Command, CommandType, TwistCommand
 from ..StateEstimation import RobotState
 from ..SensorData import SensorData
 
@@ -147,14 +147,12 @@ class PurePursuit:
         linear_velocity = min(ROBOT_CONFIG.MAX_LINEAR_VEL_POS, v_motor_cap, v_lateral_cap)
         angular_velocity = curvature * linear_velocity 
         
-        motor_speeds = twist_to_wheel_speeds(linear_velocity, angular_velocity)
-        
         return Command(
             ID="",
-            command_type=CommandType.MOTOR,
-            command=MotorCommand(
-                left_motor=motor_speeds[0],
-                right_motor=motor_speeds[1],
+            command_type=CommandType.TWIST,
+            command=TwistCommand(
+                v=linear_velocity,
+                omega=angular_velocity,
              ),
              pause_duration=0,
              duration=0

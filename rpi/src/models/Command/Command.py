@@ -1,11 +1,12 @@
 from pydantic import BaseModel, Field
 import logging
 import uuid
-from .LCDCommand import LCDCommand
+from .OLEDCommand import OLEDCommand
 from .MotorCommand import MotorCommand
 from .CommandTypeEnum import CommandType
 from .MotorPWMCommand import MotorPWMCommand
-from .PIDCommand import PIDCommand
+from .ConfigCommand import ConfigCommand
+from .TwistCommand import TwistCommand
 from .. import ROBOT_CONFIG
 
 
@@ -15,7 +16,7 @@ class Command(BaseModel):
     """
     ID: str = Field(description="Unique identifier for the command")
     command_type: CommandType
-    command: LCDCommand | MotorCommand | MotorPWMCommand | PIDCommand | None = Field(description="Command to be executed, can be LCDCommand or MotorCommand, or None for stop command")
+    command: OLEDCommand | MotorCommand | MotorPWMCommand | ConfigCommand | TwistCommand | None = Field(description="Command to be executed, can be LCDCommand or MotorCommand, or None for stop command")
     pause_duration: int = Field(description="Pause duration in seconds after executing the command (AI Command ONLY)")
     duration: int = Field(description="Duration in seconds for which the command should be executed (AI Command ONLY)")
 

@@ -63,16 +63,14 @@ class RAMSETE:
         
         omega_command = target_state.omega + k * error_theta + ROBOT_CONFIG.BETA * target_state.v * sinc * error_y
         
-        v_left, v_right = twist_to_wheel_speeds(v_command, omega_command)
-        
         self.running_time += dt
 
         return Command(
             ID="",
-            command_type=CommandType.MOTOR,
-            command=MotorCommand(
-                left_motor=v_left,
-                right_motor=v_right,
+            command_type=CommandType.TWIST,
+            command=TwistCommand(
+                v=v_command,
+                omega=omega_command,
             ),
             pause_duration=0,
             duration=0

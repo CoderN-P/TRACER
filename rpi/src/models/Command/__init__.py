@@ -3,5 +3,6 @@ from .CommandResponse import AICommand
 from .CommandTypeEnum import CommandType
 from .MotorCommand import MotorCommand
 from .MotorPWMCommand import MotorPWMCommand
-from .PIDCommand import PIDCommand
-from .LCDCommand import LCDCommand
+from .ConfigCommand import ConfigCommand
+from .OLEDCommand import OLEDCommand
+from .TwistCommand import TwistCommand

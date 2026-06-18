@@ -38,7 +38,6 @@
   import GyroMagDebug from "$lib/components/GyroMagDebug.svelte";
   import VelocityDebug from "$lib/components/VelocityDebug.svelte";
   import ConstantTuner from "$lib/components/ConstantTuner.svelte";
-  import PIDTuner from "$lib/components/PIDTuner.svelte";
   import VelocityCommandWidget from "$lib/components/VelocityCommandWidget.svelte";
   import {
     Activity,
@@ -525,10 +524,7 @@
                   {velocityProfileT}
                 />
               </div>
-              <div class="col-span-4 row-span-5 min-h-0">
-                <PIDTuner class="h-full" />
-              </div>
-              <div class="col-span-8 row-span-5 min-h-0">
+              <div class="col-span-12 row-span-5 min-h-0">
                 <VelocityDebug
                   {robotState}
                   lastSensorUpdateTime={lastSensorUpdate}

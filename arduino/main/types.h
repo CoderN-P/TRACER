@@ -33,6 +33,16 @@ struct RobotState {
     char oledLine2[17]; // 16 chars + null terminator
 }; 
 
+struct GeneralConfig {
+    float pLeft, iLeft, dLeft;
+    float pRight, iRight, dRight;
+    float maxWheelBase, minWheelBase, nominalWheelBase;
+    float alpha;
+    bool useGyroCorrection, useAdaptiveWheelBase;
+    float leftCorrectionPos, rightCorrectionPos, leftCorrectionNeg, rightCorrectionNeg;
+    float iZone;
+}
+
 // Sensor packet struct
 struct SensorPacket {
     uint8_t startByte; // 0xAA

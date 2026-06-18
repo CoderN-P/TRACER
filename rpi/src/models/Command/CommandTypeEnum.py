@@ -1,15 +1,14 @@
 from enum import Enum
 
 class CommandType(str, Enum):
-    LCD = "LCD"
+    OLED = "OLED"
     MOTOR = "MOTOR"
-    LED = "LED"
-    BUZZER = "BUZZER"
     SENSOR = "SENSOR"
     STOP = "STOP"
     ENABLE = "ENABLE" 
     PWM = "PWM"
-    PID = "PID"
+    CONFIG = "CONFIG"
+    TWIST = "TWIST"
     
 
     def __str__(self):

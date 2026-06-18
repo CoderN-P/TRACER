@@ -12,6 +12,8 @@ extern RobotState robot_state;
 extern SemaphoreHandle_t state_mutex;
 extern SensorPacket packet;
 extern SemaphoreHandle_t i2c_mutex;
+extern GeneralConfig config;
+extern SemaphoreHandle_t config_mutex;
 extern std::atomic<bool> motorsEnabled;
 extern std::atomic<uint32_t> lastMotorCommandMs;
 extern PIDController pidLeft;
@@ -22,7 +24,7 @@ extern pcnt_unit_t pcnt_unit_left;
 extern pcnt_unit_t pcnt_unit_right;
 extern std::atomic<uint8_t> pageIndex;
 extern std::atomic<int16_t> distanceFront;
-extern std::atomic<uint8_t> pendingPIDMode; // 0 = PID control mode, 1 = open-loop PWM control mode
+extern std::atomic<uint8_t> pendingPIDMode; // 0 = PID control mode, 1 = open-loop PWM control mode, 2 = twist control mode
 
 // RTOS task handles
 extern TaskHandle_t ultrasonicTaskHandle;

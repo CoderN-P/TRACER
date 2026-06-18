@@ -153,11 +153,7 @@ class StateEstimator:
 
         delta_left_ticks = sensor_data.left_encoder
         delta_right_ticks = sensor_data.right_encoder
-        
-        if delta_left_ticks > max_pulses:
-            self._logger.error(f"Left encoder tick jump detected: {previous_sensor_data.left_encoder} -> {sensor_data.left_encoder} (max expected: {max_pulses:.2f})")
-            return
-        
+
         v_prev = self.history[-1].robot_state.linear_velocity
         omega_prev = self.history[-1].robot_state.angular_velocity
         self.theta_encoders += self.heading_delta_from_encoders(delta_left_ticks, delta_right_ticks, v_prev, omega_prev)

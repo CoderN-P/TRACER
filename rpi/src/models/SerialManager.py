@@ -5,7 +5,7 @@ import time
 import logging
 import struct
 import serial.tools.list_ports
-from . import Command, CommandType
+from . import Command, CommandType, EMBEDDED_CONFIG_KEYS
 
 class SerialManager:
     def __init__(self, port='/dev/ttyUSB0', baudrate=921600):
@@ -97,7 +97,7 @@ class SerialManager:
             full = bytes([0xAA]) + packet
             checksum = sum(full) & 0xFF
             self.serial.write(full + bytes([checksum]))
-        elif data.command_type == CommandType.LCD:
+        elif data.command_type == CommandType.OLED:
             if len(data.command.line_1) > 16:
                 data.command.line_1 = data.command.line_1[:16]
             if len(data.command.line_2) > 16:
@@ -128,9 +128,41 @@ class SerialManager:
             full = bytes([0xAA]) + packet
             checksum = sum(full) & 0xFF
             self.serial.write(full + bytes([checksum]))
-        elif data.command_type == CommandType.PID:
-            packet = struct.pack("<Bffffff", 0x06, data.command.p_left, data.command.p_right, data.command.i_left, data.command.i_right, data.command.d_left, data.command.d_right)
-            full = bytes([0x0AA]) + packet
+        elif data.command_type == CommandType.CONFIG:
+            # if value type is float, send as int by multiplying by 1000, and if it's an int or bool, send as int
+            struct_string = "<BB"
+            struct_data = []
+            byte_length = 4 # Start byte + command byte + length byte + checksum byte
+            
+            for key, value in data.command:
+                if value is None:
+                    continue
+                struct_string += "B" # one byte to indicate the key
+                struct_data.append(EMBEDDED_CONFIG_KEYS[key]) # Add the integer ID of the key
+                byte_length += 1
+                
+                if isinstance(value, bool):
+                    struct_string += "B"
+                    struct_data.append(1 if value else 0)
+                    byte_length += 1
+                elif isinstance(value, float):
+                    struct_string += "h"
+                    struct_data.append(int(value*1000))
+                    byte_length += 2
+                elif isinstance(value, int):
+                    struct_string += "h"
+                    struct_data.append(value)
+                    byte_length += 2
+            
+            packet = struct.pack(struct_string, 0x06, byte_length, *struct_data)
+            full = bytes([0xAA]) + packet
+            checksum = sum(full) & 0xFF
+            self.serial.write(full + bytes([checksum]))
+        elif data.command_type == CommandType.TWIST:
+            v = max(-32767, min(32767, int(data.command.v * 1000))) # Convert from m/s to mm/s to fit in int16
+            omega = max(-32767, min(32767, int(data.command.omega * 1000))) # Convert from rad/s to mrad/s to fit in int16
+            packet = struct.pack("<Bhh", 0x07, v, omega)
+            full = bytes([0xAA]) + packet
             checksum = sum(full) & 0xFF
             self.serial.write(full + bytes([checksum]))
         else:

@@ -15,8 +15,6 @@ uint8_t expectedCommandLength(uint8_t cmd)
         return 3;
     if (cmd == CMD_PWM)
         return 7;
-    if (cmd == CMD_PID)
-        return 27;
     
     return 0; // invalid
 }
@@ -45,7 +43,7 @@ int getTypeIndex(uint8_t cmd)
         return 3;
     case CMD_PWM:
         return 4;
-    case CMD_PID:
+    case CMD_CONFIG:
         return 5;
     default:
         return -1; // Invalid command type
@@ -126,23 +124,142 @@ void handleCommand(byte *buffer, size_t length)
         pidLeft.setPendingSetpoint(leftPWM_raw / 1000.0f);
         pidRight.setPendingSetpoint(rightPWM_raw / 1000.0f); // Convert to -1 to 1 range
         strncpy(line1, "Direct PWM Set", 16);
+    } 
+    else if (cmd == CMD_TWIST && length == 7){
+        int16_t v_raw, omega_raw;
+        
+        memcpy(&v_raw, &buffer[2], 2);
+        memcpy(&omega_raw, &buffer[4], 2);
+        
+        lastMotorCommandMs.store(millis());
+        pendingPIDMode.store(2); // Switch to closed loop chassis control
+        
+        // quick cheat (store vlin in left pid setpoint and omega in right setpoint for main loop to process)
+        pidLeft.setPendingSetpoint(v_raw / 1000.0f);
+        pidRight.setPendingSetpoint(omega_raw / 1000.0f);
+        
+        strncpy(line1, "Twist mode");
     }
-    else if (cmd == CMD_PID && length == 27)
+    else if (cmd == CMD_CONFIG && length > 2 && length == buffer[2])
     {
-        // Command 0x06: Update PID constants
-        float pLeft, iLeft, dLeft, pRight, iRight, dRight;
-
-        memcpy(&pLeft, &buffer[2], 4);
-        memcpy(&iLeft, &buffer[6], 4);
-        memcpy(&dLeft, &buffer[10], 4);
-        memcpy(&pRight, &buffer[14], 4);
-        memcpy(&iRight, &buffer[18], 4);
-        memcpy(&dRight, &buffer[22], 4);
-
-        pidLeft.setPendingPIDConstants(pLeft, iLeft, dLeft);
-        pidRight.setPendingPIDConstants(pRight, iRight, dRight);
-
-        strncpy(line1, "PID Updated", 16);
+        // Command 0x06: Update Config (Format = len,key,value...
+        int i = 3;
+        if (!xSemaphoreTake(config_mutex, pdMS_TO_TICKS(5)) == pdTRUE){
+            strncpy(line1, "Config Busy", 16);
+        } else {
+            while (i < buffer[2]){
+                // Key is uint8_t, so only 1 byte
+                int key;
+                memcpy(&key, &buffer[i++], 1);
+                
+                switch key {
+                    case ConfigReg::PID_L_P:
+                        int16_t pLeft;
+                        memcpy(&pLeft, &buffer[i], 2); // PID constants are floats but sent as int16 to save space
+                        cfg.pLeft = (float) pLeft / 1000.0;
+                        i += 2;
+                        break;
+                    case ConfigReg::PID_L_I:
+                        int16_t iLeft;
+                        memcpy(&iLeft, &buffer[i], 2); // PID constants are floats but sent as int16 to save space
+                        cfg.iLeft = (float) iLeft / 1000.0;
+                        i += 2;
+                        break;
+                    case ConfigReg::PID_L_D:
+                        int16_t dLeft;
+                        memcpy(&dLeft, &buffer[i], 2); // PID constants are floats but sent as int16 to save space
+                        cfg.dLeft = (float) dLeft / 1000.0;
+                        i += 2;
+                        break;
+                    case ConfigReg::PID_R_P:
+                        int16_t pRight;
+                        memcpy(&pRight, &buffer[i], 2); // PID constants are floats but sent as int16 to save space
+                        cfg.pRight = (float) pRight / 1000.0;
+                        i += 2;
+                    case ConfigReg::PID_R_I:
+                        int16_t iRight;
+                        memcpy(&iRight, &buffer[i], 2); // PID constants are floats but sent as int16 to save space
+                        cfg.iRight = (float) iRight / 1000.0;
+                        i += 2;
+                        break;
+                    case ConfigReg::PID_R_D:
+                        int16_t dRight;
+                        memcpy(&dRight, &buffer[i], 2); // PID constants are floats but sent as int16 to save space
+                        cfg.dRight = (float) dRight / 1000.0;
+                        i += 2;
+                        break;
+                    case ConfigReg::WHEEL_BASE_MAX:
+                        uint16_t maxWheelBase;
+                        memcpy(&maxWheelBase, &buffer[i], 2); 
+                        cfg.maxWheelBase = (float) maxWheelBase / 1000.0;
+                        i += 2;
+                        break;
+                    case ConfigReg::WHEEL_BASE_MIN:
+                        uint16_t minWheelBase;
+                        memcpy(&minWheelBase, &buffer[i], 2); 
+                        cfg.minWheelBase = (float) minWheelBase / 1000.0;
+                        i += 2;
+                        break;
+                    case ConfigReg::ALPHA:
+                        int16_t alpha;
+                        memcpy(&alpha, &buffer[i], 2);
+                        cfg.alpha = (float) alpha / 1000.0;
+                        i += 2;
+                        break;
+                    case ConfigReg::NOMINAL_WHEEL_BASE:
+                        uint16_t nominalWheelBase;
+                        memcpy(&nominalWheelBase, &buffer[i], 2); 
+                        cfg.nominalWheelBase = (float) nominalWheelBase / 1000.0;
+                        i += 2;
+                        break;
+                    case ConfigReg::LEFT_CORRECTION_POS:
+                        int16_t leftCorrectionPos;
+                        memcpy(&leftCorrectionPos, &buffer[i], 2);
+                        cfg.leftCorrectionPos = (float) leftCorrectionPos / 1000.0;
+                        i += 2;
+                        break;
+                    case ConfigReg::LEFT_CORRECTION_NEG:
+                        int16_t leftCorrectionNeg;
+                        memcpy(&leftCorrectionNeg, &buffer[i], 2);
+                        cfg.leftCorrectionNeg = (float) leftCorrectionNeg / 1000.0;
+                        i += 2;  
+                        break;   
+                    case ConfigReg::RIGHT_CORRECTION_POS:
+                        int16_t rightCorrectionPos;
+                        memcpy(&rightCorrectionPos, &buffer[i], 2);
+                        cfg.rightCorrectionPos = (float) rightCorrectionPos / 1000.0;
+                        i += 2;
+                        break;
+                    case ConfigReg::RIGHT_CORRECTION_NEG:
+                        int16_t rightCorrectionNeg;
+                        memcpy(&rightCorrectionNeg, &buffer[i], 2);
+                        cfg.rightCorrectionNeg = (float) rightCorrectionNeg / 1000.0;
+                        i += 2;
+                        break;
+                    case ConfigReg::I_ZONE:
+                        uint16_t iZone;
+                        memcpy(&iZone, &buffer[i], 2);
+                        cfg.iZone = (float) iZone / 1000.0;
+                        i += 2;
+                        break;
+                    case ConfigReg::USE_GYRO_CORRECTION:                                    
+                        uint8_t useGyroCorrection;
+                        memcpy(&useGyroCorrection, &buffer[i], 1);
+                        cfg.useGyroCorrection = (bool) useGyroCorrection;
+                        i += 1;
+                        break;
+                    case ConfigReg::USE_ADAPTIVE_WHEEL_BASE:
+                        uint8_t useAdaptiveWheelBase;
+                        memcpy(&useAdaptiveWheelBase, &buffer[i], 1);
+                        cfg.useAdaptiveWheelBase = (bool) useAdaptiveWheelBase;
+                        i += 1;
+                        break;
+                    default:
+                        strncpy(line1, "Invalid cfg key", 16);
+                }
+            }
+            xSemaphoreGive(config_mutex);
+        }      
     }
     else
     {
@@ -152,8 +269,6 @@ void handleCommand(byte *buffer, size_t length)
     // Update OLED lines in robot state
     if (xSemaphoreTake(state_mutex, pdMS_TO_TICKS(0)) == pdTRUE)
     {
-        line1[16] = '\0';
-        line2[16] = '\0';
         strncpy(robot_state.oledLine1, line1, 16);
         strncpy(robot_state.oledLine2, line2, 16);
         xSemaphoreGive(state_mutex);

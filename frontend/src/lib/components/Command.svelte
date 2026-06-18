@@ -82,7 +82,7 @@
         <div
           class="p-1.5 rounded-full {command.command_type === CommandType.MOTOR
             ? 'bg-purple-100'
-            : command.command_type === CommandType.LCD
+            : command.command_type === CommandType.OLED
               ? 'bg-blue-100'
               : 'bg-red-100'}"
         >
@@ -102,7 +102,7 @@
             {:else}
               <Car class="w-5 h-5 text-purple-600" />
             {/if}
-          {:else if command.command_type === CommandType.LCD}
+          {:else if command.command_type === CommandType.OLED}
             <Monitor class="w-5 h-5 text-blue-600" />
           {:else if command.command_type === CommandType.STOP}
             <StopCircle class="w-5 h-5 text-red-600" />
@@ -141,7 +141,7 @@
             Right: {command.command?.right_motor}
           </p>
         </div>
-      {:else if command.command_type === CommandType.LCD}
+      {:else if command.command_type === CommandType.OLED}
         <h3 class="text-base font-medium text-slate-800">Displaying Message</h3>
         <div class="mt-1 text-xs px-2 py-1 bg-slate-100 rounded-md font-mono">
           <p class="truncate">&quot;{command.command?.line_1 || ""}&quot;</p>

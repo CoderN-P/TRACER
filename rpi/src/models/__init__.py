@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
 
-from .Config import RobotConfig
+from .Config import RobotConfig, EMBEDDED_CONFIG_KEYS
 
 CONFIG_FILE = (
 	Path(__file__).resolve().parents[3]

@@ -7,7 +7,7 @@ import socketio
 from fastapi import FastAPI
 import uvicorn
 
-from .models import Command, ROBOT_CONFIG
+from .models import Command, ROBOT_CONFIG, EMBEDDED_CONFIG_KEYS
 
 sio = socketio.AsyncServer(cors_allowed_origins='*', async_mode='asgi', logger=False, engineio_logger=False)
 app = FastAPI()
@@ -20,7 +20,6 @@ CONSTANTS_SAVE_FILE = (
     / "constants"
     / "constants.json"
 )
-
 
 def load_persisted_constants():
     if not CONSTANTS_SAVE_FILE.exists():
@@ -83,8 +82,6 @@ def setup_routes(robot):
     async def on_lidar(sid, data):
         await on_robot_loop(robot.process_lidar_data(data))
         
-        
-    # TODO: Implement the following events: "set_state" (if new state = PATH_FOLLOWING, a path must be provided, "
     @sio.on('set_state') # Manual, path following, LLM control
     async def on_set_state(sid, data):
         await on_robot_loop(robot.set_state(data))
@@ -97,37 +94,31 @@ def setup_routes(robot):
 
         save_requested = bool(data.get("save", False))
         constants_payload = {k: v for k, v in data.items() if k != "save"}
-
+        
+        embedded_keys = []
+        
         for attr, val in constants_payload.items():
             if not hasattr(ROBOT_CONFIG, attr):
                 logger.warning(f"Ignoring unknown constant '{attr}'")
                 continue
             try:
+                if attr in EMBEDDED_CONFIG_KEYS.keys() and val != getattr(ROBOT_CONFIG, attr):
+                    embedded_keys.append(attr)
+                    
                 setattr(ROBOT_CONFIG, attr, val)
+                
             except AttributeError:
                 logger.warning(f"Ignoring read-only constant '{attr}'")
-
+        
+        # Save embedded keys that are diff than their current values
+        
+        if embedded_keys:
+            await on_robot_loop(robot.update_embedded_config({k: constants_payload[k] for k in embedded_keys}))
+            
         if save_requested:
             persist_constants()
 
         logger.info(f"Updated constants: {constants_payload} (save={save_requested})")
-        
-    @sio.on('update_pid')
-    async def update_pid(sid, data):
-        save_requested = bool(data.get("save", False))
-
-        PID_CONFIG_FILE = (
-                Path(__file__).resolve().parents[3]
-                / "calibration_files"
-                / "pid"
-                / "gains.json"
-        )
-        
-        if save_requested:
-            with open(PID_CONFIG_FILE, "w") as pid_config:
-                json.dump(data, pid_config)
-                
-        await on_robot_loop(robot.set_pid(data))
         
     @sio.on('vel_command')
     async def vel_command(sid, data):    

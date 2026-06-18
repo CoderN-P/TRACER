@@ -11,8 +11,8 @@ import queue
 import numpy as np
 
 from . import SerialManager, SensorData,  StateEstimator, Mode, ROBOT_CONFIG, MagnetometerData, MetaMode, Path, PurePursuit, LidarData, GapNavigator, ObstacleMode, VirtualObstacle, DWA
-from .PathFollowing import GoToGoal, twist_to_wheel_speeds
-from .Command import PIDCommand, MotorCommand, MotorPWMCommand, Command, CommandType, LCDCommand
+from .PathFollowing import GoToGoal
+from .Command import MotorCommand, MotorPWMCommand, Command, CommandType, OLEDCommand, TwistCommand, ConfigCommand
 from ..ai.get_commands import text_to_command
 from socketio import AsyncClient as Socket
 
@@ -576,8 +576,8 @@ class Robot:
         await self.send_safe_command(
             Command(
                 ID="",
-                command_type=CommandType.LCD,
-                command=LCDCommand(
+                command_type=CommandType.OLED,
+                command=OLEDCommand(
                     line_1="Thinking...",
                     line_2=""
                 ),
@@ -637,15 +637,13 @@ class Robot:
                 return
         
         if mode == 'twist':
-            vl, vr = twist_to_wheel_speeds(v1, v2)
-            
             async with self.motor_lock:
                 self.pending_motor_command = Command(
                     ID="",
-                    command_type=CommandType.MOTOR,
-                    command=MotorCommand(
-                        left_motor=vl,
-                        right_motor=vr
+                    command_type=CommandType.TWIST,
+                    command=TwistCommand(
+                        v=v1,
+                        omega=v2,
                     ),
                     pause_duration=0,
                     duration=0,
@@ -677,21 +675,15 @@ class Robot:
                     duration=0,
                 )
 
-    async def set_pid(self, data):
-        await self.send_safe_command(
-            Command(
-                ID="",
-                command_type=CommandType.PID,
-                command=PIDCommand(
-                    p_left=data["kp_left"],
-                    p_right=data["kp_right"],
-                    i_left=data["ki_left"],
-                    i_right=data["ki_right"],
-                    d_left=data["kd_left"],
-                    d_right=data["kd_right"],
-                ),
-                pause_duration=0,
-                duration=0
-            )
+    async def update_embedded_config(self, data):
+        config_command = ConfigCommand.model_validate(data)
+        command = Command(
+            ID="",
+            command_type=CommandType.CONFIG,
+            command=config_command,
+            pause_duration=0,
+            duration=0,
         )
+        
+        await self.send_safe_command(command)
     

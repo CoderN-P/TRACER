@@ -2,9 +2,8 @@ import math, numpy as np
 from typing import List
 import logging
 
-from .GoToGoal import GoToGoal
 from .utils import twist_to_wheel_speeds, get_local_target, get_planning_track_width
-from .. import ROBOT_CONFIG, GapNavigator
+from .. import ROBOT_CONFIG
 from ..Command import Command, CommandType, TwistCommand
 from ..StateEstimation import RobotState
 from ..SensorData import SensorData
@@ -19,7 +18,6 @@ class PurePursuit:
     def __init__(self, path: List[tuple]):
         self.path = path
         self.last_found_index = 0 # to prevent the robot from going backwards along the path
-        self.go_to_goal = None
 
 
     @classmethod
@@ -107,7 +105,7 @@ class PurePursuit:
         
         return None # no goal point found
 
-    def calculate_control_command(self, robot_state: RobotState, sensor_data: SensorData, gap_navigator: GapNavigator, update_gap_navigator: bool) -> Command | None:
+    def calculate_control_command(self, robot_state: RobotState) -> Command | None:
         """
         Calculate the control command (linear and angular velocity) based on the current robot state and the path.
         """
@@ -120,17 +118,11 @@ class PurePursuit:
         goal_point = self.find_goal_point(current_pos)
         
         if not goal_point:
-            if not self.go_to_goal:
-                logger = logging.getLogger("RobotManager")
-                logger.warning("PurePursuit lost the path")
-                self.go_to_goal = GoToGoal(self.path[self.last_found_index +  1])
-
-            return self.go_to_goal.calculate_control_command(robot_state, sensor_data, gap_navigator, update_gap_navigator)
-        else:
-            if self.go_to_goal:
-                logger = logging.getLogger("RobotManager")
-                logger.warning("PurePursuit found the path again")
-                self.go_to_goal = None
+            logger = logging.getLogger("RobotManager")
+            logger.warning("PurePursuit lost the path")
+            
+            return None
+               
                 
         local_target = get_local_target(robot_state, goal_point)
         lateral_y = local_target[1]

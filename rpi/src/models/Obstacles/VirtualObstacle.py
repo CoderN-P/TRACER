@@ -1,7 +1,7 @@
 from pydantic import Field, BaseModel
 import math, numpy as np
 from .VirtualObstacleType import VirtualObstacleType
-from .StateEstimation import RobotState
+from ..StateEstimation import RobotState
 
 class VirtualObstacle(BaseModel):
     obstacle_type: VirtualObstacleType = Field(default=VirtualObstacleType.CIRCLE, description="Obstacle type (rectangle/circle)")

@@ -21,7 +21,7 @@ def serial_test(port=None):
         
         # check if its been one second since the last print, and if so, print the sensor data
         nonlocal prev_sensor_data
-        sensor_data = Robot.bytes_to_sensor_data(data)
+        sensor_data = SensorData.from_bytes(data)
         if prev_sensor_data:
             print(sensor_data.timestamp - prev_sensor_data.timestamp)            
         prev_sensor_data = sensor_data            

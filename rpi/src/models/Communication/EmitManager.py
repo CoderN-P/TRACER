@@ -1,0 +1,33 @@
+from .. import ROBOT_CONFIG
+class EmitManager:
+    def __init__(self, socket_manager, state_manager, manual_manager, loop_monitoring):
+        self.socket_manager = socket_manager
+        self.state_manager = state_manager
+        self.loop_monitoring = loop_monitoring
+        self.manual_manager = manual_manager
+
+        self.sensor_update_dt = 1 / ROBOT_CONFIG.EMIT_SENSOR_FREQ
+        self.last_emit_time: float = 0.0
+
+    async def send_sensor_update(self, sensor_data: SensorData, robot_state: RobotState ):
+        cur_time = asyncio.get_event_loop().time()
+        if cur_time - self.last_emit_time < self.sensor_update_dt:
+            return
+            
+        self.last_emit_time = cur_time
+
+        current_mode = await self.state_manager.get_state()
+
+        packet = {
+            "sensors": SensorData.clean(sensor_data.model_dump()),
+            "state": SensorData.clean(robot_state.model_dump()),
+            "mode": current_mode.name,
+            "timestamp": datetime.datetime.now().isoformat(),
+            "max_loop_time": self.loop_monitoring.max_loop_time,
+            "velocity_profile_t": time.monotonic() - self.manual_manager.velocity_profile_manager.velocity_profile_start if self.manual_manager.velocity_profile_manager.velocity_profile_start else None,
+            "virtual_rays": self.gap_navigator.ray_points
+        }
+        
+            
+        await self.socket_manager.socketio.emit("sensor_data", packet)
+        self.loop_monitoring.max_loop_time = 0.0

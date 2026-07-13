@@ -3,8 +3,8 @@ import math, numpy as np
 from .utils import twist_to_wheel_speeds
 from ..Command import Command, CommandType, TwistCommand
 from ..StateEstimation import RobotState
-from ..VirtualObstacle import VirtualObstacle
-from ..VirtualObstacleType import VirtualObstacleType
+from ..Obstacles.VirtualObstacle import VirtualObstacle
+from ..Obstacles.VirtualObstacleType import VirtualObstacleType
 from .. import ROBOT_CONFIG
 
 class DWA:

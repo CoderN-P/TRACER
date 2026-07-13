@@ -69,7 +69,7 @@ class MagnetometerCalibrator:
 
     def callback(self, packet: bytes):
         try:
-            sensor_data = Robot.bytes_to_sensor_data(packet)
+            sensor_data = SensorData.from_bytes(packet)
             mag = sensor_data.magnetometer
             
             if not mag.new:

@@ -6,3 +6,4 @@ from .MotorPWMCommand import MotorPWMCommand
 from .ConfigCommand import ConfigCommand
 from .OLEDCommand import OLEDCommand
 from .TwistCommand import TwistCommand
+from .CommandManager import CommandManager

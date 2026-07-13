@@ -93,7 +93,6 @@ class RobotConfig:
     R_THETA_ENCODER: float
     R_THETA_MAGNETOMETER: float
     R_POSITION: float
-    USE_VIO: bool
     STATE_HISTORY_SIZE: int
     LOOKAHEAD_DISTANCE: float
     COMPLETION_THRESHOLD: float
@@ -105,9 +104,6 @@ class RobotConfig:
     SPLINE_SAMPLES: int
     TRAJECTORY_DT: float
     K_WIDTH: float
-    K_OMEGA: float
-    K_V: float
-    K_D: float
     I_ZONE: float
     P_LEFT: float
     I_LEFT: float

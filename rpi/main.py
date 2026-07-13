@@ -10,7 +10,7 @@ load_dotenv()
 from src import text_to_command
 import os
 
-from src import Robot, SerialManager, run_socket_server, socketio, ROBOT_CONFIG, serial_test, calibrate_feedforward, calibrate_max_speed, interactive_test, calibrate_mag, visualize_feedforward, EMBEDDED_CONFIG_KEYS
+from src import Robot, SerialManager, run_socket_server, socketio, ROBOT_CONFIG, serial_test, calibrate_feedforward, calibrate_max_speed, interactive_test, calibrate_mag, visualize_feedforward, EMBEDDED_CONFIG_KEYS, lidar_test
 
 parser = argparse.ArgumentParser(
     prog="TRACER RPI",
@@ -30,6 +30,7 @@ parser.add_argument("--timeout", type=float, default=1.0, help="No-data timeout 
 parser.add_argument('--backwards', action='store_true', help="Calibrate maximum speed in the reverse direction")
 parser.add_argument('--output-json', type=str, default=None, help="Optional output dir for averaged LUT JSON or output filename for normal LUT JSON.")
 parser.add_argument('--show-plots', action='store_true', help="Display plot windows in addition to saving PNG files.")
+parser.add_argument('--lidar-test', action='store_true', help="Continuously plot lidar scans.")
 
 async def main(p):
     port = p if p else SerialManager.find_port()
@@ -44,15 +45,11 @@ async def main(p):
     serial_manager = SerialManager(port, 921600)
     robot = Robot(serial_manager, socketio)
     
-    # Initialize embedded side by sending saved config values on startup; this ensures the embedded config is always in sync with the loaded constants, even if the constants have been updated since the last run. Only send keys that are actually embedded to minimize unnecessary serial communication.
-    data = {attr: getattr(ROBOT_CONFIG, attr) for attr in EMBEDDED_CONFIG_KEYS.keys()}
-    await robot.update_embedded_config(data)
-    
     logging.getLogger('socketio').setLevel(logging.ERROR)
     logging.getLogger('engineio').setLevel(logging.ERROR)
     robot._logger.setLevel(logging.INFO)  
     
-    serial_manager.start(robot, robot.loop)  # Start background serial read thread; dispatch sensor packets on robot loop
+    serial_manager.start(robot)  # Start background serial read thread; dispatch sensor packets on robot loop
     robot.start()
 
     try:
@@ -82,5 +79,7 @@ if __name__ == "__main__":
         interactive_test(args.port)
     elif args.calibrate_mag:
         calibrate_mag(args.port, args.timeout)
+    elif args.lidar_test:
+        lidar_test(args.port)
     else:
         asyncio.run(main(args.port))

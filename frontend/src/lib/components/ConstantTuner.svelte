@@ -531,15 +531,6 @@
         { key: "TRAJECTORY_DT", label: "TRAJECTORY_DT", step: "0.001", min: 0 },
       ],
     },
-    {
-      title: "Go to Goal",
-      subtitle: "Heading and velocity control while targeting a point.",
-      fields: [
-        { key: "K_OMEGA", label: "K_OMEGA", step: "0.01", min: 0 },
-        { key: "K_V", label: "K_V", step: "0.01", min: 0 },
-        { key: "K_D", label: "K_D", step: "0.01", min: 0 },
-      ],
-    },
   ];
 
   let { class: className = "" } = $props();

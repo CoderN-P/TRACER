@@ -1,7 +1,7 @@
 from typing import List
 import numpy as np, math
 from . import ROBOT_CONFIG
-from .SensorData.Lidar import LidarGrid
+from .SensorData.IPhoneLidar import LidarGrid
 from .Gap import Gap
 from .ObstacleState import ObstacleState
 from .StateEstimation import RobotState

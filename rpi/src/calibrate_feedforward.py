@@ -81,7 +81,7 @@ def calibrate_feedforward(resolution, duration_sec, file = 'feedforward_lookup_t
         if not data:
             return
 
-        sensor_data = Robot.bytes_to_sensor_data(data)
+        sensor_data = SensorData.from_bytes(data)
         nonlocal left_encoder, right_encoder
         with lock:
             left_encoder += sensor_data.left_encoder

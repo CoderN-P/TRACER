@@ -366,7 +366,7 @@ def interactive_test(port=None):
         if not data:
             return
         
-        sensor_data = Robot.bytes_to_sensor_data(data)
+        sensor_data = SensorData.from_bytes(data)
         with lock:
             if run_active:
                 state.update_velocity_from_encoder(sensor_data, time.time())

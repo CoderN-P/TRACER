@@ -2,14 +2,15 @@ import math
 import numpy as np
 import time
 from collections import deque
+import logging
 from ..PathFollowing.utils import get_ekf_track_width
 from . import RobotState, HeadingFilter, PoseFilter, EKFSnapshot
-from .. import SensorData, LidarData, ROBOT_CONFIG
-
+from ..Bus import StateChange
+from .. import SensorData, ROBOT_CONFIG, Mode
 
 
 class StateEstimator:
-    def __init__(self, logger):
+    def __init__(self, bus):
         self.state: RobotState = RobotState(
             x=0.0,
             y=0.0,
@@ -26,13 +27,24 @@ class StateEstimator:
         # Pre state estimations
         self.initial_mag_heading = None
         self.theta_encoders = 0.0 # Cumulative heading change from encoders, in radians
-        self._logger = logger
+        self._logger = logging.getLogger("Robot.StateEstimator")
         self.heading_filter = HeadingFilter()
         self.pose_filter = PoseFilter()
+        
+        self.bus = bus
+        
+        self.bus.subscribe(
+            StateChange,
+            self.on_state_change
+        )
+        
+    def on_state_change(self, event: StateChange):
+        if event.new_state == Mode.STOPPED or event.prev_state == Mode.STOPPED:
+            self.reset()
+
     
     def initialize(self, sensor_data: SensorData):
         self.initial_mag_heading = math.radians(sensor_data.magnetometer.heading)
-        
         
     def reset(self):
         self.state = RobotState(
@@ -153,6 +165,10 @@ class StateEstimator:
 
         delta_left_ticks = sensor_data.left_encoder
         delta_right_ticks = sensor_data.right_encoder
+        
+        if delta_left_ticks > max_pulses or delta_right_ticks > max_pulses:
+            self._logger.warning(f"Wheel encoders reported more ticks than expected: L: {delta_left_ticks}, R: {delta_right_ticks}, Expected: {max_pulses}")
+            
 
         v_prev = self.history[-1].robot_state.linear_velocity
         omega_prev = self.history[-1].robot_state.angular_velocity
@@ -256,3 +272,5 @@ class StateEstimator:
         
         w_eff = get_ekf_track_width(v_prev, omega_prev)
         return (delta_right - delta_left) / w_eff
+
+        

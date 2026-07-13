@@ -5,7 +5,8 @@ import time
 import logging
 import struct
 import serial.tools.list_ports
-from . import Command, CommandType, EMBEDDED_CONFIG_KEYS
+from ..Command import Command, CommandType
+from .. import EMBEDDED_CONFIG_KEYS
 
 class SerialManager:
     def __init__(self, port='/dev/ttyUSB0', baudrate=921600):
@@ -13,7 +14,6 @@ class SerialManager:
         time.sleep(1)  # Allow time for the serial connection to stabilize
         self.running = False
         self.robot = None  # Reference to the robot instance
-        self.loop = None   # Event loop to use for coroutine execution
         self._buffer = bytearray()  # Buffer to store incoming data
         self._logger = logging.getLogger("SerialManager")
         self._START_BYTE = 0xAA
@@ -29,9 +29,8 @@ class SerialManager:
                 return port.device
         return None
 
-    def start(self, robot, loop):
+    def start(self, robot):
         self.robot = robot
-        self.loop = loop
         
         if not self.serial.is_open or not self.serial.writable() or not self.serial.readable():
             self._logger.error(f"Serial port {self.serial.portstr} is not open/writable/readable")
@@ -76,7 +75,7 @@ class SerialManager:
                         del self._buffer[:self._PACKET_LENGTH]
                    
                         if callback is None:
-                            self.robot.process_sensor_data(bytes(packet))
+                            self.robot.sensor_data_manager.process_raw_sensor_data(bytes(packet))
                         else:
                             callback(bytes(packet))
                 else:

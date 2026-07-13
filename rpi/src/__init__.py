@@ -7,3 +7,4 @@ from .calibrate_max_speed import calibrate_max_speed
 from .calibrate_mag import calibrate_mag
 from .interactive_test import interactive_test
 from .visualize_feedforward import visualize_feedforward
+from .lidar_test import lidar_test

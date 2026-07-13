@@ -24,7 +24,7 @@ def calibrate_max_speed(backwards, port=None):
     def callback(data):
         if not data: return
 
-        sensor_data = Robot.bytes_to_sensor_data(data)
+        sensor_data = SensorData.from_bytes(data)
 
         nonlocal left_encoder, right_encoder
         with lock:

@@ -9,7 +9,7 @@ class ManualManager:
         self.last_manual_time: float = 0.0
         
         self.manual_dt = 1 / ROBOT_CONFIG.MANUAL_FREQ
-        self._logger = logging.getLogger("RobotManager.JoystickManager")
+        self._logger = logging.getLogger("Robot.ManualManager")
         
         self.velocity_profile_manager = VelocityProfileManager(command_manager, state_manager) # Handles execution of manual velocity profiles
 

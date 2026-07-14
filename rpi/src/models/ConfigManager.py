@@ -13,7 +13,7 @@ CONSTANTS_SAVE_FILE = (
 class ConfigManager:
     def __init__(self, command_manager):
         self.command_manager = command_manager
-        self._logger = logging.getLogger("RobotManager.ConfigManager")
+        self._logger = logging.getLogger("Robot.ConfigManager")
         
     
     async def update_embedded_config(self, data):

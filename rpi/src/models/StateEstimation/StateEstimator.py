@@ -4,7 +4,7 @@ import time
 from collections import deque
 import logging
 from ..PathFollowing.utils import get_ekf_track_width
-from . import RobotState, HeadingFilter, PoseFilter, EKFSnapshot
+from . import RobotState, HeadingFilter, PoseFilter, EKFSnapshot, StateHistory
 from ..Bus import StateChange
 from .. import SensorData, ROBOT_CONFIG, Mode
 
@@ -23,7 +23,7 @@ class StateEstimator:
             v_right=0.0
         )
         
-        self.history: deque[EKFSnapshot] = deque(maxlen=ROBOT_CONFIG.STATE_HISTORY_SIZE)
+        self.snapshot_history = StateHistory()
         # Pre state estimations
         self.initial_mag_heading = None
         self.theta_encoders = 0.0 # Cumulative heading change from encoders, in radians
@@ -62,7 +62,7 @@ class StateEstimator:
         self.initial_mag_heading = None
         self.heading_filter.reset()
         self.pose_filter.reset()
-        self.history.clear()
+        self.snapshot_history.clear()
 
     # Python logic to find how many packets were missed
     @staticmethod
@@ -142,12 +142,12 @@ class StateEstimator:
             return delta_x * math.cos(theta_c), delta_x * math.sin(theta_c)
 
 
-    def update(self, sensor_data: SensorData, previous_sensor_data: SensorData, lidar_data: LidarData | None):
+    def update(self, sensor_data: SensorData, previous_sensor_data: SensorData):
         # Previous sensor data is needed to determine dt
         if not previous_sensor_data: return
         
         if len(self.history) == 0:
-            self.history.append(EKFSnapshot(
+            self.history.add(EKFSnapshot(
                 timestamp=time.time_ns() // 1000,
                 robot_state=self.state.model_copy(),
                 sensor_data=previous_sensor_data.model_copy(),
@@ -169,9 +169,8 @@ class StateEstimator:
         if delta_left_ticks > max_pulses or delta_right_ticks > max_pulses:
             self._logger.warning(f"Wheel encoders reported more ticks than expected: L: {delta_left_ticks}, R: {delta_right_ticks}, Expected: {max_pulses}")
             
-
-        v_prev = self.history[-1].robot_state.linear_velocity
-        omega_prev = self.history[-1].robot_state.angular_velocity
+        v_prev = self.snapshot_history.history[-1].robot_state.linear_velocity
+        omega_prev = self.snapshot_history.history[-1].robot_state.angular_velocity
         self.theta_encoders += self.heading_delta_from_encoders(delta_left_ticks, delta_right_ticks, v_prev, omega_prev)
         
         if sensor_data.magnetometer.new and sensor_data.magnetometer.is_available():
@@ -191,61 +190,12 @@ class StateEstimator:
         self.state.linear_velocity = self.estimate_linear_velocity(self.state.v_left, self.state.v_right)
         self.state.angular_velocity = sensor_data.imu.gyroscope_z - self.heading_filter.state[1]
 
-        position_delta_x, position_delta_y = self.get_position_delta(delta_left_ticks, delta_right_ticks, self.state.yaw, self.history[-1].robot_state.yaw)
+        position_delta_x, position_delta_y = self.get_position_delta(delta_left_ticks, delta_right_ticks, self.state.yaw, self.snapshot_history.history[-1].robot_state.yaw)
         
-        # If lidar data is not none, go through history to find the timstamp that most closely matches lidar timestamp and replay from there
-        
-        if lidar_data:
-            closest_idx = 0
-            closest_error = float("inf")
-            
-            for i in range(len(self.history)):
-                error = abs(
-                    self.history[i].timestamp -
-                    lidar_data.timestamp
-                )
-            
-                if error < closest_error:
-                    closest_error = error
-                    closest_idx = i
-                    
-            if closest_idx < 1:
-                self.state.x, self.state.y = self.pose_filter.step(position_delta_x, position_delta_y, None)
-            else:
-                # Repeat all the steps from closest_idx to the end of history, but with the lidar update at closest_idx
-                # Run once with injected lidar measurement then call update for the following snapshots
-                closest = self.history[closest_idx]
-                self.heading_filter.P = closest.heading_covariance
-                self.heading_filter.state = np.array([closest.robot_state.yaw, closest.gyro_bias])
-                self.pose_filter.P = closest.pose_covariance
-                
-                self.pose_filter.state = np.array([closest.robot_state.x, closest.robot_state.y])
-                self.theta_encoders = closest.theta_encoders
-                self.state = closest.robot_state
-                
-                # Clear outdated snapshots 
-                removed = 0
-                sensor_data_history = []
-                while len(self.history) > closest_idx + 1:
-                    removed += 1
-                    sensor_data_history.append(self.history.pop().sensor_data)
-                    
-                # update the closest snapshot with VIO measurement 
-                self.pose_filter.update(lidar_data.camera.x, lidar_data.camera.y, self.pose_filter.state, self.pose_filter.P)
-                    
-                # re run by calling update for the number of snapshots we removed
-                for i in range(0, removed):
-                    if i == 0:
-                        self.update(sensor_data_history[removed - 1 - i], self.history[-1].sensor_data, None)
-                    else:
-                        self.update(sensor_data_history[removed - 1 - i], sensor_data_history[removed - i], None)
-                
-                
-        else:
-            self.state.x, self.state.y = self.pose_filter.step(position_delta_x, position_delta_y, None)
+        self.state.x, self.state.y = self.pose_filter.step(position_delta_x, position_delta_y, None)
 
-        self.history.append(EKFSnapshot(
-            timestamp=time.time_ns() // 1000,
+        self.snapshot_history.add(EKFSnapshot(
+            timestamp=time.perf_counter_ns(),
             robot_state=self.state.model_copy(),
             sensor_data=sensor_data.model_copy(),
             pose_covariance=self.pose_filter.P,
@@ -256,7 +206,42 @@ class StateEstimator:
         
         return
         
+    def correct(self, timestamp, measurement):
+        closest_idx = self.snapshot_history.get_closest_idx(timestamp)
         
+        if closest_idx < 1:
+            return
+        
+        # Repeat all the steps from closest_idx to the end of history, but with the lidar update at closest_idx
+        # Run once with injected lidar measurement then call update for the following snapshots
+        closest = self.history[closest_idx]
+        self.heading_filter.P = closest.heading_covariance
+        self.heading_filter.state = np.array([closest.robot_state.yaw, closest.gyro_bias])
+        self.pose_filter.P = closest.pose_covariance
+
+        self.pose_filter.state = np.array([closest.robot_state.x, closest.robot_state.y])
+        self.theta_encoders = closest.theta_encoders
+        self.state = closest.robot_state
+
+        # Clear outdated snapshots 
+        removed = 0
+        sensor_data_history = []
+        while len(self.snapshot_history.history) > closest_idx + 1:
+            removed += 1
+            sensor_data_history.append(self.snapshot_history.history.pop().sensor_data)
+
+        # update the closest snapshot with scan matching measurement
+        self.pose_filter.update(lidar_data.camera.x, lidar_data.camera.y, self.pose_filter.state, self.pose_filter.P)
+
+        # re run by calling update for the number of snapshots we removed
+        for i in range(0, removed):
+            if i == 0:
+                self.update(sensor_data_history[removed - 1 - i], self.snapshot_history.history[-1].sensor_data)
+            else:
+                self.update(sensor_data_history[removed - 1 - i], sensor_data_history[removed - i])
+
+
+
     @staticmethod
     def heading_delta_from_encoders(left_ticks, right_ticks, v_prev, omega_prev):
         delta_left = left_ticks * (

@@ -82,4 +82,7 @@ if __name__ == "__main__":
     elif args.lidar_test:
         lidar_test(args.port)
     else:
-        asyncio.run(main(args.port))
+        try:
+            asyncio.run(main(args.port))
+        except KeyboardInterrupt:
+            logging.info("Robot shutting down...")

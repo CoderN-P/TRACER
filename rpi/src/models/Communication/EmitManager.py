@@ -25,7 +25,6 @@ class EmitManager:
             "timestamp": datetime.datetime.now().isoformat(),
             "max_loop_time": self.loop_monitoring.max_loop_time,
             "velocity_profile_t": time.monotonic() - self.manual_manager.velocity_profile_manager.velocity_profile_start if self.manual_manager.velocity_profile_manager.velocity_profile_start else None,
-            "virtual_rays": self.gap_navigator.ray_points
         }
         
             

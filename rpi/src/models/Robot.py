@@ -33,7 +33,7 @@ class Robot:
         self.emit_manager = EmitManager(self.socket_manager, self.state_manager, self.manual_manager, self.loop_monitoring)
         
         self.running: bool = False
-        self._logger: logging.Logger = logging.getLogger("RobotManager")
+        self._logger: logging.Logger = logging.getLogger("Robot")
         
         self.lidar_read_task: asyncio.Task | None = None
         self.main_loop_task: asyncio.Task | None = None

@@ -33,6 +33,7 @@ class PathManager:
                 await self.bus.publish(
                     PathError(reason="Invalid spline path")
                 )
+                self._logger.error("Invalid spline path")
         elif event.data["path_type"] == "freehand":
             self.pure_pursuit = PurePursuit.from_xy_points(event.data["path"])
         elif event.data["path_type"] == "point":

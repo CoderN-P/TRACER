@@ -1,14 +1,17 @@
 import logging, asyncio
 from .Bus import PathError, PathCompleted, StateChange
 from .Command import Command
-from . import Mode, MetaMode
+from .Mapping import LocalizationMode
+from . import Mode, MetaMode, NavigationMode
 
 class StateManager:
     def __init__(self, command_manager, bus):
         self.state: Mode = Mode.MANUAL
+        self.navigation_state: NavigationMode = NavigationMode.MANUAL
         self.meta_state: MetaMode = MetaMode.USER
+        self.localization_state: LocalizationMode = LocalizationMode.MAP
         self.state_lock: asyncio.Lock = asyncio.Lock()  # Lock to protect access to the robot's state (manual, autonomous, stopped)
-        self._logger = logging.getLogger("RobotManager.StateManager")
+        self._logger = logging.getLogger("Robot.StateManager")
         self.command_manager = command_manager
         self.bus = bus
         self.state_lock = asyncio.Lock()

@@ -311,8 +311,8 @@
           min: 0,
         },
         {
-          key: "LIDAR_OFFSET",
-          label: "LIDAR_OFFSET",
+          key: "LIDAR_OFFSET_X",
+          label: "LIDAR_OFFSET_X",
           step: "0.01",
           min: -100,
         },
@@ -329,15 +329,9 @@
           min: 0,
         },
         {
-          key: "LIDAR_HEIGHT",
-          label: "LIDAR_HEIGHT",
+          key: "LIDAR_OFFSET_Y",
+          label: "LIDAR_OFFSET_Y",
           step: "0.01",
-          min: 0,
-        },
-        {
-          key: "LIDAR_FOV",
-          label: "LIDAR_FOV",
-          step: "0.1",
           min: 0,
         },
         {

@@ -4,7 +4,7 @@ from ..SensorData import SensorData
 from .RobotState import RobotState
 
 class EKFSnapshot(BaseModel):
-    timestamp: int = Field(..., description="Microseconds since epoch of this snapshot")
+    timestamp: int = Field(..., description="Nanosecond perf counter")
     robot_state: RobotState = Field(..., description="Estimated robot state at snapshot")
     sensor_data: SensorData = Field(..., description="Sensor data control inputs at snapshot")
     heading_covariance: list = Field(..., description="Covariance matrix of heading")

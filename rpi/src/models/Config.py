@@ -61,9 +61,8 @@ class RobotConfig:
     OBSTACLE_DETECTED_THRESHOLD: float
     GAP_UPDATE_THRESHOLD: float
     OBSTACLE_AVOID_THRESHOLD: float
-    LIDAR_FOV: float
-    LIDAR_OFFSET: float
-    LIDAR_HEIGHT: float
+    LIDAR_OFFSET_X: float
+    LIDAR_OFFSET_Y: float
     CLEARANCE_HEIGHT: float 
     CLEAR_FRAMES_THRESHOLD: float
     EMIT_SENSOR_FREQ: float
@@ -120,10 +119,6 @@ class RobotConfig:
     @property
     def WHEEL_CIRCUMFERENCE(self) -> float:
         return math.pi * self.WHEEL_DIAMETER
-
-    @property
-    def FOV_RAD(self) -> float:
-        return math.radians(self.LIDAR_FOV)
 
     @property
     def ENCODER_TICKS_PER_REV(self) -> int:

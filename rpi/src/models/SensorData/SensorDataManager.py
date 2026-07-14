@@ -10,7 +10,7 @@ class SensorDataManager:
         self.sensor_queue = queue.Queue()
         self.lidar_queue = queue.Queue()
         self.last_sensor_receive_time = time.monotonic()
-        self._logger = logging.getLogger("RobotManager.SensorDataManager")
+        self._logger = logging.getLogger("Robot.SensorDataManager")
 
         # Ultrasonic sensor smoothing
         self.left_distance_history: deque = deque(maxlen=50)  # Store last 10 distance readings for smoothing

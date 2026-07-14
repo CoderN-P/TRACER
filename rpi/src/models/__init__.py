@@ -36,6 +36,7 @@ from .Bus import *
 from .LoopMonitoring import LoopMonitoring
 from .ConfigManager import ConfigManager
 from .MetaMode import MetaMode
+from .NavigationMode import NavigationMode
 
 from .StateManager import StateManager
 from .Robot import Robot

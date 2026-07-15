@@ -1,13 +1,19 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import { UserRound, Spline, Brain, OctagonX } from "lucide-svelte";
+  import { UserRound, Spline, Brain, OctagonX, MapPinned } from "lucide-svelte";
   import { type LogEntry, Mode } from "$lib/types";
 
   let {
     lastSensorUpdate,
     mode,
+    localizationMode = null,
     logs = $bindable(),
-  }: { lastSensorUpdate: number; mode: Mode; logs: LogEntry[] } = $props();
+  }: {
+    lastSensorUpdate: number;
+    mode: Mode;
+    localizationMode?: string | null;
+    logs: LogEntry[];
+  } = $props();
 
   let status: "Online" | "Stale" | "Offline" = $state("Online");
   let prevStatus: "Online" | "Stale" | "Offline" = $state("Offline");
@@ -66,6 +72,14 @@
       } as LogEntry);
     }
   }
+
+  function formatModeName(value: string) {
+    return value
+      .toLowerCase()
+      .split("_")
+      .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+      .join(" ");
+  }
 </script>
 
 <div
@@ -77,19 +91,31 @@
         <div class="h-2 w-2 bg-green-500 rounded-full"></div>
         <span class="text-green-500">Online</span>
       </div>
-      <div
-        class="flex flex-row items-center gap-1 rounded-md border border-gray-100 px-2 py-0.5 bg-gray-50 text-gray-900"
-      >
-        {#if mode === Mode.MANUAL}
-          <UserRound class="w-4 h-4" />
-        {:else if mode === Mode.AUTONOMOUS}
-          <Brain class="w-4 h-4" />
-        {:else if mode === Mode.PATH_FOLLOWING}
-          <Spline class="w-4 h-4" />
-        {:else if mode === Mode.STOPPED}
-          <OctagonX class="w-4 h-4" />
+      <div class="flex flex-row items-center gap-1.5">
+        <div
+          class="flex flex-row items-center gap-1 rounded-md border border-gray-100 px-2 py-0.5 bg-gray-50 text-gray-900"
+          title="Drive mode"
+        >
+          {#if mode === Mode.MANUAL}
+            <UserRound class="w-4 h-4" />
+          {:else if mode === Mode.AUTONOMOUS}
+            <Brain class="w-4 h-4" />
+          {:else if mode === Mode.PATH_FOLLOWING}
+            <Spline class="w-4 h-4" />
+          {:else if mode === Mode.STOPPED}
+            <OctagonX class="w-4 h-4" />
+          {/if}
+          <span>{formatModeName(mode)}</span>
+        </div>
+        {#if localizationMode}
+          <div
+            class="flex flex-row items-center gap-1 rounded-md border border-blue-100 px-2 py-0.5 bg-blue-50 text-blue-900"
+            title="Localization mode"
+          >
+            <MapPinned class="w-4 h-4" />
+            <span>{formatModeName(localizationMode)}</span>
+          </div>
         {/if}
-        <span class="">{mode.charAt(0) + mode.toLowerCase().slice(1)}</span>
       </div>
     </div>
   {:else if status === "Stale"}

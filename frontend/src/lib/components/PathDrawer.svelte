@@ -13,6 +13,7 @@
     StopCircle,
     CircleIcon,
     Square,
+    Layers2,
   } from "lucide-svelte";
   import { Stage, Layer, Line, Circle, Rect, Text } from "svelte-konva";
   import {
@@ -34,16 +35,23 @@
         path: { x: number; y: number };
       };
 
+  export type MapCell = [number, number, number];
+  export type MapUpdatePayload = {
+    static: MapCell[];
+    lidar: MapCell[];
+  };
+
   /** Robot position in meters, updated at ~10 Hz. Pass null to hide the robot. */
   let {
     robotPos = null,
+    mapUpdate = { static: [], lidar: [] },
     freehandPath: freehandPathProp = $bindable([]),
     pathComplete = false,
     onRunPath = (_payload: RunPathPayload) => {},
     onStopRun = () => {},
-    rayPoints = null,
   }: {
     robotPos?: { x: number; y: number; theta: number } | null;
+    mapUpdate?: MapUpdatePayload;
     freehandPath?: { x: number; y: number }[];
     /** Set to true by the parent when the robot confirms path completion. */
     pathComplete?: boolean;
@@ -51,7 +59,6 @@
     onRunPath?: (payload: RunPathPayload) => void;
     /** Called when the user presses Stop while a run is active. */
     onStopRun?: () => void;
-    rayPoints?: (number | null)[][] | null;
   } = $props();
 
   let path = new SplinePathSvelte();
@@ -64,6 +71,8 @@
   const TICK_LENGTH = 10; // length of axis ticks
   const PATH_RENDER_INTERVAL = 0.01; // seconds (dt)
   const SCALE = 100; // pixels per meter
+  const MAP_CELL_RESOLUTION = 0.05; // meters
+  const MAP_CELL_SIZE = MAP_CELL_RESOLUTION * SCALE;
 
   $effect(() => {
     if (!containerEl) return;
@@ -168,6 +177,26 @@
   let gridLines = $derived(getGridLines(GRID_SPACING));
   let axisTicks = $derived(getAxisTicks(GRID_SPACING, TICK_LENGTH));
 
+  // ── Occupancy map layers ─────────────────────────────────────────────────
+  let showStaticMap = $state(true);
+  let showLidarLayer = $state(true);
+
+  function clampIntensity(intensity: number) {
+    return Math.max(0, Math.min(255, Math.round(intensity)));
+  }
+
+  function mapCellRect(cell: MapCell) {
+    return {
+      x: cell[0] * SCALE,
+      y: -(cell[1] + MAP_CELL_RESOLUTION) * SCALE,
+      intensity: clampIntensity(cell[2]),
+    };
+  }
+
+  function mapCellFill(intensity: number, opacity: number) {
+    return `rgba(${255 - intensity}, ${255 - intensity}, ${255 - intensity}, ${opacity})`;
+  }
+
   // ── Robot interpolation ──────────────────────────────────────────────────
   // Sensor updates arrive at 10 Hz (every 100 ms). We lerp between the last
   // known position and the newly received one over that same 100 ms window so
@@ -242,13 +271,7 @@
   });
 
   // ── Mode ──────────────────────────────────────────────────────────────────
-  type Mode =
-    | "spline"
-    | "freehand"
-    | "point"
-    | "point_dwa"
-    | "svg"
-    | "obstacle";
+  type Mode = "spline" | "freehand" | "point" | "svg" | "obstacle";
   let mode = $state<Mode>("spline");
 
   // ── Point mode ────────────────────────────────────────────────────────────
@@ -260,7 +283,6 @@
 
   // ── Virtual obstacles ────────────────────────────────────────────────────
   type ObstacleShape = "circle" | "rectangle";
-  type ObstacleAvoidanceMode = "normal" | "virtual";
   type VirtualObstaclePayload = {
     obstacle_type: ObstacleShape;
     position: [number, number];
@@ -289,7 +311,6 @@
       };
 
   let obstacleShape = $state<ObstacleShape>("circle");
-  let obstacleAvoidanceMode = $state<ObstacleAvoidanceMode>("normal");
   let virtualObstacles = $state<VirtualObstacle[]>([]);
   let selectedObstacleId = $state<string | null>(null);
   let obstacleIdCounter = 0;
@@ -328,17 +349,6 @@
   function setVirtualObstacles(nextObstacles: VirtualObstacle[]) {
     virtualObstacles = nextObstacles;
     emitVirtualObstacles(nextObstacles);
-  }
-
-  function setObstacleAvoidanceMode(nextMode: ObstacleAvoidanceMode) {
-    obstacleAvoidanceMode = nextMode;
-    socket.emit("update_obstacle_mode", { mode: nextMode });
-
-    if (nextMode === "virtual") {
-      emitVirtualObstacles(virtualObstacles);
-    } else if (mode === "point_dwa") {
-      mode = "point";
-    }
   }
 
   function updateObstacle(
@@ -668,7 +678,7 @@
   // ── Run mode ──────────────────────────────────────────────────────────────
   // When running, we record which type of path is active and a UI offset so
   // spline/freehand-style paths appear to start at the robot's current position.
-  type RunSource = "spline" | "freehand" | "point" | "point_dwa" | "svg";
+  type RunSource = "spline" | "freehand" | "point" | "svg";
   let running = $state(false);
   let runSource = $state<RunSource>("spline");
   // Offset in meters applied only for rendering while running.
@@ -723,11 +733,9 @@
         ? freehandPath.length > 0
         : mode === "point"
           ? selectedPoint !== null
-          : mode === "point_dwa"
-            ? obstacleAvoidanceMode === "virtual" && selectedPoint !== null
-            : mode === "svg"
-              ? svgPath.length > 1
-              : false,
+          : mode === "svg"
+            ? svgPath.length > 1
+            : false,
   );
 
   function startRun() {
@@ -797,7 +805,7 @@
     } else {
       // Point mode
       payload = {
-        type: runSource === "point_dwa" ? "point_dwa" : "point",
+        type: "point",
         path: {
           x: selectedPoint?.x ?? 0,
           y: selectedPoint?.y ?? 0,
@@ -819,7 +827,7 @@
   }
 
   function runSourceLabel(source: RunSource) {
-    return source === "point_dwa" ? "DWA point" : source;
+    return source;
   }
 
   // Exit run mode automatically when parent signals completion.
@@ -879,9 +887,7 @@
     fallback: number,
   ) {
     const value =
-      constants &&
-      typeof constants === "object" &&
-      key in constants
+      constants && typeof constants === "object" && key in constants
         ? (constants as Record<string, unknown>)[key]
         : null;
 
@@ -971,7 +977,7 @@
 
     if (mode === "freehand") return freehandPath;
     if (mode === "svg") return svgPath;
-    if (mode === "point" || mode === "point_dwa") {
+    if (mode === "point") {
       return selectedPoint ? [selectedPoint] : [];
     }
     return plannedSplinePoints();
@@ -1094,8 +1100,6 @@
   let routeStats = $derived(
     buildRouteStats(activePathPoints(), displayRobotPos, robotTrajectory),
   );
-
-  // virtual rays are rendered directly in the template to keep logic simple
 </script>
 
 {#if !browser}
@@ -1139,25 +1143,11 @@
           disabled={running}
           class="flex items-center gap-1 px-3 py-2 text-xs transition-colors border-l border-gray-200 {mode ===
           'point'
-            ? 'bg-purple-600 text-white'
-            : 'bg-gray-50 text-black hover:bg-gray-100'} disabled:opacity-40 disabled:cursor-not-allowed"
-        >
-          <PlusIcon class="w-3.5 h-3.5" /> Point
-        </button>
-        <button
-          onclick={() => {
-            if (obstacleAvoidanceMode === "virtual") mode = "point_dwa";
-          }}
-          disabled={running || obstacleAvoidanceMode !== "virtual"}
-          class="flex items-center gap-1 px-3 py-2 text-xs transition-colors border-l border-gray-200 {mode ===
-          'point_dwa'
             ? 'bg-red-600 text-white'
             : 'bg-gray-50 text-black hover:bg-gray-100'} disabled:opacity-40 disabled:cursor-not-allowed"
-          title={obstacleAvoidanceMode === "virtual"
-            ? "Select a DWA point target"
-            : "Enable virtual obstacles to use DWA"}
+          title="Select a DWA point target"
         >
-          <Square class="w-3.5 h-3.5" /> DWA
+          <PlusIcon class="w-3.5 h-3.5" /> Point
         </button>
         <button
           onclick={() => {
@@ -1182,6 +1172,38 @@
             : 'bg-gray-50 text-black hover:bg-gray-100'} disabled:opacity-40 disabled:cursor-not-allowed"
         >
           <Square class="w-3.5 h-3.5" /> Obstacles
+        </button>
+      </div>
+
+      <!-- Map layer controls -->
+      <div
+        class="flex items-center overflow-hidden rounded-md border border-gray-200"
+      >
+        <button
+          type="button"
+          onclick={() => {
+            showStaticMap = !showStaticMap;
+          }}
+          class="flex items-center gap-1 border-r border-gray-200 px-3 py-2 text-xs transition-colors {showStaticMap
+            ? 'bg-gray-800 text-white'
+            : 'bg-gray-50 text-black hover:bg-gray-100'}"
+          title="Toggle static occupancy map"
+        >
+          <Layers2 class="h-3.5 w-3.5" /> Static
+          <span class="text-[10px] opacity-70">{mapUpdate.static.length}</span>
+        </button>
+        <button
+          type="button"
+          onclick={() => {
+            showLidarLayer = !showLidarLayer;
+          }}
+          class="flex items-center gap-1 px-3 py-2 text-xs transition-colors {showLidarLayer
+            ? 'bg-sky-700 text-white'
+            : 'bg-gray-50 text-black hover:bg-gray-100'}"
+          title="Toggle live lidar layer"
+        >
+          <Layers2 class="h-3.5 w-3.5" /> Lidar
+          <span class="text-[10px] opacity-70">{mapUpdate.lidar.length}</span>
         </button>
       </div>
 
@@ -1324,28 +1346,6 @@
       {#if mode === "obstacle"}
         <div class="flex overflow-hidden rounded-md border border-gray-200">
           <button
-            onclick={() => setObstacleAvoidanceMode("normal")}
-            class="px-3 py-2 text-xs font-semibold transition-colors {obstacleAvoidanceMode ===
-            'normal'
-              ? 'bg-gray-900 text-white'
-              : 'bg-gray-50 text-gray-700 hover:bg-gray-100'}"
-            title="Use physical sensors for obstacle handling"
-          >
-            Normal
-          </button>
-          <button
-            onclick={() => setObstacleAvoidanceMode("virtual")}
-            class="border-l border-gray-200 px-3 py-2 text-xs font-semibold transition-colors {obstacleAvoidanceMode ===
-            'virtual'
-              ? 'bg-red-600 text-white'
-              : 'bg-gray-50 text-gray-700 hover:bg-gray-100'}"
-            title="Use virtual map obstacles for obstacle handling"
-          >
-            Virtual
-          </button>
-        </div>
-        <div class="flex overflow-hidden rounded-md border border-gray-200">
-          <button
             onclick={() => {
               obstacleShape = "circle";
             }}
@@ -1482,7 +1482,7 @@
         onwheel={handleWheel}
         ondragend={handleDragEnd}
         onmousedown={(e) => {
-          if (mode === "point" || mode === "point_dwa") {
+          if (mode === "point") {
             pointModeClick(e);
           } else if (mode === "obstacle") {
             obstacleModeClick(e);
@@ -1526,6 +1526,36 @@
             />
           {/each}
         </Layer>
+
+        <!-- Occupancy map layers -->
+        {#if showStaticMap || showLidarLayer}
+          <Layer listening={false}>
+            {#if showStaticMap}
+              {#each mapUpdate.static as cell}
+                {@const rect = mapCellRect(cell)}
+                <Rect
+                  x={rect.x}
+                  y={rect.y}
+                  width={MAP_CELL_SIZE}
+                  height={MAP_CELL_SIZE}
+                  fill={mapCellFill(rect.intensity, 1.0)}
+                />
+              {/each}
+            {/if}
+            {#if showLidarLayer}
+              {#each mapUpdate.lidar as cell}
+                {@const rect = mapCellRect(cell)}
+                <Rect
+                  x={rect.x}
+                  y={rect.y}
+                  width={MAP_CELL_SIZE}
+                  height={MAP_CELL_SIZE}
+                  fill={mapCellFill(rect.intensity, 1.0)}
+                />
+              {/each}
+            {/if}
+          </Layer>
+        {/if}
 
         <!-- Virtual obstacles -->
         {#if virtualObstacles.length > 0}
@@ -1721,26 +1751,6 @@
                     }}
                   />
                 {/if}
-              {/if}
-            {/each}
-          </Layer>
-        {/if}
-
-        <!-- Virtual obstacle avoidance rays: one plain line per valid ray endpoint -->
-        {#if rayPoints && displayRobotPos}
-          <Layer>
-            {#each rayPoints as rp}
-              {#if rp && rp[0] !== null && rp[1] !== null}
-                <Line
-                  points={[
-                    displayRobotPos.x * SCALE,
-                    -displayRobotPos.y * SCALE,
-                    rp[0] * SCALE,
-                    -rp[1] * SCALE,
-                  ]}
-                  stroke="#DC143C"
-                  strokeWidth={2 / zoom}
-                />
               {/if}
             {/each}
           </Layer>

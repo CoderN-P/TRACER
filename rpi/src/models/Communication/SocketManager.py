@@ -1,12 +1,14 @@
 from ..Bus import PathCompleted, PathError
+from ..Obstacles import VirtualObstacle
 
 class SocketManager:
-    def __init__(self, socketio, state_manager, config_manager, manual_manager, bus):
+    def __init__(self, socketio, state_manager, config_manager, manual_manager, world_model, bus):
         self.socketio = socketio
         
         self.state_manager = state_manager
         self.config_manager = config_manager
         self.manual_manager = manual_manager
+        self.world_model = world_model
         self.bus = bus
         
         self.bus.subscribe(
@@ -38,11 +40,17 @@ class SocketManager:
                 return
             case 'query':
                 # TODO: Implement proper LLM control
-                pass
+                return
+            case 'update_virtual_obstacles':
+                objects = [VirtualObstacle.model_validate(obstacle) for obstacle in data]
+                self.world_model.virtual_layer.update(objects)
             case 'update_constants':
                 await self.config_manager.update_constants(data)
                 return
             case 'vel_command':
                 await self.manual_manager.velocity_profile_manager.execute_velocity_profile()
+                return
             case 'joystick_input':
                 await self.manual_manager.handle_joystick_input(data)  
+                return
+            

@@ -4,6 +4,8 @@ __pycache__/
 *$py.class
 
 arduino/libraries
+arduino/oled
+arduino/servo_test
 
 # C extensions
 *.so

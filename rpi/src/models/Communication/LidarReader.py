@@ -7,14 +7,20 @@ from ..SensorData.Lidar import ScanAssembler, LidarPoint
 
 class LidarReader:
     def __init__(self, port='/dev/ttyUSB0', baudrate=460800):
-        self.reader = RPLidar(port,baudrate)
+        self.reader = None
+        self.port = port
+        self.baudrate = baudrate
         self.running = False
         self._logger = logging.getLogger("LidarReader")
         self.scan_assembler = ScanAssembler()
         
     async def scan_loop(self, callback):
         try:
-            print(self.reader.healthcheck())
+            self.reader = RPLidar(self.port, self.baudrate)
+        except:
+            return self._logger.error("Lidar is not available")
+            
+        try:
             scan_coroutine = self.reader.simple_scan(make_return_dict=True)
             
             async with asyncio.TaskGroup() as tg:
@@ -30,7 +36,7 @@ class LidarReader:
         while True:
             point_raw = await self.reader.output_queue.get()
             
-            if point_raw["d_mm"] is None:
+            if point_raw["d_mm"] is None or point_raw["d_mm"] < 100: # 10 cm is too close
                 continue
 
             point = LidarPoint(

@@ -27,7 +27,7 @@
     "RIGHT_CORRECTION_NEG",
     "OMEGA_P",
     "MAX_LINEAR_VEL_POS",
-    "MAX_LINEAR_VEL_NEG"
+    "MAX_LINEAR_VEL_NEG",
   ] as const satisfies readonly ConstantKey[];
 
   type ConstantKey = keyof typeof DEFAULT_CONSTANTS;
@@ -201,6 +201,33 @@
       ],
     },
     {
+      title: "Map & World",
+      subtitle: "Global map sizing and occupancy tuning.",
+      fields: [
+        {
+          key: "MAX_WORLD_WIDTH",
+          label: "MAX_WORLD_WIDTH",
+          step: "0.01",
+          min: 0,
+        },
+        {
+          key: "MAX_WORLD_HEIGHT",
+          label: "MAX_WORLD_HEIGHT",
+          step: "0.01",
+          min: 0,
+        },
+        { key: "GRID_RES", label: "GRID_RES", step: "0.01", min: 0 },
+        {
+          key: "OBSTACLE_PROB_THRESHOLD",
+          label: "OBSTACLE_PROB_THRESHOLD",
+          step: "0.01",
+          min: 0,
+        },
+        { key: "LOG_ODDS_OCC", label: "LOG_ODDS_OCC", step: "0.1" },
+        { key: "LOG_ODDS_FREE", label: "LOG_ODDS_FREE", step: "0.1" },
+      ],
+    },
+    {
       title: "Hardware & Motors",
       subtitle: "Motor and encoder hardware parameters.",
       fields: [
@@ -279,7 +306,7 @@
         { key: "I_RIGHT", label: "I_RIGHT", step: "0.01", min: 0 },
         { key: "D_RIGHT", label: "D_RIGHT", step: "0.01", min: 0 },
         { key: "I_ZONE", label: "I_ZONE", step: "0.001", min: 0 },
-        { key: "OMEGA_P", label: "OMEGA_P", step: "0.001", min: 0 },      
+        { key: "OMEGA_P", label: "OMEGA_P", step: "0.001", min: 0 },
       ],
     },
     {
@@ -439,6 +466,12 @@
           min: 0,
         },
         {
+          key: "EMIT_MAP_FREQ",
+          label: "EMIT_MAP_FREQ",
+          step: "0.1",
+          min: 0,
+        },
+        {
           key: "DWA_FREQ",
           label: "DWA_FREQ",
           step: "1",
@@ -463,7 +496,18 @@
         { key: "LSB_uT", label: "LSB_uT", step: "1e-6", min: 0 },
         { key: "LSB_C", label: "LSB_C", step: "1e-6", min: 0 },
         { key: "TEMP_OFFSET", label: "TEMP_OFFSET", step: "0.1", min: -100 },
-        { key: "USE_VIO", label: "USE_VIO" },
+        {
+          key: "LIDAR_TIMEOUT_NS",
+          label: "LIDAR_TIMEOUT_NS",
+          step: "1",
+          min: 0,
+        },
+        {
+          key: "LIDAR_DECAY_FREQ",
+          label: "LIDAR_DECAY_FREQ",
+          step: "0.1",
+          min: 0,
+        },
       ],
     },
     {
@@ -529,6 +573,7 @@
 
   let { class: className = "" } = $props();
   let activeSection = $state<number>(0);
+  let activeConstantSection = $derived(CONSTANT_SECTIONS[activeSection]);
   const initialConstants = createInitialConstants();
 
   let constants = $state<Record<ConstantKey, ConstantValue>>(initialConstants);
@@ -606,9 +651,9 @@
 </script>
 
 <Card.Root
-  class="w-full h-full border border-gray-100 bg-white flex flex-col {className}"
+  class="w-full h-full overflow-hidden border border-gray-100 bg-white flex flex-col {className}"
 >
-  <Card.Header class="space-y-2">
+  <Card.Header class="shrink-0 space-y-2">
     <div
       class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"
     >
@@ -646,109 +691,115 @@
     </div>
   </Card.Header>
 
-  <Card.Content class="min-h-0 flex-1 space-y-3 overflow-hidden">
-    <div class="flex flex-wrap gap-2">
-      {#each CONSTANT_SECTIONS as section, index}
-        <button
-          type="button"
-          onclick={() => (activeSection = index)}
-          class="rounded-full border px-3 py-1 text-xs font-semibold transition-colors {activeSection ===
-          index
-            ? 'border-gray-300 bg-gray-200 text-gray-900'
-            : 'border-gray-200 bg-gray-50 text-gray-600 hover:bg-gray-100'}"
-        >
-          {section.title}
-        </button>
-      {/each}
-    </div>
-
-    {@const section = CONSTANT_SECTIONS[activeSection]}
-    <section
-      class="h-[calc(100%-2.5rem)] rounded-lg border border-gray-200 bg-gray-50 p-4 overflow-hidden"
-    >
-      <div class="mb-4 space-y-1">
-        <h3 class="text-sm font-semibold text-gray-900">{section.title}</h3>
-        <p class="text-xs text-gray-500">{section.subtitle}</p>
-      </div>
-
-      <div class="grid gap-3 sm:grid-cols-2">
-        {#each section.fields as field}
-          <div class="space-y-1">
-            <div
-              class="flex items-center justify-between gap-2 text-xs font-medium text-gray-700"
-            >
-              <div class="flex min-w-0 items-center gap-1.5">
-                <span class="truncate font-mono">{field.label}</span>
-                {#if isEmbeddedConstant(field.key)}
-                  <span
-                    class="inline-flex shrink-0 items-center gap-1 rounded border border-amber-200 bg-amber-50 px-1.5 py-px text-[9px] font-bold uppercase leading-4 text-amber-700"
-                    title="Also sent to the embedded controller config"
-                  >
-                    <Cpu class="h-2.5 w-2.5" />
-                    emb
-                  </span>
-                {/if}
-              </div>
-              <button
-                type="button"
-                class="shrink-0 text-[11px] font-semibold text-gray-500 hover:text-gray-900"
-                onclick={() => resetConstant(field.key)}
-                title={`Reset ${field.label} to its default value`}
-              >
-                default
-              </button>
-            </div>
-
-            {#if typeof constants[field.key] === "boolean"}
-              <button
-                type="button"
-                role="switch"
-                aria-checked={Boolean(constants[field.key])}
-                onclick={() =>
-                  syncBooleanConstant(field.key, constants[field.key] !== true)}
-                class="flex h-10 w-full items-center justify-between rounded-md border px-3 text-sm font-semibold transition-colors {constants[
-                  field.key
-                ] === true
-                  ? 'border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100'
-                  : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'}"
-              >
-                <span class="font-mono">
-                  {constants[field.key] === true ? "true" : "false"}
-                </span>
-                <span
-                  class="relative h-5 w-9 rounded-full transition-colors {constants[
-                    field.key
-                  ] === true
-                    ? 'bg-emerald-500'
-                    : 'bg-gray-300'}"
-                >
-                  <span
-                    class="absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform {constants[
-                      field.key
-                    ] === true
-                      ? ''
-                      : '-translate-x-4'}"
-                  ></span>
-                </span>
-              </button>
-            {:else}
-              <input
-                type="number"
-                step={field.step ?? "any"}
-                min={field.min}
-                value={draftValues[field.key]}
-                oninput={(event) =>
-                  syncConstant(
-                    field.key,
-                    (event.currentTarget as HTMLInputElement).value,
-                  )}
-                onblur={() => normalizeField(field.key)}
-                class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 font-mono text-sm text-gray-900 outline-none transition-colors placeholder:text-gray-400 focus:border-gray-500 focus:ring-2 focus:ring-gray-200"
-              />
-            {/if}
-          </div>
+  <Card.Content class="min-h-0 flex-1 overflow-hidden">
+    <div class="flex h-full min-h-0 flex-col gap-3">
+      <div class="shrink-0 flex flex-wrap gap-2">
+        {#each CONSTANT_SECTIONS as section, index}
+          <button
+            type="button"
+            onclick={() => (activeSection = index)}
+            class="rounded-full border px-3 py-1 text-xs font-semibold transition-colors {activeSection ===
+            index
+              ? 'border-gray-300 bg-gray-200 text-gray-900'
+              : 'border-gray-200 bg-gray-50 text-gray-600 hover:bg-gray-100'}"
+          >
+            {section.title}
+          </button>
         {/each}
       </div>
-    </section>
+
+      <section
+        class="min-h-0 flex-1 overflow-y-auto overscroll-contain rounded-lg border border-gray-200 bg-gray-50 p-4"
+      >
+        <div class="mb-4 space-y-1">
+          <h3 class="text-sm font-semibold text-gray-900">
+            {activeConstantSection.title}
+          </h3>
+          <p class="text-xs text-gray-500">{activeConstantSection.subtitle}</p>
+        </div>
+
+        <div class="grid gap-3 sm:grid-cols-2">
+          {#each activeConstantSection.fields as field}
+            <div class="space-y-1">
+              <div
+                class="flex items-center justify-between gap-2 text-xs font-medium text-gray-700"
+              >
+                <div class="flex min-w-0 items-center gap-1.5">
+                  <span class="truncate font-mono">{field.label}</span>
+                  {#if isEmbeddedConstant(field.key)}
+                    <span
+                      class="inline-flex shrink-0 items-center gap-1 rounded border border-amber-200 bg-amber-50 px-1.5 py-px text-[9px] font-bold uppercase leading-4 text-amber-700"
+                      title="Also sent to the embedded controller config"
+                    >
+                      <Cpu class="h-2.5 w-2.5" />
+                      emb
+                    </span>
+                  {/if}
+                </div>
+                <button
+                  type="button"
+                  class="shrink-0 text-[11px] font-semibold text-gray-500 hover:text-gray-900"
+                  onclick={() => resetConstant(field.key)}
+                  title={`Reset ${field.label} to its default value`}
+                >
+                  default
+                </button>
+              </div>
+
+              {#if typeof constants[field.key] === "boolean"}
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={Boolean(constants[field.key])}
+                  onclick={() =>
+                    syncBooleanConstant(
+                      field.key,
+                      constants[field.key] !== true,
+                    )}
+                  class="flex h-10 w-full items-center justify-between rounded-md border px-3 text-sm font-semibold transition-colors {constants[
+                    field.key
+                  ] === true
+                    ? 'border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100'
+                    : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'}"
+                >
+                  <span class="font-mono">
+                    {constants[field.key] === true ? "true" : "false"}
+                  </span>
+                  <span
+                    class="relative h-5 w-9 rounded-full transition-colors {constants[
+                      field.key
+                    ] === true
+                      ? 'bg-emerald-500'
+                      : 'bg-gray-300'}"
+                  >
+                    <span
+                      class="absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform {constants[
+                        field.key
+                      ] === true
+                        ? ''
+                        : '-translate-x-4'}"
+                    ></span>
+                  </span>
+                </button>
+              {:else}
+                <input
+                  type="number"
+                  step={field.step ?? "any"}
+                  min={field.min}
+                  value={draftValues[field.key]}
+                  oninput={(event) =>
+                    syncConstant(
+                      field.key,
+                      (event.currentTarget as HTMLInputElement).value,
+                    )}
+                  onblur={() => normalizeField(field.key)}
+                  class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 font-mono text-sm text-gray-900 outline-none transition-colors placeholder:text-gray-400 focus:border-gray-500 focus:ring-2 focus:ring-gray-200"
+                />
+              {/if}
+            </div>
+          {/each}
+        </div>
+      </section>
+    </div>
   </Card.Content>
 </Card.Root>

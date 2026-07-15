@@ -36,7 +36,15 @@ class RobotConfig:
     ROBOT_WIDTH: float
     ROBOT_HEIGHT: float
     MAX_RPM: int
+    MAX_WORLD_WIDTH: float
+    MAX_WORLD_HEIGHT: float
+    GRID_RES: float
+    OBSTACLE_PROB_THRESHOLD: float
+    LOG_ODDS_OCC: float
+    LOG_ODDS_FREE: float
     REDUCTION_RATIO: float
+    LIDAR_TIMEOUT_NS: int
+    LIDAR_DECAY_FREQ: float
     JOYSTICK_DEADZONE: float
     MAX_LATERAL_ACCEL: float
     MAX_LONG_ACCEL: float
@@ -66,6 +74,7 @@ class RobotConfig:
     CLEARANCE_HEIGHT: float 
     CLEAR_FRAMES_THRESHOLD: float
     EMIT_SENSOR_FREQ: float
+    EMIT_MAP_FREQ: float
     SENSOR_TIMEOUT: float
     MAIN_LOOP_FREQ: float
     PATH_FOLLOWING_FREQ: float

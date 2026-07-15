@@ -17,6 +17,7 @@
     RobotStateSchema,
   } from "$lib/types";
   import PathDrawer, {
+    type MapUpdatePayload,
     type RunPathPayload,
   } from "$lib/components/PathDrawer.svelte";
   import Status from "$lib/components/Status.svelte";
@@ -30,7 +31,9 @@
   import KeyboardHandler from "$lib/components/KeyboardHandler.svelte";
   import TemperatureDisplay from "$lib/components/TemperatureDisplay.svelte";
   import BatteryPercentage from "$lib/components/BatteryPercentage.svelte";
-  import ObstructionStatus from "$lib/components/ObstructionStatus.svelte";
+  import ObstructionStatus, {
+    type LidarPointCloud,
+  } from "$lib/components/ObstructionStatus.svelte";
   import CommandList from "$lib/components/CommandList.svelte";
   import Recordings from "$lib/components/Recordings.svelte";
   import GestureController from "$lib/components/GestureController.svelte";
@@ -91,6 +94,7 @@
   let previousSensorData = $state<SensorData | null>(null);
   let rayPoints = $state<(number | null)[][] | null>(null);
   let mode = $state<Mode>(Mode.MANUAL);
+  let localizationMode = $state<string | null>(null);
   let logs = $state<LogEntry[]>([]);
   let joystickInput = $state<Joystick>({
     left_y: 0,
@@ -122,6 +126,8 @@
     }[]
   >([]);
   let freehandPath = $state<{ x: number; y: number }[]>([]);
+  let mapUpdate = $state<MapUpdatePayload>({ static: [], lidar: [] });
+  let latestLidarScan = $state<LidarPointCloud | null>(null);
   let pathComplete = $state(false);
   let joystickSendInterval: ReturnType<typeof setInterval> | null = null;
   let wasJoystickActive = false;
@@ -139,6 +145,83 @@
       icon: "send",
     });
     input = "";
+  }
+
+  function normalizeMapLayer(layer: unknown): MapUpdatePayload["static"] {
+    if (!Array.isArray(layer)) return [];
+
+    return layer.flatMap((cell) => {
+      if (!Array.isArray(cell) || cell.length < 3) return [];
+      const [x, y, intensity] = cell;
+      if (
+        typeof x !== "number" ||
+        typeof y !== "number" ||
+        typeof intensity !== "number" ||
+        !Number.isFinite(x) ||
+        !Number.isFinite(y) ||
+        !Number.isFinite(intensity)
+      ) {
+        return [];
+      }
+
+      return [
+        [x, y, Math.max(0, Math.min(255, intensity))] as [
+          number,
+          number,
+          number,
+        ],
+      ];
+    });
+  }
+
+  function normalizeMapUpdate(data: unknown): MapUpdatePayload {
+    const packet =
+      data && typeof data === "object" ? (data as Record<string, unknown>) : {};
+
+    return {
+      static: normalizeMapLayer(packet.static),
+      lidar: normalizeMapLayer(packet.lidar),
+    };
+  }
+
+  function normalizeLatestLidarScan(data: unknown): LidarPointCloud | null {
+    if (!data || typeof data !== "object") return null;
+
+    const packet = data as Record<string, unknown>;
+    const timestamp = packet.timestamp;
+    const points = packet.points;
+
+    if (typeof timestamp !== "number" || !Array.isArray(points)) return null;
+
+    const normalizedPoints = points.flatMap((point) => {
+      if (!point || typeof point !== "object") return [];
+      const candidate = point as Record<string, unknown>;
+      const { x, y, quality } = candidate;
+
+      if (
+        typeof x !== "number" ||
+        typeof y !== "number" ||
+        typeof quality !== "number" ||
+        !Number.isFinite(x) ||
+        !Number.isFinite(y) ||
+        !Number.isFinite(quality)
+      ) {
+        return [];
+      }
+
+      return [
+        {
+          x,
+          y,
+          quality: Math.max(0, Math.min(63, quality)),
+        },
+      ];
+    });
+
+    return {
+      timestamp,
+      points: normalizedPoints,
+    };
   }
 
   onMount(() => {
@@ -204,6 +287,10 @@
     socket.on("sensor_data", (data) => {
       previousSensorData = sensorData;
       mode = data.mode;
+      localizationMode =
+        typeof data.localization_mode === "string"
+          ? data.localization_mode
+          : null;
       try {
         sensorData = SensorDataSchema.parse(data.sensors);
         robotState = RobotStateSchema.parse(data.state);
@@ -211,6 +298,7 @@
         velocityCommand = data.velocityCommand;
         maxLoopTime = data.max_loop_time ?? null;
         rayPoints = data.virtual_rays ?? null;
+        latestLidarScan = normalizeLatestLidarScan(data.latest_lidar_scan);
 
         packetCount++;
         const now = new Date().getTime();
@@ -247,6 +335,10 @@
 
     socket.on("path_complete", () => {
       pathComplete = true;
+    });
+
+    socket.on("map_update", (data) => {
+      mapUpdate = normalizeMapUpdate(data);
     });
 
     joystickSendInterval = setInterval(() => {
@@ -378,7 +470,7 @@
     <main class="min-w-0 flex-1 p-3">
       <div class="flex h-full min-h-0 flex-col gap-2">
         <div class="grid w-full grid-cols-1 gap-2 lg:grid-cols-[1fr_auto_auto]">
-          <Status {lastSensorUpdate} {mode} bind:logs />
+          <Status {lastSensorUpdate} {mode} {localizationMode} bind:logs />
           <div class="flex flex-row gap-2 justify-between lg:justify-end">
             <RobotControls lastSensorUpdateTime={lastSensorUpdate} />
             <BatteryPercentage
@@ -411,7 +503,7 @@
                 bind:freehandPath
                 onRunPath={runPath}
                 onStopRun={stopPathRun}
-                {rayPoints}
+                {mapUpdate}
               />
             </div>
             <div class="col-span-5 row-span-8 min-h-0">
@@ -423,6 +515,8 @@
             <div class="col-span-5 row-span-4 min-h-0">
               <ObstructionStatus
                 {sensorData}
+                {latestLidarScan}
+                {robotState}
                 {lastSensorUpdate}
                 class="h-full"
               />
@@ -448,6 +542,8 @@
                 </div>
                 <ObstructionStatus
                   {sensorData}
+                  {latestLidarScan}
+                  {robotState}
                   {lastSensorUpdate}
                   class="h-full"
                 />

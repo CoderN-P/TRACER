@@ -8,9 +8,9 @@ from ..Obstacles.VirtualObstacleType import VirtualObstacleType
 from .. import ROBOT_CONFIG
 
 class DWA:
-    def __init__(self, goal_position: tuple, virtual_obstacles: List[VirtualObstacle]):  
+    def __init__(self, goal_position: tuple, world_model: WorldModel):  
         self.goal_position = goal_position
-        self.virtual_obstacles = virtual_obstacles
+        self.world_model = world_model
         
     def calculate_control_command(self, robot_state: RobotState):
         if math.hypot(robot_state.x - self.goal_position[0], robot_state.y - self.goal_position[1]) <= ROBOT_CONFIG.COMPLETION_THRESHOLD:
@@ -86,72 +86,8 @@ class DWA:
         return trajectory
 
     def distance(self, trajectory):
-        if not trajectory:
-            return 3
-
-        # --- STEP 1: Broad-phase filtering ---
-        # Find the bounding box of the entire trajectory
-        xs = [pt[0] for pt in trajectory]
-        ys = [pt[1] for pt in trajectory]
-        traj_min_x, traj_max_x = min(xs), max(xs)
-        # Pad by a reasonable safety margin (e.g., max obstacle size + robot radius)
-        margin = 2.0
-    
-        relevant_obstacles = []
-        for obstacle in self.virtual_obstacles:
-            ox, oy = obstacle.position[0], obstacle.position[1]
-            # Quick AABB proximity check
-            if (traj_min_x - margin <= ox <= traj_max_x + margin and
-                    min(ys) - margin <= oy <= max(ys) + margin):
-                relevant_obstacles.append(obstacle)
-    
-        # If no obstacles are anywhere near this trajectory, skip all collision checks
-        if not relevant_obstacles:
-            # Just calculate total length up to max of 3
-            total_dist = 0
-            for i in range(1, len(trajectory)):
-                dx = trajectory[i][0] - trajectory[i-1][0]
-                dy = trajectory[i][1] - trajectory[i-1][1]
-                total_dist += (dx*dx + dy*dy) ** 0.5
-                if total_dist >= 3:
-                    return 3
-            return min(total_dist, 3)
-    
-        # --- STEP 2: Narrow-phase with early exits ---
-        dist = 0.0
-        prev_x, prev_y, _ = trajectory[0]
-    
-        for i in range(1, len(trajectory)):
-            x, y, theta = trajectory[i]
-    
-            # Optimized distance calculation
-            dx = x - prev_x
-            dy = y - prev_y
-            dist += (dx * dx + dy * dy) ** 0.5
-    
-            # Early exit if we are already past the max window
-            if dist >= 3:
-                return 3
-    
-            for obstacle in relevant_obstacles:
-                if obstacle.obstacle_type == VirtualObstacleType.CIRCLE:
-                    collision = self.check_collision_circle(
-                        x, y, theta,
-                        obstacle.position[0], obstacle.position[1], obstacle.radius
-                    )
-                else:
-                    collision = self.check_collision_rect(
-                        x, y, theta,
-                        obstacle.position[0], obstacle.position[1],
-                        obstacle.width, obstacle.height,
-                    )
-    
-                if collision:
-                    return dist
-    
-            prev_x, prev_y = x, y
-    
-        return 3
+        # TODO
+        return
         
         
     @staticmethod

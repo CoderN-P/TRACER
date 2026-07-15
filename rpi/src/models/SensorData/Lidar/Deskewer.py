@@ -12,10 +12,11 @@ class Deskewer:
             deskewed_point = self.deskew_point(point)
             deskewed_points.append(deskewed_point)
         
+        # Returns point cloud and associated robot pose
         return PointCloud(
             timestamp=scan.end_time_ns,
             points=deskewed_points
-        )
+        ), self.state_estimator.state_history.interpolate_pose(scna.points[-1].timestamp)
     
     def deskew_point(self, point: LidarPoint):
         state = self.state_estimator.state_history.interpolate_pose(point.timestamp)

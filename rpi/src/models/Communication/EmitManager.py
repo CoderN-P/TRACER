@@ -1,4 +1,5 @@
 from .. import ROBOT_CONFIG
+
 class EmitManager:
     def __init__(self, socket_manager, state_manager, manual_manager, loop_monitoring):
         self.socket_manager = socket_manager
@@ -7,9 +8,11 @@ class EmitManager:
         self.manual_manager = manual_manager
 
         self.sensor_update_dt = 1 / ROBOT_CONFIG.EMIT_SENSOR_FREQ
+        self.map_update_dt = 1 / ROBOT_CONFIG.EMIT_MAP_FREQ
         self.last_emit_time: float = 0.0
+        self.last_map_emit_time: float = 0.0
 
-    async def send_sensor_update(self, sensor_data: SensorData, robot_state: RobotState ):
+    async def send_sensor_update(self, sensor_data: SensorData, robot_state: RobotState, lidar_data: PointCloud):
         cur_time = asyncio.get_event_loop().time()
         if cur_time - self.last_emit_time < self.sensor_update_dt:
             return
@@ -22,6 +25,8 @@ class EmitManager:
             "sensors": SensorData.clean(sensor_data.model_dump()),
             "state": SensorData.clean(robot_state.model_dump()),
             "mode": current_mode.name,
+            "localization_mode": self.state_manager.localization_mode.name,
+            "latest_lidar_scan": SensorData.clean(lidar_data.model_dump()),
             "timestamp": datetime.datetime.now().isoformat(),
             "max_loop_time": self.loop_monitoring.max_loop_time,
             "velocity_profile_t": time.monotonic() - self.manual_manager.velocity_profile_manager.velocity_profile_start if self.manual_manager.velocity_profile_manager.velocity_profile_start else None,
@@ -30,3 +35,12 @@ class EmitManager:
             
         await self.socket_manager.socketio.emit("sensor_data", packet)
         self.loop_monitoring.max_loop_time = 0.0
+        
+    async def send_map_update(self):
+        cur_time = asyncio.get_event_loop().time()
+        if cur_time - self.last_map_emit_time < self.map_update_dt:
+            return
+        
+        self.last_map_emit_time = cur_time
+        packet = self.socket_manager.world_model.serialize_visualization()
+        await self.socket_manager.socketio.emit("map_update", packet)

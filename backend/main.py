@@ -51,20 +51,14 @@ def setup_routes(controller: Controller):
         """
         controller.handle_joystick_input(data)
         
-    @sio_client.on('obstacle_detected')
-    def handle_obstacle_detected(data):
-        controller.on_obstacle_detected(data)
-        socket.emit('obstacle_detected', data)
-        
-    @sio_client.on('cliff_detected')
-    def handle_cliff_detected(data):
-        controller.on_cliff_detected(data)
-        socket.emit('cliff_detected', data)
-        
     @sio_client.on('sensor_data')
     def handle_sensor_update(data):
         controller.update_state(data)
         socket.emit('sensor_data', data)
+        
+    @sio_client.on('map_update')
+    def handle_map_update(data):
+        socket.emit('map_update', data)
         
     @sio_client.on('active_command')
     def handle_active_command(data):
@@ -77,6 +71,11 @@ def setup_routes(controller: Controller):
         """
         controller.rumble(0.5, 0.5, 500)
         socket.emit('path_complete', data)
+
+    @sio_client.on('obstacle_detected')
+    def handle_obstacle_detected(data):
+        controller.on_obstacle_detected(data)
+        socket.emit('obstacle_detected', data)
         
     @socket.on('update_constants')
     def update_constants(data):
@@ -85,15 +84,6 @@ def setup_routes(controller: Controller):
     @socket.on('update_virtual_obstacles')
     def update_virtual_obstacles(data):
         sio_client.emit('update_virtual_obstacles', data)
-
-    @socket.on('update_obstacle_mode')
-    def update_obstacle_mode(data):
-        sio_client.emit('update_obstacle_mode', data)
-        
-    @socket.on('update_pid')
-    def update_pid(data):
-        controller.rumble(0.5, 0.5, 500)
-        sio_client.emit('update_pid', data)
         
     @socket.on('vel_command')
     def vel_command(data):

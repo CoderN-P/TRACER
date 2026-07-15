@@ -8,7 +8,8 @@ from .PathFollowing import PathManager
 from .Communication import LidarReader, SerialManager, SocketManager, EmitManager
 from .Bus import EventBus
 from .StateEstimation import StateEstimator
-from .SensorData import SensorDataManager
+from .SensorData import SensorDataManager, Deskewer
+from .Mapping import WorldModel
 from .Manual import ManualManager
 from . import RobotConfig, Mode, LoopMonitoring, ConfigManager, StateManager, ROBOT_CONFIG
 from ..ai.get_commands import text_to_command
@@ -22,14 +23,16 @@ class Robot:
         self.socketio: Socket = socketio
         self.serial: SerialManager = serial_manager
         self.state_estimator: StateEstimator = StateEstimator(self.bus)
+        self.deskewer: Deskewer = Deskewer(self.state_estimator)
         self.loop_monitoring = LoopMonitoring()
         self.command_manager = CommandManager(self.serial)
         self.config_manager = ConfigManager(self.command_manager)
         self.state_manager = StateManager(self.command_manager, self.bus)
+        self.world_model = WorldModel(self.state_manager)
         self.sensor_data_manager = SensorDataManager(self.state_manager, self.command_manager)
         self.manual_manager = ManualManager(self.command_manager, self.state_manager)
-        self.socket_manager = SocketManager(self.socketio, self.state_manager, self.config_manager, self.manual_manager, self.bus)
-        self.path_manager = PathManager(self.command_manager, self.bus)
+        self.socket_manager = SocketManager(self.socketio, self.state_manager, self.config_manager, self.manual_manager, self.world_model, self.bus)
+        self.path_manager = PathManager(self.command_manager, self.world_model, self.bus)
         self.emit_manager = EmitManager(self.socket_manager, self.state_manager, self.manual_manager, self.loop_monitoring)
         
         self.running: bool = False
@@ -96,16 +99,33 @@ class Robot:
         if self.state_manager.get_state() == Mode.STOPPED: # Only update state estimator if not stopped
             return sensor_data
         
-        self.state_estimator.update(sensor_data, self.sensor_data_manager.previous_sensor_data, None)
+        self.state_estimator.update(sensor_data, self.sensor_data_manager.previous_sensor_data)
 
         # Update EKF with missed packets
         self.sensor_data_manager.previous_sensor_data = sensor_data
         while not self.sensor_data_manager.sensor_queue.empty():
             sensor_data = self.sensor_queue.get()
-            self.state_estimator.update(sensor_data, self.previous_sensor_data, None)
+            self.state_estimator.update(sensor_data, self.previous_sensor_data)
             self.sensor_data_manager.previous_sensor_data = sensor_data
         
         return sensor_data
+
+    def process_lidar_queue(self):
+        latest_scan = None
+    
+        while not self.sensor_data_manager.lidar_queue.empty():
+            latest_scan = self.sensor_data_manager.lidar_queue.get()
+            point_cloud, reference_pose = self.deskewer.deskew(latest_scan)
+            
+    
+            if self.state_manager.get_state() != Mode.STOPPED: # Only update the world model if not stopped
+                self.world_model.update(
+                    point_cloud,
+                    reference_pose
+                )
+    
+        return latest_scan
+        
     
     async def main_loop(self):
         """Main loop to continuously read sensor data and update state estimator."""
@@ -124,14 +144,18 @@ class Robot:
                 continue
                 
             sensor_data = self.process_sensor_queue()
+            lidar_data = self.process_lidar_queue()
+            self.world_model.decay_live_layer()
             await self.state_manager.sync_with_embedded(sensor_data) # Syncs rpi state to embedded state
             self.path_manager.execute_cur_path(self.state_estimator.state) # Follows the current path if available
             self.manual_manager.execute_manual_commands() # Executes manual commands such as joystick or custom velocity profiles
             
             self.loop_monitoring.update_loop_time(start) # Monitors worst loop times
-            await self.emit_manager.send_sensor_update(sensor_data, self.state_estimator.state)
+            await self.emit_manager.send_sensor_update(sensor_data, self.state_estimator.state, lidar_data)
+            await self.emit_manager.send_map_update()
             
             elapsed = asyncio.get_event_loop().time() - start
-            await asyncio.sleep(max(0.0001, dt - elapsed)) # 100Hz loop
-            
+            await asyncio.sleep(max(0.0001, dt - elapsed)) # 200Hz loop
+          
+        self.world_model.shutdown()  
         self._logger.info("Exited main loop")

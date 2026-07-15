@@ -4,7 +4,6 @@ import logging
 from . import MAP_SAVE_DIR
 from .OccupancyGrid import OccupancyGrid
 from ..SensorData import PointCloud
-from ..StateEstimation import RobotState
 from .. import ROBOT_CONFIG
 
 class StaticMapGrid(OccupancyGrid):
@@ -21,20 +20,20 @@ class StaticMapGrid(OccupancyGrid):
             self._logger.error("Map not found")
             return False
 
-    def update(self, point_cloud: PointCloud, pose: RobotState):
+    def update(self, point_cloud: PointCloud, pose):
         origin = (
-            pose.x + offset_x*np.cos(pose.yaw)
-            - offset_y*np.sin(pose.yaw),
+            pose[0] + ROBOT_CONFIG.LIDAR_OFFSET_X*np.cos(pose[2])
+            - ROBOT_CONFIG.LIDAR_OFFSET_Y*np.sin(pose[2]),
 
-            pose.y + offset_x*np.sin(pose.yaw)
-            + offset_y*np.cos(pose.yaw)
+            pose[1] + ROBOT_CONFIG.LIDAR_OFFSET_X*np.sin(pose[2])
+            + ROBOT_CONFIG.LIDAR_OFFSET_Y*np.cos(pose[2])
         )
         endpoints = [[point.x, point.y] for point in point_cloud.points]
         rays = self.raycast(origin, endpoints)
         
         for ray in rays:
             for cell in ray[:-1]:
-                self.decrease_occpancy(cell)
+                self.decrease_occupancy(cell)
             
             self.increase_occupancy(ray[-1])
             

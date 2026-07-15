@@ -1,7 +1,6 @@
 import os
 import datetime
 from ..SensorData.Lidar import PointCloud
-from ..StateEstimation import RobotState
 from . import LocalizationMode, StaticMapGrid, VirtualLayer, MAP_SAVE_DIR, LidarLayer
 
 
@@ -13,7 +12,7 @@ class WorldModel:
         
         self.state_manager = state_manager
         
-    def update(self, point_cloud: PointCloud, pose: RobotState):
+    def update(self, point_cloud: PointCloud, pose):
         self.lidar_layer.update(point_cloud, pose)
         
         if self.state_manager.localization_state == LocalizationMode.MAP:

@@ -38,9 +38,10 @@ class LidarLayer(OccupancyGrid):
                 x, y = cell
                 self.grid[y, x] = np.clip(self.grid[y, x] + self.FREE_UPDATE, self.CELL_MIN, self.CELL_MAX)
                 self.last_seen[y, x] = point_cloud.timestamp
-
-            # Mark occupied endpoint.
             x, y = ray[-1]
+            if x >= self.grid_width or y >= self.grid_height:
+                self._logger.warning(ray)
+            # Mark occupied endpoint.
             self.grid[y, x] = np.clip(self.grid[y, x] + self.OCCUPIED_UPDATE, self.CELL_MIN, self.CELL_MAX)
             self.last_seen[y, x] = point_cloud.timestamp
                 
@@ -66,6 +67,6 @@ class LidarLayer(OccupancyGrid):
             )
         )
 
-        data = [self.cell_to_world(cell[0], cell[1]) + [cell[2]] for cell in cells] # array of x, y, intensity
+        data = [list(self.cell_to_world(cell[0], cell[1])) + [cell[2]] for cell in cells] # array of x, y, intensity
 
         return data

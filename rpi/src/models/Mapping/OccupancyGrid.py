@@ -16,7 +16,6 @@ class OccupancyGrid:
         self.origin_y = -height / 2
         
     def world_to_cell(self, x, y):
-        
         cell_x = int((x - self.origin_x) / self.resolution)
         cell_y = int((y - self.origin_y) / self.resolution)
         return cell_x, cell_y

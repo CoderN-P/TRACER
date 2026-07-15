@@ -24,7 +24,7 @@ class Deskewer:
         state = self.state_estimator.snapshot_history.interpolate_pose(point.timestamp_ns)
         if not state: return None
         # 1. Convert local polar point to local Cartesian (LiDAR sensor frame)
-        print(state)
+
         point_theta = np.radians(point.angle)
         
         p_lidar = np.array([

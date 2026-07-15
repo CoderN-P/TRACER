@@ -119,7 +119,6 @@ class GapNavigator:
                     valid_gaps.append((gap, width))
 
             if not valid_gaps:
-                print(gaps)
                 # Gaps exist but none are wide enough to fit physical robot bounds
                 self.recovery_state = RecoveryState.SCANNING
                 self.spin_direction = 1 if goal_is_left else -1

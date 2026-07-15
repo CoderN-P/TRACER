@@ -58,6 +58,7 @@ def setup_routes(controller: Controller):
         
     @sio_client.on('map_update')
     def handle_map_update(data):
+        print("recieved map update")
         socket.emit('map_update', data)
         
     @sio_client.on('active_command')

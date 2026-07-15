@@ -44,7 +44,15 @@ class StateHistory:
             next_snapshot = self.history[closest_idx + 1]
         else:
             if closest_idx == 0:
-                return self.history[0].robot_state
+                return (
+                    self.history[0].robot_state.x,
+                    self.history[0].robot_state.y,
+                    self.history[0].robot_state.yaw,
+                    self.history[0].robot_state.linear_velocity,
+                    self.history[0].robot_state.angular_velocity,
+                    self.history[0].robot_state.v_left,
+                    self.history[0].robot_state.v_right
+                )
             prev_snapshot = self.history[closest_idx - 1]
             next_snapshot = self.history[closest_idx]
 
@@ -52,7 +60,15 @@ class StateHistory:
         t1 = next_snapshot.timestamp
 
         if t1 == t0:
-            return prev_snapshot.robot_state
+            return (
+                prev_snapshot.robot_state.x,
+                prev_snapshot.robot_state.y,
+                prev_snapshot.robot_state.yaw,
+                prev_snapshot.robot_state.linear_velocity,
+                prev_snapshot.robot_state.angular_velocity,
+                prev_snapshot.robot_state.v_left,
+                prev_snapshot.robot_state.v_right
+            )
 
         alpha = (timestamp - t0) / (t1 - t0)
 

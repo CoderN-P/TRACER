@@ -146,7 +146,7 @@ void handleCommand(byte *buffer, size_t length)
     {
         // Command 0x06: Update Config (Format = len,key,value...
         int i = 3;
-        if (!xSemaphoreTake(config_mutex, pdMS_TO_TICKS(5)) == pdTRUE){
+        if (!(xSemaphoreTake(config_mutex, pdMS_TO_TICKS(5)) == pdTRUE)){
             strncpy(line1, "Config Busy", 16);
         } else {
             while (i < buffer[2]){

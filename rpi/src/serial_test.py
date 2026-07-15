@@ -3,7 +3,7 @@ import logging
 import time
 import threading
 from . import ROBOT_CONFIG
-from .models import SerialManager, Robot, Command, CommandType, OLEDCommand, MotorCommand
+from .models import SerialManager, SensorData, Robot, Command, CommandType, OLEDCommand, MotorCommand
 
 def serial_test(port=None):
     port = port if port else SerialManager.find_port()
@@ -23,7 +23,7 @@ def serial_test(port=None):
         nonlocal prev_sensor_data
         sensor_data = SensorData.from_bytes(data)
         if prev_sensor_data:
-            print(sensor_data.timestamp - prev_sensor_data.timestamp)            
+            print(sensor_data)            
         prev_sensor_data = sensor_data            
         
     serial_manager = SerialManager(port, 921600)
@@ -32,9 +32,20 @@ def serial_test(port=None):
     serial_manager.send(Command(
         ID="",
         command_type=CommandType.OLED,
-        command=OLEDCommandommand(
+        command=OLEDCommand(
             line_1="Serial Test",
             line_2="Running...",
+        ),
+        duration=0,
+        pause_duration=0,
+    ))
+
+    serial_manager.send(Command(
+        ID="",
+        command_type=CommandType.MOTOR,
+        command=MotorCommand(
+            left_motor=-0.3,
+            right_motor=-0.3,
         ),
         duration=0,
         pause_duration=0,

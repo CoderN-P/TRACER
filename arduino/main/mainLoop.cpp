@@ -33,8 +33,9 @@ void mainLoop(void *pvParameters)
         int16_t pcntLeftRaw, pcntRightRaw;
         GeneralConfig configCopy;
         
-        if (xSemaphoreTake(config_mutex, pdMS_TO_TICKS(0.5))){
+        if (xSemaphoreTake(config_mutex, pdMS_TO_TICKS(0.5)) == pdTRUE){
             memcpy(&configCopy, &config, sizeof(config));
+            xSemaphoreGive(config_mutex);
         } else {
             continue;
         }
@@ -178,7 +179,7 @@ void mainLoop(void *pvParameters)
         packet.checksum = computeChecksum((uint8_t *)&packet, sizeof(packet) - 1);
         
         xQueueSend(sensorQueue, &packet, 0);
-
+        
         uint32_t totalTime = micros() - startTime;
         
         float elapsed_ms = totalTime / 1000.0;
@@ -220,6 +221,7 @@ void mainLoop(void *pvParameters)
 
         uint32_t now = millis();
 
+    
         if (now - windowStartTime >= MAIN_WINDOW_SIZE_MS)
         {
             windowStartTime = now;
@@ -227,6 +229,7 @@ void mainLoop(void *pvParameters)
         }
 
         loopCounter++;
+        
         vTaskDelayUntil(&xLastWakeTime, xFrequency);
     }
 }

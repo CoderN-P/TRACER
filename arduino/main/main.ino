@@ -126,7 +126,7 @@ void setup()
     // Create RTOS tasks
 
     // Medium priority task for triggering ultrasonic sensors at 20 Hz
-    xTaskCreatePinnedToCore(ultrasonicTask, "Ultrasonic Task", 2048, NULL, 3, &ultrasonicTaskHandle, 0);
+    // xTaskCreatePinnedToCore(ultrasonicTask, "Ultrasonic Task", 2048, NULL, 3, &ultrasonicTaskHandle, 0);
 
     // High priority task for sensor transmit loop (Sending sensor data)
     xTaskCreatePinnedToCore(sensorTransmitTask, "Sensor Transmit Task", 2048, NULL, 4, &sensorTransmitHandle, 0);

@@ -37,6 +37,8 @@ class ManualManager:
         else:
             motor_command = Command.from_joystick(left_y, right_x)
 
+        self.command_manager.pending_motor_command = motor_command
+        """
         if self.obstacle_clear.is_set():
             self.command_manager.pending_motor_command = motor_command
         else:
@@ -47,7 +49,7 @@ class ManualManager:
                 self._logger.info("Skipping command to avoid crashing")
             else:
                 self.command_manager.pending_motor_command = motor_command
-                
+        """                
                 
     async def execute_manual_commands(self):
         if self.state_manager.get_state != Mode.MANUAL:

@@ -36,7 +36,7 @@ class LidarReader:
         while True:
             point_raw = await self.reader.output_queue.get()
             
-            if point_raw["d_mm"] is None or point_raw["d_mm"] < 100: # 10 cm is too close
+            if point_raw["d_mm"] is None or point_raw["d_mm"] < 100 or point_raw["d_mm"] > 12000: # 10 cm is too close, 12m is too far
                 continue
 
             point = LidarPoint(

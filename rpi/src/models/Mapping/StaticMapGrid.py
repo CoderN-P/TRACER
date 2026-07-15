@@ -54,13 +54,13 @@ class StaticMapGrid(OccupancyGrid):
 
     def increase_occupancy(self, cell):
         cell_y, cell_x = cell
-        if 0 <= cell_x < self.width and 0 <= cell_y < self.height:
+        if 0 <= cell_x < self.grid_width and 0 <= cell_y < self.grid_height:
             self.grid[cell_y][cell_x] = np.clip(self.grid[cell_y][cell_x] + ROBOT_CONFIG.LOG_ODDS_OCC, -5, 5)
             
     def decrease_occupancy(self, cell):
         cell_y, cell_x = cell
-        if 0 <= cell_x < self.width and 0 <= cell_y < self.height:
-            self.grid[cell_y][cell_x] = np.clip(self.grid[cell_y][cell_x] - ROBOT_CONFIG.LOG_ODDS_FREE, -5, 5)
+        if 0 <= cell_x < self.grid_width and 0 <= cell_y < self.grid_height:
+            self.grid[cell_y][cell_x] = np.clip(self.grid[cell_y][cell_x] + ROBOT_CONFIG.LOG_ODDS_FREE, -5, 5)
             
     def save_map(self, name):
         np.save(MAP_SAVE_DIR / name / f"static_grid.npy", self.grid)
@@ -72,8 +72,10 @@ class StaticMapGrid(OccupancyGrid):
         """
 
         probs = 1 / (1 + np.exp(-self.grid))
-        mask = probs > 0.6
+        mask = probs > ROBOT_CONFIG.OBSTACLE_PROB_THRESHOLD
         ys, xs = np.nonzero(mask)
+        print (probs.max())
+        print(len(xs))
         values = probs[ys, xs]
         cells = np.column_stack(
             (

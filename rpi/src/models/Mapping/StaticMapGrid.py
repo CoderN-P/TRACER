@@ -83,7 +83,7 @@ class StaticMapGrid(OccupancyGrid):
             )
         )
         
-        data = [self.cell_to_world(cell[0], cell[1]) + [cell[2]] for cell in cells] # array of x, y, intensity
+        data = [list(map(float, list(self.cell_to_world(cell[0], cell[1])))) + [int(cell[2])] for cell in cells] # array of x, y, intensity
         
         return data
         

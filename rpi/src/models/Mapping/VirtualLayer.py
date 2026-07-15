@@ -1,5 +1,7 @@
+from typing import List
 import json
 from . import MAP_SAVE_DIR
+from ..Obstacles import VirtualObstacle
 from .OccupancyGrid import OccupancyGrid
 from ..SensorData import PointCloud
 from ..StateEstimation import RobotState

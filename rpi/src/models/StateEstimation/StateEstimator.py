@@ -146,9 +146,9 @@ class StateEstimator:
         # Previous sensor data is needed to determine dt
         if not previous_sensor_data: return
         
-        if len(self.history) == 0:
-            self.history.add(EKFSnapshot(
-                timestamp=time.time_ns() // 1000,
+        if len(self.snapshot_history.history) == 0:
+            self.snapshot_history.add(EKFSnapshot(
+                timestamp=time.perf_counter_ns(),
                 robot_state=self.state.model_copy(),
                 sensor_data=previous_sensor_data.model_copy(),
                 heading_covariance=self.heading_filter.P,

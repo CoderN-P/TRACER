@@ -1,3 +1,5 @@
+import asyncio
+
 class LoopMonitoring:
     def __init__(self):
         self.max_loop_time = 0.0

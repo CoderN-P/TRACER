@@ -1,4 +1,5 @@
 import asyncio
+from .Command import Command
 
 class CommandManager:
     def __init__(self, serial):

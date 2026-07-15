@@ -32,9 +32,9 @@ class Robot:
         self.sensor_data_manager = SensorDataManager(self.state_manager, self.command_manager)
         self.manual_manager = ManualManager(self.command_manager, self.state_manager)
         self.socket_manager = SocketManager(self.socketio, self.state_manager, self.config_manager, self.manual_manager, self.world_model, self.bus)
-        self.path_manager = PathManager(self.command_manager, self.world_model, self.bus)
+        self.path_manager = PathManager(self.command_manager, self.world_model, self.state_manager, self.bus)
         self.emit_manager = EmitManager(self.socket_manager, self.state_manager, self.manual_manager, self.loop_monitoring)
-        
+        self.latest_scan = None
         self.running: bool = False
         self._logger: logging.Logger = logging.getLogger("Robot")
         
@@ -50,7 +50,7 @@ class Robot:
         self.main_loop_task = self.loop.create_task(self.main_loop())
         
         # Run lidar read loop
-        lidar_reader = LidarReader(port="/dev/cu.usbserial-1120", baudrate=460800)
+        lidar_reader = LidarReader(port="/dev/ttyUSB0", baudrate=460800)
         self.lidar_read_task = self.loop.create_task(lidar_reader.scan_loop(callback=self.sensor_data_manager.process_lidar_data))
         
         self._loop_ready.set()
@@ -94,9 +94,9 @@ class Robot:
         future = asyncio.run_coroutine_threadsafe(coro, self.loop)
         return await asyncio.wrap_future(future)
         
-    def process_sensor_queue(self):
+    async def process_sensor_queue(self):
         sensor_data = self.sensor_data_manager.sensor_queue.get()
-        if self.state_manager.get_state() == Mode.STOPPED: # Only update state estimator if not stopped
+        if await self.state_manager.get_state() == Mode.STOPPED: # Only update state estimator if not stopped
             return sensor_data
         
         self.state_estimator.update(sensor_data, self.sensor_data_manager.previous_sensor_data)
@@ -104,13 +104,13 @@ class Robot:
         # Update EKF with missed packets
         self.sensor_data_manager.previous_sensor_data = sensor_data
         while not self.sensor_data_manager.sensor_queue.empty():
-            sensor_data = self.sensor_queue.get()
-            self.state_estimator.update(sensor_data, self.previous_sensor_data)
+            sensor_data = self.sensor_data_manager.sensor_queue.get()
+            self.state_estimator.update(sensor_data, self.sensor_data_manager.previous_sensor_data)
             self.sensor_data_manager.previous_sensor_data = sensor_data
         
         return sensor_data
 
-    def process_lidar_queue(self):
+    async def process_lidar_queue(self):
         latest_scan = None
     
         while not self.sensor_data_manager.lidar_queue.empty():
@@ -118,12 +118,12 @@ class Robot:
             point_cloud, reference_pose = self.deskewer.deskew(latest_scan)
             
     
-            if self.state_manager.get_state() != Mode.STOPPED: # Only update the world model if not stopped
+            if await self.state_manager.get_state() != Mode.STOPPED: # Only update the world model if not stopped
                 self.world_model.update(
                     point_cloud,
                     reference_pose
                 )
-    
+        if latest_scan: self.latest_scan = latest_scan    
         return latest_scan
         
     
@@ -143,12 +143,12 @@ class Robot:
             if not data_available:
                 continue
                 
-            sensor_data = self.process_sensor_queue()
-            lidar_data = self.process_lidar_queue()
+            sensor_data = await self.process_sensor_queue()
+            lidar_data = await self.process_lidar_queue()
             self.world_model.decay_live_layer()
-            await self.state_manager.sync_with_embedded(sensor_data) # Syncs rpi state to embedded state
-            self.path_manager.execute_cur_path(self.state_estimator.state) # Follows the current path if available
-            self.manual_manager.execute_manual_commands() # Executes manual commands such as joystick or custom velocity profiles
+            await self.sensor_data_manager.sync_with_embedded(sensor_data) # Syncs rpi state to embedded state
+            await self.path_manager.execute_cur_path(self.state_estimator.state) # Follows the current path if available
+            await self.manual_manager.execute_manual_commands() # Executes manual commands such as joystick or custom velocity profiles
             
             self.loop_monitoring.update_loop_time(start) # Monitors worst loop times
             await self.emit_manager.send_sensor_update(sensor_data, self.state_estimator.state, lidar_data)

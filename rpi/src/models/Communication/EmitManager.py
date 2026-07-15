@@ -1,3 +1,6 @@
+import datetime
+import asyncio
+from ..SensorData import SensorData
 from .. import ROBOT_CONFIG
 
 class EmitManager:
@@ -12,7 +15,7 @@ class EmitManager:
         self.last_emit_time: float = 0.0
         self.last_map_emit_time: float = 0.0
 
-    async def send_sensor_update(self, sensor_data: SensorData, robot_state: RobotState, lidar_data: PointCloud):
+    async def send_sensor_update(self, sensor_data, robot_state, lidar_data):
         cur_time = asyncio.get_event_loop().time()
         if cur_time - self.last_emit_time < self.sensor_update_dt:
             return
@@ -25,8 +28,8 @@ class EmitManager:
             "sensors": SensorData.clean(sensor_data.model_dump()),
             "state": SensorData.clean(robot_state.model_dump()),
             "mode": current_mode.name,
-            "localization_mode": self.state_manager.localization_mode.name,
-            "latest_lidar_scan": SensorData.clean(lidar_data.model_dump()),
+            "localization_mode": self.state_manager.localization_state.name,
+            "latest_lidar_scan": SensorData.clean(lidar_data.model_dump()) if lidar_data else None,
             "timestamp": datetime.datetime.now().isoformat(),
             "max_loop_time": self.loop_monitoring.max_loop_time,
             "velocity_profile_t": time.monotonic() - self.manual_manager.velocity_profile_manager.velocity_profile_start if self.manual_manager.velocity_profile_manager.velocity_profile_start else None,

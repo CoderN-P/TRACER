@@ -1,9 +1,9 @@
+import asyncio
 import logging
 import numpy as np
 import time
 from .OccupancyGrid import OccupancyGrid
 from ..SensorData import PointCloud
-from ..StateEstimation import RobotState
 from .. import ROBOT_CONFIG
 
 class LidarLayer(OccupancyGrid):
@@ -20,13 +20,13 @@ class LidarLayer(OccupancyGrid):
         self.CELL_MIN = -10
         self.CELL_MAX = 10
 
-    def update(self, point_cloud: PointCloud, pose: RobotState):
+    def update(self, point_cloud: PointCloud, pose):
         origin = (
-            pose.x + offset_x*np.cos(pose.yaw)
-            - offset_y*np.sin(pose.yaw),
+            pose[0] + ROBOT_CONFIG.LIDAR_OFFSET_X*np.cos(pose[2])
+            - ROBOT_CONFIG.LIDAR_OFFSET_Y*np.sin(pose[2]),
 
-            pose.y + offset_x*np.sin(pose.yaw)
-            + offset_y*np.cos(pose.yaw)
+            pose[1] + ROBOT_CONFIG.LIDAR_OFFSET_X*np.sin(pose[2])
+            + ROBOT_CONFIG.LIDAR_OFFSET_Y*np.cos(pose[2])
         )
         
         endpoints = [[point.x, point.y] for point in point_cloud.points]
@@ -37,13 +37,12 @@ class LidarLayer(OccupancyGrid):
             for cell in ray[:-1]:
                 x, y = cell
                 self.grid[y, x] = np.clip(self.grid[y, x] + self.FREE_UPDATE, self.CELL_MIN, self.CELL_MAX)
-                self.last_seen[y, x] = point_cloud.timestamp_ns
+                self.last_seen[y, x] = point_cloud.timestamp
 
             # Mark occupied endpoint.
-            if ray:
-                x, y = ray[-1]
-                self.grid[y, x] = np.clip(self.grid[y, x] + self.OCCUPIED_UPDATE, self.CELL_MIN, self.CELL_MAX)
-                self.last_seen[y, x] = point_cloud.timestamp_ns
+            x, y = ray[-1]
+            self.grid[y, x] = np.clip(self.grid[y, x] + self.OCCUPIED_UPDATE, self.CELL_MIN, self.CELL_MAX)
+            self.last_seen[y, x] = point_cloud.timestamp
                 
     def decay(self):
         if not asyncio.get_event_loop().time() - self.last_decay_time >= self.decay_dt:
@@ -63,7 +62,7 @@ class LidarLayer(OccupancyGrid):
             (
                 xs,
                 ys,
-                (self.grid[ys, xs] / MAX_VALUE * 255).astype(np.uint8)
+                (self.grid[ys, xs] / self.CELL_MAX * 255).astype(np.uint8)
             )
         )
 

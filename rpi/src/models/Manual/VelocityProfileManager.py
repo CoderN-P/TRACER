@@ -1,3 +1,5 @@
+from typing import List, Dict
+
 class VelocityProfileManager:
     def __init__(self, command_manager = None, state_manager = None):
         self.velocity_profile_start: float = 0.0

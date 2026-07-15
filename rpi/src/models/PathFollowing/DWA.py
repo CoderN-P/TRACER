@@ -8,7 +8,7 @@ from ..Obstacles.VirtualObstacleType import VirtualObstacleType
 from .. import ROBOT_CONFIG
 
 class DWA:
-    def __init__(self, goal_position: tuple, world_model: WorldModel):  
+    def __init__(self, goal_position: tuple, world_model):  
         self.goal_position = goal_position
         self.world_model = world_model
         

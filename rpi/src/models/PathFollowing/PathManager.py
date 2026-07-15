@@ -3,11 +3,12 @@ from ..Bus import StateChange
 from .. import ROBOT_CONFIG, Mode
 
 class PathManager:
-    def __init__(self, command_manager, world_model, bus):
+    def __init__(self, command_manager, world_model, state_manager, bus):
         self.spline_path: Path | None = None
         self.dwa: DWA | None = None
         self.pure_pursuit: PurePursuit | None = None
         self.command_manager = command_manager
+        self.state_manager = state_manager
         self.world_model = world_model
         self.bus = bus
         self.last_path_time: float = 0.0
@@ -68,8 +69,8 @@ class PathManager:
         self.pure_pursuit = None
         self.dwa = None
         
-    async def execute_cur_path(self, robot_state: RobotState):
-        if not (self.state_manager.get_state() == Mode.PATH_FOLLOWING):
+    async def execute_cur_path(self, robot_state):
+        if not (await self.state_manager.get_state() == Mode.PATH_FOLLOWING):
             self.last_path_time = 0
             self.last_dwa_time = 0
             return

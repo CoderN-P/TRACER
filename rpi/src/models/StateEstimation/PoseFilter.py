@@ -45,7 +45,7 @@ class PoseFilter:
         self.state = predicted_state + K @ y
         self.P = (np.eye(2) - K) @ P_pred
     
-    def step(self, delta_x, delta_y, lidar_data: 'LidarData' | None):
+    def step(self, delta_x, delta_y, lidar_data):
         self.predict(delta_x, delta_y)
         
         if lidar_data is not None:

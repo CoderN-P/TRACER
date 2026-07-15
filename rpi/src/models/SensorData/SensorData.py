@@ -3,6 +3,7 @@ from pydantic import BaseModel, Field
 import logging
 import struct
 from . import UltrasonicSensor, IMUData, MagnetometerData, TOFData
+from .. import ROBOT_CONFIG
 
 class SensorData(BaseModel):
     """

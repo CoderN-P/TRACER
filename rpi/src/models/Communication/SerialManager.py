@@ -133,7 +133,7 @@ class SerialManager:
             struct_data = []
             byte_length = 4 # Start byte + command byte + length byte + checksum byte
             
-            for key, value in data.command.model_dump():
+            for key, value in data.command.model_dump().items():
                 if value is None:
                     continue
                 struct_string += "B" # one byte to indicate the key

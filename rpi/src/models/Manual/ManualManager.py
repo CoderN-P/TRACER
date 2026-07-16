@@ -52,10 +52,10 @@ class ManualManager:
         """                
                 
     async def execute_manual_commands(self):
-        if self.state_manager.get_state != Mode.MANUAL:
+        if await self.state_manager.get_state() != Mode.MANUAL:
             self.last_manual_time = 0
             return
-        
+                
         if asyncio.get_event_loop().time() - self.last_manual_time >= self.manual_dt:
             await self.command_manager.execute_pending_motor_command()
             self.last_manual_time = asyncio.get_event_loop().time()

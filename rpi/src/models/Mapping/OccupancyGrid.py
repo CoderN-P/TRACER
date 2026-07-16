@@ -12,7 +12,7 @@ class OccupancyGrid:
 
         self.grid = np.zeros(
             (self.grid_height, self.grid_width),
-            dtype=np.int8
+            dtype=np.float32
         )
         
         self.origin_x = -width / 2

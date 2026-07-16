@@ -20,6 +20,7 @@ class CommandManager:
             await asyncio.sleep(wait_after)
                 
     async def execute_pending_motor_command(self):
+        print(self.pending_motor_command)
         if self.pending_motor_command:
             await self.send_safe_command(self.pending_motor_command)
             self.pending_motor_command = None

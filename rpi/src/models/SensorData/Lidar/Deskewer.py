@@ -27,8 +27,10 @@ class Deskewer:
         ), reference_pose
     
     def deskew_point(self, point: LidarPoint):
-        state, idx = self.state_estimator.snapshot_history.interpolate_pose(point.timestamp_ns, self.latest_snapshot_index)
-        if not state: return None
+        data = self.state_estimator.snapshot_history.interpolate_pose(point.timestamp_ns, self.latest_snapshot_index)
+        if not data: return None
+        
+        state, idx = data
         # 1. Convert local polar point to local Cartesian (LiDAR sensor frame)
         
         self.latest_snapshot_index = idx

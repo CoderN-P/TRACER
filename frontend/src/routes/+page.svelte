@@ -299,6 +299,7 @@
         maxLoopTime = data.max_loop_time ?? null;
         rayPoints = data.virtual_rays ?? null;
         latestLidarScan = normalizeLatestLidarScan(data.latest_lidar_scan);
+        console.log(latestLidarScan);
 
         packetCount++;
         const now = new Date().getTime();

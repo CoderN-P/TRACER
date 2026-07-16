@@ -78,7 +78,7 @@ class PathManager:
             self.last_dwa_time = 0
             return
         
-        if not asyncio.get_event_loop().time() - self.last_path_time >= self.path_following_dt:
+        if not (asyncio.get_event_loop().time() - self.last_path_time >= self.path_following_dt):
             return
         
         if not self.cur_path_exists():

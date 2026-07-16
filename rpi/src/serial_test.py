@@ -3,7 +3,7 @@ import logging
 import time
 import threading
 from . import ROBOT_CONFIG
-from .models import SerialManager, SensorData, Robot, Command, CommandType, OLEDCommand, MotorCommand
+from .models import SerialManager, SensorData, Robot, Command, CommandType, OLEDCommand, MotorCommand, TwistCommand
 
 def serial_test(port=None):
     port = port if port else SerialManager.find_port()
@@ -42,10 +42,10 @@ def serial_test(port=None):
 
     serial_manager.send(Command(
         ID="",
-        command_type=CommandType.MOTOR,
-        command=MotorCommand(
-            left_motor=-0.3,
-            right_motor=-0.3,
+        command_type=CommandType.TWIST,
+        command=TwistCommand(
+            v=-0.3,
+            omega=-0.3,
         ),
         duration=0,
         pause_duration=0,

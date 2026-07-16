@@ -117,7 +117,7 @@ class Robot:
             latest_scan = self.sensor_data_manager.lidar_queue.get()
             point_cloud = self.deskewer.deskew(latest_scan)
             
-            if not point_clud: 
+            if not point_cloud: 
                 break
                 
             latest_scan = point_cloud  

@@ -1,7 +1,7 @@
 import numpy as np
 from skimage.draw import line
 
-from rpi.src import PointCloud
+from ..SensorData.Lidar  import PointCloud
 
 
 class OccupancyGrid:

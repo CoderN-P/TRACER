@@ -102,7 +102,6 @@ class PathManager:
         elif self.pure_pursuit:
             # Run pure pursuit
             command = self.pure_pursuit.calculate_control_command(robot_state)
-
             if not command:
                 exit_path = True
             else:

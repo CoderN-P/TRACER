@@ -47,6 +47,8 @@ int getTypeIndex(uint8_t cmd)
         return 4;
     case CMD_CONFIG:
         return 5;
+    case CMD_TWIST:
+        return 6;
     default:
         return -1; // Invalid command type
     }

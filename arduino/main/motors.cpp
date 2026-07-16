@@ -199,8 +199,8 @@ std::pair<float, float> scaleToMax(float left, float right, GeneralConfig cfg){
     float scaled_left = left * scale;
     float scaled_right = right * scale;
     
-    float final_left = max(-cfg.maxLinearVelNeg, std::min(scaled_left, cfg.maxLinearVelPos));
-    float final_right = max(-cfg.maxLinearVelNeg, std::min(scaled_right, cfg.maxLinearVelPos));
+    float final_left = constrain(scaled_left, -cfg.maxLinearVelNeg, cfg.maxLinearVelPos);
+    float final_right = constrain(scaled_right, -cfg.maxLinearVelNeg, cfg.maxLinearVelPos);
 
     return {final_left, final_right};
 }

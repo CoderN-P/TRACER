@@ -1,6 +1,13 @@
 <script lang="ts">
   import * as Card from "$lib/components/ui/card";
-  import { Radar, Signal, Zap } from "lucide-svelte";
+  import {
+    Radar,
+    RotateCcw,
+    Signal,
+    Zap,
+    ZoomIn,
+    ZoomOut,
+  } from "lucide-svelte";
   import type { RobotState, SensorData } from "$lib/types";
   import { fly } from "svelte/transition";
 
@@ -31,11 +38,12 @@
   const VIEWBOX_HEIGHT = 300;
   const RADAR_CENTER = { x: 180, y: 142 };
   const MAX_RANGE_M = 12;
+  const MIN_VISIBLE_RANGE_M = 1.5;
   const RADAR_RADIUS = 118;
-  const PIXELS_PER_METER = RADAR_RADIUS / MAX_RANGE_M;
   const QUALITY_MAX = 63;
-  const ROBOT_WIDTH = 20;
-  const ROBOT_HEIGHT = 30;
+  const ROBOT_WIDTH = 0.2;
+  const ROBOT_HEIGHT = 0.3;
+  const ZOOM_STEP = 1.25;
 
   let {
     sensorData,
@@ -50,6 +58,42 @@
     lastSensorUpdate: number;
     class?: string;
   } = $props();
+
+  let lidarZoom = $state(1);
+  let visibleRangeM = $derived(MAX_RANGE_M / lidarZoom);
+  let pixelsPerMeter = $derived(RADAR_RADIUS / visibleRangeM);
+  let robotWidthPx = $derived(ROBOT_WIDTH * pixelsPerMeter);
+  let robotHeightPx = $derived(ROBOT_HEIGHT * pixelsPerMeter);
+  let robotHalfWidthPx = $derived(robotWidthPx / 2);
+  let robotHalfHeightPx = $derived(robotHeightPx / 2);
+  let rangeRings = $derived(
+    [0.25, 0.5, 0.75, 1].map((amount) => visibleRangeM * amount),
+  );
+
+  function setLidarZoom(nextZoom: number) {
+    lidarZoom = clamp(nextZoom, 1, MAX_RANGE_M / MIN_VISIBLE_RANGE_M);
+  }
+
+  function zoomLidarIn() {
+    setLidarZoom(lidarZoom * ZOOM_STEP);
+  }
+
+  function zoomLidarOut() {
+    setLidarZoom(lidarZoom / ZOOM_STEP);
+  }
+
+  function resetLidarZoom() {
+    lidarZoom = 1;
+  }
+
+  function handleLidarWheel(event: WheelEvent) {
+    event.preventDefault();
+    if (event.deltaY < 0) {
+      zoomLidarIn();
+    } else {
+      zoomLidarOut();
+    }
+  }
 
   function clamp(value: number, min: number, max: number) {
     return Math.min(max, Math.max(min, value));
@@ -108,13 +152,13 @@
 
       const local = pointToRobotFrame(point);
       const distance = Math.hypot(local.x, local.y);
-      if (distance <= 0 || distance > MAX_RANGE_M) return [];
+      if (distance <= 0 || distance > visibleRangeM) return [];
 
       const quality = pointQuality(point);
       return [
         {
-          x: RADAR_CENTER.x - local.y * PIXELS_PER_METER,
-          y: RADAR_CENTER.y - local.x * PIXELS_PER_METER,
+          x: RADAR_CENTER.x - local.y * pixelsPerMeter,
+          y: RADAR_CENTER.y - local.x * pixelsPerMeter,
           distance,
           quality,
           radius: 1.5 + (quality / QUALITY_MAX) * 2.3,
@@ -126,9 +170,10 @@
 
   function closestDistance(points: RenderedPoint[]) {
     if (points.length === 0) return null;
-    return points.reduce((closest, point) =>
-      point.distance < closest ? point.distance : closest,
-    points[0].distance);
+    return points.reduce(
+      (closest, point) => (point.distance < closest ? point.distance : closest),
+      points[0].distance,
+    );
   }
 
   let renderedPoints = $derived(buildRenderedPoints(latestLidarScan));
@@ -146,6 +191,7 @@
     <div
       class="relative h-full min-h-[240px] w-full overflow-hidden p-0"
       in:fly={{ y: 8, duration: 220 }}
+      onwheel={handleLidarWheel}
     >
       <svg
         viewBox="0 0 {VIEWBOX_WIDTH} {VIEWBOX_HEIGHT}"
@@ -156,8 +202,8 @@
         <rect width={VIEWBOX_WIDTH} height={VIEWBOX_HEIGHT} fill="#ffffff" />
 
         <g>
-          {#each [3, 6, 9, 12] as range}
-            {@const radius = range * PIXELS_PER_METER}
+          {#each rangeRings as range}
+            {@const radius = range * pixelsPerMeter}
             <circle
               cx={RADAR_CENTER.x}
               cy={RADAR_CENTER.y}
@@ -172,7 +218,7 @@
               text-anchor="end"
               class="fill-slate-400 text-[9px] font-medium"
             >
-              {range}m
+              {range < 10 ? range.toFixed(1) : range.toFixed(0)}m
             </text>
           {/each}
 
@@ -205,21 +251,26 @@
 
         <g>
           <path
-            d={`M ${RADAR_CENTER.x} ${RADAR_CENTER.y - ROBOT_HEIGHT / 2 - 9} L ${RADAR_CENTER.x - ROBOT_WIDTH / 2} ${RADAR_CENTER.y - ROBOT_HEIGHT / 2} Q ${RADAR_CENTER.x - ROBOT_WIDTH / 2 - 6} ${RADAR_CENTER.y + ROBOT_HEIGHT / 2} ${RADAR_CENTER.x} ${RADAR_CENTER.y + ROBOT_HEIGHT / 2 + 4} Q ${RADAR_CENTER.x + ROBOT_WIDTH / 2 + 6} ${RADAR_CENTER.y + ROBOT_HEIGHT / 2} ${RADAR_CENTER.x + ROBOT_WIDTH / 2} ${RADAR_CENTER.y - ROBOT_HEIGHT / 2} Z`}
+            d={`M ${RADAR_CENTER.x} ${RADAR_CENTER.y - robotHalfHeightPx - 6} L ${RADAR_CENTER.x - robotHalfWidthPx} ${RADAR_CENTER.y - robotHalfHeightPx} Q ${RADAR_CENTER.x - robotHalfWidthPx - Math.max(3, robotWidthPx * 0.3)} ${RADAR_CENTER.y + robotHalfHeightPx} ${RADAR_CENTER.x} ${RADAR_CENTER.y + robotHalfHeightPx + Math.max(2, robotHeightPx * 0.12)} Q ${RADAR_CENTER.x + robotHalfWidthPx + Math.max(3, robotWidthPx * 0.3)} ${RADAR_CENTER.y + robotHalfHeightPx} ${RADAR_CENTER.x + robotHalfWidthPx} ${RADAR_CENTER.y - robotHalfHeightPx} Z`}
             fill="#ffffff"
             stroke="#334155"
             stroke-width="2"
           />
           <line
             x1={RADAR_CENTER.x}
-            y1={RADAR_CENTER.y + ROBOT_HEIGHT / 2}
+            y1={RADAR_CENTER.y + robotHalfHeightPx}
             x2={RADAR_CENTER.x}
-            y2={RADAR_CENTER.y - ROBOT_HEIGHT / 2 - 6}
+            y2={RADAR_CENTER.y - robotHalfHeightPx - 5}
             stroke="#94a3b8"
             stroke-width="1.5"
             stroke-linecap="round"
           />
-          <circle cx={RADAR_CENTER.x} cy={RADAR_CENTER.y} r="3" fill="#0f172a" />
+          <circle
+            cx={RADAR_CENTER.x}
+            cy={RADAR_CENTER.y}
+            r={Math.max(2, Math.min(robotWidthPx, robotHeightPx) * 0.1)}
+            fill="#0f172a"
+          />
         </g>
       </svg>
 
@@ -236,7 +287,9 @@
             class="flex items-center gap-1.5 text-xs font-semibold text-slate-800"
           >
             <span
-              class="h-2 w-2 rounded-full {live ? 'bg-sky-500' : 'bg-slate-300'}"
+              class="h-2 w-2 rounded-full {live
+                ? 'bg-sky-500'
+                : 'bg-slate-300'}"
             ></span>
             {renderedPoints.length} pts
             <span class="text-slate-400">/</span>
@@ -255,9 +308,40 @@
             Range
           </div>
           <div class="text-xs font-semibold text-slate-800">
-            {MAX_RANGE_M} m max
+            {visibleRangeM.toFixed(1)} m max
           </div>
         </div>
+      </div>
+
+      <div
+        class="absolute right-3 top-16 flex overflow-hidden rounded-md border border-slate-200 bg-white/95 shadow-sm"
+      >
+        <button
+          type="button"
+          class="flex h-7 w-7 items-center justify-center border-r border-slate-200 text-slate-700 transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40"
+          onclick={zoomLidarOut}
+          disabled={lidarZoom <= 1}
+          title="Zoom out"
+        >
+          <ZoomOut class="h-3.5 w-3.5" />
+        </button>
+        <button
+          type="button"
+          class="flex h-7 w-7 items-center justify-center border-r border-slate-200 text-slate-700 transition-colors hover:bg-slate-100"
+          onclick={resetLidarZoom}
+          title="Reset zoom"
+        >
+          <RotateCcw class="h-3.5 w-3.5" />
+        </button>
+        <button
+          type="button"
+          class="flex h-7 w-7 items-center justify-center text-slate-700 transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40"
+          onclick={zoomLidarIn}
+          disabled={visibleRangeM <= MIN_VISIBLE_RANGE_M}
+          title="Zoom in"
+        >
+          <ZoomIn class="h-3.5 w-3.5" />
+        </button>
       </div>
 
       <div

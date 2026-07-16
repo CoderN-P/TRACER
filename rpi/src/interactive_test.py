@@ -20,7 +20,7 @@ from collections import deque
 from datetime import datetime
 
 from . import ROBOT_CONFIG
-from .models import SerialManager, Robot, Command, CommandType, MotorCommand, TwistCommand, MotorPWMCommand, ConfigCommand
+from .models import SerialManager, Robot, SensorData, Command, CommandType, MotorCommand, TwistCommand, MotorPWMCommand, ConfigCommand
 from .models.PathFollowing import twist_to_wheel_speeds
 # Interval (seconds) between repeated sends while a command is active
 SEND_INTERVAL = 0.05

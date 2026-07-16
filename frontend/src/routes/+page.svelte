@@ -506,13 +506,13 @@
                 {mapUpdate}
               />
             </div>
-            <div class="col-span-5 row-span-8 min-h-0">
+            <div class="col-span-5 row-span-6 min-h-0">
               <VelocityDebug
                 {robotState}
                 lastSensorUpdateTime={lastSensorUpdate}
               />
             </div>
-            <div class="col-span-5 row-span-4 min-h-0">
+            <div class="col-span-5 row-span-6 min-h-0">
               <ObstructionStatus
                 {sensorData}
                 {latestLidarScan}
@@ -525,12 +525,12 @@
 
           {#if activePage === "overview"}
             <div class="grid h-full grid-cols-12 grid-rows-12 gap-2">
-              <div class="col-span-8 row-span-8 min-h-0 overflow-hidden">
+              <div class="col-span-7 row-span-8 min-h-0 overflow-hidden">
                 <UltrasonicGraph {distanceHistory} />
               </div>
 
-              <div class="col-span-4 row-span-8 min-h-0 flex flex-col gap-2">
-                <div class="grid grid-cols-1 gap-2 md:grid-cols-2">
+              <div class="col-span-5 row-span-8 min-h-0 flex flex-col gap-2">
+                <div class="grid shrink-0 grid-cols-1 gap-2 md:grid-cols-2">
                   <TemperatureDisplay
                     temperature={sensorData?.imu.temperature ?? null}
                     class="h-full"
@@ -540,13 +540,15 @@
                     lastUpdateTime={lastSensorUpdate}
                   />
                 </div>
-                <ObstructionStatus
-                  {sensorData}
-                  {latestLidarScan}
-                  {robotState}
-                  {lastSensorUpdate}
-                  class="h-full"
-                />
+                <div class="min-h-0 flex-1">
+                  <ObstructionStatus
+                    {sensorData}
+                    {latestLidarScan}
+                    {robotState}
+                    {lastSensorUpdate}
+                    class="h-full"
+                  />
+                </div>
               </div>
 
               <div class="col-span-5 row-span-4 min-h-0">

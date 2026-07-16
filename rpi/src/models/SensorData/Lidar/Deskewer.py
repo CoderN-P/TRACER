@@ -26,6 +26,7 @@ class Deskewer:
         )
     
     def deskew_point(self, point: LidarPoint):
+        # state[0] = x, state[1] = y, state[2] = theta
         data = self.state_estimator.snapshot_history.interpolate_pose(point.timestamp_ns, self.latest_snapshot_index)
         if not data: return None
         
@@ -38,7 +39,7 @@ class Deskewer:
         
         p_lidar = np.array([
             point.distance * np.cos(point_theta),
-            point.distance * np.sin(point_theta),
+            -point.distance * np.sin(point_theta),
             1.0
         ])
     

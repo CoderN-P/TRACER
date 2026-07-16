@@ -1,5 +1,6 @@
 from typing import List
 from collections import deque
+import numpy as np
 from . import EKFSnapshot
 from .. import ROBOT_CONFIG
 
@@ -71,6 +72,11 @@ class StateHistory:
             ), closest_idx
 
         alpha = (timestamp - t0) / (t1 - t0)
+        
+        # For theta (yaw), clamp both next and prev to be between -pi and pi to avoid wierd effects when interpolating
+        
+        prev_snapshot.robot_state.yaw = (prev_snapshot.robot_state.yaw + np.pi) % (2 * np.pi) - np.pi
+        next_snapshot.robot_state.yaw = (next_snapshot.robot_state.yaw + np.pi) % (2 * np.pi) - np.pi
 
         interpolated_pose = (
             prev_snapshot.robot_state.x + alpha * (next_snapshot.robot_state.x - prev_snapshot.robot_state.x),

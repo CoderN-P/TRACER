@@ -20,17 +20,8 @@ class LidarLayer(OccupancyGrid):
         self.CELL_MIN = -10
         self.CELL_MAX = 10
 
-    def update(self, point_cloud: PointCloud, pose):
-        origin = (
-            pose[0] + ROBOT_CONFIG.LIDAR_OFFSET_X*np.cos(pose[2])
-            - ROBOT_CONFIG.LIDAR_OFFSET_Y*np.sin(pose[2]),
-
-            pose[1] + ROBOT_CONFIG.LIDAR_OFFSET_X*np.sin(pose[2])
-            + ROBOT_CONFIG.LIDAR_OFFSET_Y*np.cos(pose[2])
-        )
-
-        endpoints = [[point.x, point.y] for point in point_cloud.points]
-        rays = self.raycast(origin, endpoints)
+    def update(self, point_cloud: PointCloud):
+        rays = self.raycast(point_cloud)
 
         free_cells = []
         occupied_cells = []

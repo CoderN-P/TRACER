@@ -115,18 +115,18 @@ class Robot:
     
         while not self.sensor_data_manager.lidar_queue.empty():
             latest_scan = self.sensor_data_manager.lidar_queue.get()
-            data = self.deskewer.deskew(latest_scan)
+            point_cloud = self.deskewer.deskew(latest_scan)
             
-            if not data: 
+            if not point_clud: 
                 break
                 
-            point_cloud, reference_pose = data
-            latest_scan = point_cloud    
+            latest_scan = point_cloud  
+            
             if await self.state_manager.get_state() != Mode.STOPPED: # Only update the world model if not stopped
                 self.world_model.update(
-                    point_cloud,
-                    reference_pose
+                    point_cloud
                 )
+                
         if latest_scan: self.latest_scan = latest_scan    
         return self.latest_scan
         

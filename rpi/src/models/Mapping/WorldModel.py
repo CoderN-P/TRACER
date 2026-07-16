@@ -12,11 +12,11 @@ class WorldModel:
         
         self.state_manager = state_manager
         
-    def update(self, point_cloud: PointCloud, pose):
-        self.lidar_layer.update(point_cloud, pose)
+    def update(self, point_cloud: PointCloud):
+        self.lidar_layer.update(point_cloud)
         
         if self.state_manager.localization_state == LocalizationMode.MAP:
-            self.static_map.update(point_cloud, pose)
+            self.static_map.update(point_cloud)
             
     def save(self, name):
         os.mkdir(MAP_SAVE_DIR / name)

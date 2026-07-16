@@ -1,6 +1,9 @@
 import numpy as np
 from skimage.draw import line
 
+from rpi.src import PointCloud
+
+
 class OccupancyGrid:
     def __init__(self, width, height, resolution):
         self.width = width # In meters
@@ -47,12 +50,12 @@ class OccupancyGrid:
     def clear(self):
         self.grid.fill(0)
         
-    def raycast(self, origin, endpoints):
+    def raycast(self, point_cloud: PointCloud):
         rays = []
-        origin_cell_x, origin_cell_y = self.world_to_cell(origin[0], origin[1])
-        for pt in endpoints:
+        for pt in point_cloud.points:
             # Get y and x coordinate arrays for this single ray
-            cell_x, cell_y = self.world_to_cell(pt[0], pt[1])
+            cell_x, cell_y = self.world_to_cell(pt.x, pt.y)
+            origin_cell_x, origin_cell_y = self.world_to_cell(pt.origin_x, pt.origin_y)
             rr, cc = line(origin_cell_y, origin_cell_x, cell_y, cell_x)
         
             # Stack them together into an (N, 2) array of coordinates

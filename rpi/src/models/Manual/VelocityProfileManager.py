@@ -1,4 +1,8 @@
 from typing import List, Dict
+import time
+import asyncio
+from ..Mode import Mode
+from ..Command import Command, TwistCommand, MotorCommand, CommandType, MotorPWMCommand
 
 class VelocityProfileManager:
     def __init__(self, command_manager = None, state_manager = None):
@@ -52,17 +56,16 @@ class VelocityProfileManager:
             return
 
         if mode == 'twist':
-            async with self.motor_lock:
-                self.pending_motor_command = Command(
-                    ID="",
-                    command_type=CommandType.TWIST,
-                    command=TwistCommand(
-                        v=v1,
-                        omega=v2,
-                    ),
-                    pause_duration=0,
-                    duration=0,
-                )
+            self.pending_motor_command = Command(
+                ID="",
+                command_type=CommandType.TWIST,
+                command=TwistCommand(
+                    v=v1,
+                    omega=v2,
+                ),
+                pause_duration=0,
+                duration=0,
+            )
 
         elif mode == 'pwm':
             self.command_manager.pending_motor_command = Command(

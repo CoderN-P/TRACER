@@ -2,7 +2,7 @@ import numpy as np
 from typing import List
 from .. import ROBOT_CONFIG
 from ..StateEstimation import RobotState
-from ..Command import Command, CommandType, MotorCommand
+from ..Command import Command, CommandType, MotorCommand, TwistCommand
 from .TrajectoryState import TrajectoryState
 from .utils import twist_to_wheel_speeds, get_local_target
 

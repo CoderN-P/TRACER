@@ -22,10 +22,10 @@ class SocketManager:
         )
         
     async def on_path_complete(self, event: PathCompleted):
-        await self.socket_manager.socketio.emit('path_complete', {"status": "success"})
+        await self.socketio.emit('path_complete', {"status": "success"})
         
     async def on_path_error(self, event: PathError):
-        await self.socket_manager.socketio.emit('path_complete', {"status": "error", "message": event.message})
+        await self.socketio.emit('path_complete', {"status": "error", "message": event.message})
     
     async def process_socketio_command(self, event, data):
         match event:
@@ -48,7 +48,7 @@ class SocketManager:
                 await self.config_manager.update_constants(data)
                 return
             case 'vel_command':
-                await self.manual_manager.velocity_profile_manager.execute_velocity_profile()
+                await self.manual_manager.velocity_profile_manager.execute_velocity_profile(data["profile"], data["mode"])
                 return
             case 'joystick_input':
                 await self.manual_manager.handle_joystick_input(data)  

@@ -42,8 +42,8 @@ class StateManager:
             elif next_state == Mode.STOPPED:
                 await self.emergency_stop()
 
-    async def on_finish_path(self):
-        await self.set_state({"state": "manual"})
+    async def on_finish_path(self, event):
+        await self.set_state({"state": "MANUAL"})
 
     async def emergency_stop(self):
         """Immediately stop the robot and clear any pending commands."""

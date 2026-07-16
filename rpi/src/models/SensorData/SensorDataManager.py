@@ -88,7 +88,7 @@ class SensorDataManager:
         # Only check this if we have not recently recieved a resume command (since it might take a moment for the ESTOP command to be processed and for the state estimator to reset, we want to avoid immediately switching back to STOPPED mode if we receive sensor data with motors disabled right after a resume command)
         if state != Mode.STOPPED and sensor_data.motors_enabled == False and self.previous_sensor_data and self.previous_sensor_data.motors_enabled == True:
             self._logger.warning("Motors manually disabled via ESTOP button, switching to STOPPED mode")
-            await self.state_manager.set_state({"state": "stopped"})
+            await self.state_manager.set_state({"state": "STOPPED"})
         if state == Mode.STOPPED and sensor_data.motors_enabled == True and self.previous_sensor_data and self.previous_sensor_data.motors_enabled == False:
             self._logger.warning("Motors manually re-enabled via ESTOP button, switching to MANUAL mode")
-            await self.state_manager.set_state({"state": "manual"})            
+            await self.state_manager.set_state({"state": "MANUAL"})            

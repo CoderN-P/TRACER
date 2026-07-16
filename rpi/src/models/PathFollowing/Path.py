@@ -78,6 +78,7 @@ class Path:
         
         arr = np.array([[p.x, p.y, p.theta, p.v, p.omega, p.t] for p in trajectory])
         shm = shared_memory.SharedMemory(create=True, size=arr.nbytes)
+        unregister(shm._name, "shared_memory")
         shared_arr = np.ndarray(arr.shape, dtype=arr.dtype, buffer=shm.buf)
         shared_arr[:] = arr
         self._meta_queue.put((shm.name, len(trajectory)))

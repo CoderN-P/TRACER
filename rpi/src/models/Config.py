@@ -63,7 +63,6 @@ class RobotConfig:
     DWA_Y: float
     K_SCRUB: float
     ALPHA: float
-    MIN_GAP_WIDTH: float
     MAX_LINEAR_VEL_POS: float
     MAX_LINEAR_VEL_NEG: float 
     OBSTACLE_DETECTED_THRESHOLD: float
@@ -102,6 +101,7 @@ class RobotConfig:
     R_THETA_MAGNETOMETER: float
     R_POSITION: float
     STATE_HISTORY_SIZE: int
+    USE_LIDAR: bool
     LOOKAHEAD_DISTANCE: float
     COMPLETION_THRESHOLD: float
     MAX_SEARCH_POINTS: int

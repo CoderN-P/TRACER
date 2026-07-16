@@ -122,7 +122,7 @@ class Robot:
                 
             latest_scan = point_cloud  
             
-            if await self.state_manager.get_state() != Mode.STOPPED: # Only update the world model if not stopped
+            if await self.state_manager.get_state() != Mode.STOPPED and ROBOT_CONFIG.USE_LIDAR: # Only update the world model if not stopped
                 self.world_model.update(
                     point_cloud
                 )

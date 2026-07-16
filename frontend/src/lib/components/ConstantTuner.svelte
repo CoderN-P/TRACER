@@ -320,12 +320,6 @@
           min: 0,
         },
         {
-          key: "MIN_GAP_WIDTH",
-          label: "MIN_GAP_WIDTH",
-          step: "0.01",
-          min: 0,
-        },
-        {
           key: "OBSTACLE_DETECTED_THRESHOLD",
           label: "OBSTACLE_DETECTED_THRESHOLD",
           step: "1",
@@ -502,6 +496,10 @@
           step: "1",
           min: 0,
         },
+        {
+          key: "USE_LIDAR",
+          label: "USE_LIDAR",
+        },  
         {
           key: "LIDAR_DECAY_FREQ",
           label: "LIDAR_DECAY_FREQ",

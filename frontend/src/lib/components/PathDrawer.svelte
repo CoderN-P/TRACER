@@ -102,6 +102,17 @@
   const MIN_ZOOM = 0.2;
   const MAX_ZOOM = 8;
   const ZOOM_SENSITIVITY = 1.1;
+  const PAN_DRAG_THRESHOLD = 4;
+
+  type StagePanStart = {
+    pointerX: number;
+    pointerY: number;
+    stageX: number;
+    stageY: number;
+  };
+
+  let panStart = $state<StagePanStart | null>(null);
+  let isPanning = $state(false);
 
   function handleWheel(e) {
     e.evt.preventDefault();
@@ -135,6 +146,55 @@
       stageX = e.target.x();
       stageY = e.target.y();
     }
+  }
+
+  function canPanWithStageDrag() {
+    return mode !== "spline" && !running && !isDrawing;
+  }
+
+  function isPrimaryButton(e: any) {
+    return e.evt.button === 0;
+  }
+
+  function isStageBackground(e: any) {
+    return e.target === e.target.getStage();
+  }
+
+  function startStagePan(e: any) {
+    if (!canPanWithStageDrag() || !isPrimaryButton(e) || !isStageBackground(e)) {
+      return;
+    }
+
+    panStart = {
+      pointerX: e.evt.clientX,
+      pointerY: e.evt.clientY,
+      stageX,
+      stageY,
+    };
+    isPanning = false;
+  }
+
+  function updateStagePan(e: any) {
+    if (!panStart) return;
+
+    const dx = e.evt.clientX - panStart.pointerX;
+    const dy = e.evt.clientY - panStart.pointerY;
+    const movedEnough = dx * dx + dy * dy >= PAN_DRAG_THRESHOLD ** 2;
+
+    if (!isPanning && !movedEnough) {
+      return;
+    }
+
+    isPanning = true;
+    stageX = panStart.stageX + dx;
+    stageY = panStart.stageY + dy;
+  }
+
+  function finishStagePan() {
+    const didPan = isPanning;
+    panStart = null;
+    isPanning = false;
+    return didPan;
   }
 
   // Extended grid that covers a large virtual canvas so it appears infinite while panning
@@ -487,6 +547,7 @@
 
   function freehandMouseDown(e) {
     if (mode !== "freehand" || running) return;
+    if (!e.evt.shiftKey) return;
     // Only draw on left mouse button
     if (e.evt.button !== 0) return;
     isDrawing = true;
@@ -522,12 +583,45 @@
   }
 
   function pointModeClick(e) {
-    if ((mode !== "point" && mode !== "point_dwa") || running) return;
+    if (mode !== "point" || running) return;
     // Only select on left mouse button
     if (e.evt.button !== 0) return;
     const world = pointerToWorld(e.target.getStage());
     // Convert world pixels → meters
     selectedPoint = { x: world.x / SCALE, y: -world.y / SCALE };
+  }
+
+  function handleStageMouseDown(e: any) {
+    freehandMouseDown(e);
+
+    if (!isDrawing) {
+      startStagePan(e);
+    }
+  }
+
+  function handleStageMouseMove(e: any) {
+    updateStagePan(e);
+    freehandMouseMove(e);
+  }
+
+  function handleStageMouseUp(e: any) {
+    const didPan = finishStagePan();
+    freehandMouseUp(e);
+
+    if (didPan || !isStageBackground(e)) {
+      return;
+    }
+
+    if (mode === "point") {
+      pointModeClick(e);
+    } else if (mode === "obstacle") {
+      obstacleModeClick(e);
+    }
+  }
+
+  function handleStageMouseLeave(e: any) {
+    finishStagePan();
+    freehandMouseUp(e);
   }
 
   /** Resample a polyline in meters so points are evenly spaced by `step`. */
@@ -1286,7 +1380,7 @@
           <X class="w-3.5 h-3.5" /> Clear
         </button>
         <span class="text-xs text-gray-400">
-          {freehandPath.length} pts &nbsp;·&nbsp; drag to pan disabled while drawing
+          {freehandPath.length} pts &nbsp;·&nbsp; drag to pan · Shift-drag to draw
         </span>
       {/if}
 
@@ -1304,9 +1398,7 @@
         <span class="text-xs text-gray-400">
           {selectedPoint
             ? `(${selectedPoint.x.toFixed(2)}, ${selectedPoint.y.toFixed(2)})`
-            : mode === "point_dwa"
-              ? "Click to select DWA target"
-              : "Click to select point"}
+            : "Click to select point"}
         </span>
       {/if}
 
@@ -1389,8 +1481,8 @@
         <span class="text-xs text-gray-400">
           {virtualObstacles.length} obstacle{virtualObstacles.length === 1
             ? ""
-            : "s"} · click map to place, drag to move, drag red/orange handles to
-          scale/rotate
+            : "s"} · click map to place, drag map to pan, drag obstacles and
+          handles to edit
         </span>
       {/if}
 
@@ -1434,9 +1526,7 @@
           Reset View
         </button>
         <span class="text-xs text-gray-400 whitespace-nowrap"
-          >Scroll to zoom{mode === "spline" && !running
-            ? " · Drag to pan"
-            : ""}</span
+          >Scroll to zoom{!running ? " · Drag to pan" : ""}</span
         >
       </div>
     </div>
@@ -1481,18 +1571,10 @@
         draggable={mode === "spline"}
         onwheel={handleWheel}
         ondragend={handleDragEnd}
-        onmousedown={(e) => {
-          if (mode === "point") {
-            pointModeClick(e);
-          } else if (mode === "obstacle") {
-            obstacleModeClick(e);
-          } else {
-            freehandMouseDown(e);
-          }
-        }}
-        onmousemove={freehandMouseMove}
-        onmouseup={freehandMouseUp}
-        onmouseleave={freehandMouseUp}
+        onmousedown={handleStageMouseDown}
+        onmousemove={handleStageMouseMove}
+        onmouseup={handleStageMouseUp}
+        onmouseleave={handleStageMouseLeave}
       >
         <!-- Grid & axes -->
         <Layer>

@@ -28,20 +28,49 @@ class LidarLayer(OccupancyGrid):
             pose[1] + ROBOT_CONFIG.LIDAR_OFFSET_X*np.sin(pose[2])
             + ROBOT_CONFIG.LIDAR_OFFSET_Y*np.cos(pose[2])
         )
-        
+
         endpoints = [[point.x, point.y] for point in point_cloud.points]
         rays = self.raycast(origin, endpoints)
 
+        free_cells = []
+        occupied_cells = []
+
         for ray in rays:
-            # Mark free space.
-            for cell in ray[:-1]:
-                x, y = cell
-                self.grid[y, x] = np.clip(self.grid[y, x] + self.FREE_UPDATE, self.CELL_MIN, self.CELL_MAX)
-                self.last_seen[y, x] = point_cloud.timestamp
-            x, y = ray[-1]
-            # Mark occupied endpoint.
-            self.grid[y, x] = np.clip(self.grid[y, x] + self.OCCUPIED_UPDATE, self.CELL_MIN, self.CELL_MAX)
-            self.last_seen[y, x] = point_cloud.timestamp
+            if len(ray) == 0:
+                continue
+
+            if len(ray) > 1:
+                free_cells.append(ray[:-1])
+
+            occupied_cells.append(ray[-1])
+
+        if free_cells:
+            free_cells = np.concatenate(free_cells)
+
+            self.grid[
+                free_cells[:, 0],
+                free_cells[:, 1]
+            ] += self.FREE_UPDATE
+
+            self.last_seen[
+                free_cells[:, 0],
+                free_cells[:, 1]
+            ] = point_cloud.timestamp
+
+        if occupied_cells:
+            occupied_cells = np.array(occupied_cells)
+
+            self.grid[
+                occupied_cells[:, 0],
+                occupied_cells[:, 1]
+            ] += self.OCCUPIED_UPDATE
+
+            self.last_seen[
+                occupied_cells[:, 0],
+                occupied_cells[:, 1]
+            ] = point_cloud.timestamp
+
+        np.clip(self.grid, self.CELL_MIN, self.CELL_MAX, out=self.grid)
                 
     def decay(self):
         if not asyncio.get_event_loop().time() - self.last_decay_time >= self.decay_dt:
@@ -57,14 +86,22 @@ class LidarLayer(OccupancyGrid):
 
         ys, xs = np.nonzero(mask)
 
-        cells = np.column_stack(
+        if len(xs) == 0:
+            return []
+
+        values = (
+            self.grid[ys, xs] / self.CELL_MAX * 255
+        ).astype(np.uint8)
+
+        world_x = (xs - self.origin_x) * self.resolution
+        world_y = (ys - self.origin_y) * self.resolution
+
+        data = np.column_stack(
             (
-                xs,
-                ys,
-                (self.grid[ys, xs] / self.CELL_MAX * 255).astype(np.uint8)
+                world_x.astype(np.float32),
+                world_y.astype(np.float32),
+                values
             )
         )
 
-        data = [list(map(float, list(self.cell_to_world(cell[0], cell[1])))) + [int(cell[2])] for cell in cells] # array of x, y, intensity
-
-        return data
+        return data.tolist()

@@ -15,7 +15,8 @@ class VirtualLayer(OccupancyGrid):
         # Updates grid to occupy cells that are intersected by the virtual obstacles
         # Occupied = INF, free = 0
     
-        raise NotImplementedError()
+        for obstacle in virtual_obstacles:
+            obstacle.rasterize(self)
             
             
     

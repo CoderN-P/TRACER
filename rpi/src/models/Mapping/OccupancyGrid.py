@@ -9,8 +9,11 @@ class OccupancyGrid:
         
         self.grid_width = int(width / resolution)
         self.grid_height = int(height / resolution)
-        
-        self.grid = np.array([[0 for _ in range(self.grid_width)] for _ in range(self.grid_height)])
+
+        self.grid = np.zeros(
+            (self.grid_height, self.grid_width),
+            dtype=np.int8
+        )
         
         self.origin_x = -width / 2
         self.origin_y = -height / 2
@@ -42,7 +45,7 @@ class OccupancyGrid:
         return self.cost_at_cell(cell_x, cell_y)
         
     def clear(self):
-        self.grid = [[0 for _ in range(self.width)] for _ in range(self.height)]
+        self.grid.fill(0)
         
     def raycast(self, origin, endpoints):
         rays = []

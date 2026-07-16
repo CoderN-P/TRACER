@@ -15,11 +15,11 @@ class StateHistory:
     def clear(self):
         self.history.clear()
         
-    def get_closest_idx(self, timestamp):
+    def get_closest_idx(self, timestamp, index = 0):
         closest_idx = 0
         closest_error = float("inf")
 
-        for i in range(len(self.history)):
+        for i in range(index, len(self.history)):
             error = abs(
                 self.history[i].timestamp -
                 timestamp
@@ -31,11 +31,11 @@ class StateHistory:
 
         return closest_idx
     
-    def interpolate_pose(self, timestamp):
+    def interpolate_pose(self, timestamp, index=0):
         if len(self.history) < 2:
             return None
 
-        closest_idx = self.get_closest_idx(timestamp)
+        closest_idx = self.get_closest_idx(timestamp, index)
 
         if timestamp > self.history[closest_idx].timestamp:
             if closest_idx == len(self.history) - 1:
@@ -52,7 +52,7 @@ class StateHistory:
                     self.history[0].robot_state.angular_velocity,
                     self.history[0].robot_state.v_left,
                     self.history[0].robot_state.v_right
-                )
+                ), closest_idx
             prev_snapshot = self.history[closest_idx - 1]
             next_snapshot = self.history[closest_idx]
 
@@ -68,7 +68,7 @@ class StateHistory:
                 prev_snapshot.robot_state.angular_velocity,
                 prev_snapshot.robot_state.v_left,
                 prev_snapshot.robot_state.v_right
-            )
+            ), closest_idx
 
         alpha = (timestamp - t0) / (t1 - t0)
 
@@ -82,4 +82,4 @@ class StateHistory:
             prev_snapshot.robot_state.v_right + alpha * (next_snapshot.robot_state.v_right - prev_snapshot.robot_state.v_right),
         )
 
-        return interpolated_pose
+        return interpolated_pose, closest_idx

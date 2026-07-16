@@ -28,14 +28,39 @@ class StaticMapGrid(OccupancyGrid):
             pose[1] + ROBOT_CONFIG.LIDAR_OFFSET_X*np.sin(pose[2])
             + ROBOT_CONFIG.LIDAR_OFFSET_Y*np.cos(pose[2])
         )
+
         endpoints = [[point.x, point.y] for point in point_cloud.points]
         rays = self.raycast(origin, endpoints)
-        
+
+        free_cells = []
+        occupied_cells = []
+
         for ray in rays:
-            for cell in ray[:-1]:
-                self.decrease_occupancy(cell)
-            
-            self.increase_occupancy(ray[-1])
+            if len(ray) == 0:
+                continue
+
+            if len(ray) > 1:
+                free_cells.append(ray[:-1])
+
+            occupied_cells.append(ray[-1])
+
+        if free_cells:
+            free_cells = np.concatenate(free_cells)
+
+            self.grid[
+                free_cells[:, 0],
+                free_cells[:, 1]
+            ] += ROBOT_CONFIG.LOG_ODDS_FREE
+
+        if occupied_cells:
+            occupied_cells = np.array(occupied_cells)
+
+            self.grid[
+                occupied_cells[:, 0],
+                occupied_cells[:, 1]
+            ] += ROBOT_CONFIG.LOG_ODDS_OCC
+
+        np.clip(self.grid, -5, 5, out=self.grid)
             
     def probability_at_cell(self, cell_x, cell_y):
         log_prob_cost = super().cost_at_cell(cell_x, cell_y)
@@ -52,16 +77,6 @@ class StaticMapGrid(OccupancyGrid):
     def cost_at(self, x, y):
         return self.cost_at_cell(*self.world_to_cell(x, y))
 
-    def increase_occupancy(self, cell):
-        cell_y, cell_x = cell
-        if 0 <= cell_x < self.grid_width and 0 <= cell_y < self.grid_height:
-            self.grid[cell_y, cell_x] = np.clip(self.grid[cell_y, cell_x] + ROBOT_CONFIG.LOG_ODDS_OCC, -5, 5)
-            
-    def decrease_occupancy(self, cell):
-        cell_y, cell_x = cell
-        if 0 <= cell_x < self.grid_width and 0 <= cell_y < self.grid_height:
-            self.grid[cell_y, cell_x] = np.clip(self.grid[cell_y, cell_x] + ROBOT_CONFIG.LOG_ODDS_FREE, -5, 5)
-            
     def save_map(self, name):
         np.save(MAP_SAVE_DIR / name / f"static_grid.npy", self.grid)
 
@@ -73,18 +88,23 @@ class StaticMapGrid(OccupancyGrid):
 
         probs = 1 / (1 + np.exp(-self.grid))
         mask = probs > ROBOT_CONFIG.OBSTACLE_PROB_THRESHOLD
+
         ys, xs = np.nonzero(mask)
 
-        values = probs[ys, xs]
-        cells = np.column_stack(
+        if len(xs) == 0:
+            return []
+
+        values = (probs[ys, xs] * 255).astype(np.uint8)
+
+        world_x = xs * self.resolution + self.origin_x
+        world_y = ys * self.resolution + self.origin_y
+
+        data = np.column_stack(
             (
-                xs,
-                ys,
-                (values * 255).astype(np.uint8)
+                world_x.astype(np.float32),
+                world_y.astype(np.float32),
+                values
             )
         )
-        
-        data = [list(map(float, list(self.cell_to_world(cell[0], cell[1])))) + [int(cell[2])] for cell in cells] # array of x, y, intensity
-        
-        return data
-        
+
+        return data.tolist()

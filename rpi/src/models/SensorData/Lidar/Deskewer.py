@@ -5,6 +5,7 @@ from ... import ROBOT_CONFIG
 class Deskewer:
     def __init__(self, state_estimator):
         self.state_estimator = state_estimator
+        self.latest_snapshot_index = 0
         
     def deskew(self, scan: LidarScan):
         deskewed_points = []
@@ -12,19 +13,26 @@ class Deskewer:
             deskewed_point = self.deskew_point(point)
             if not point: return None
             deskewed_points.append(deskewed_point)
+            
         if any([not point for point in deskewed_points]):
-            return None        
+            return None 
+            
+        reference_pose, reference_idx = self.state_estimator.snapshot_history.interpolate_pose(scan.points[-1].timestamp_ns, self.latest_snapshot_index)
+        self.latest_snapshot_index = 0
+        
         # Returns point cloud and associated robot pose
         return PointCloud(
             timestamp=scan.end_time_ns,
             points=deskewed_points
-        ), self.state_estimator.snapshot_history.interpolate_pose(scan.points[-1].timestamp_ns)
+        ), reference_pose
     
     def deskew_point(self, point: LidarPoint):
-        state = self.state_estimator.snapshot_history.interpolate_pose(point.timestamp_ns)
+        state, idx = self.state_estimator.snapshot_history.interpolate_pose(point.timestamp_ns, self.latest_snapshot_index)
         if not state: return None
         # 1. Convert local polar point to local Cartesian (LiDAR sensor frame)
-
+        
+        self.latest_snapshot_index = idx
+        
         point_theta = np.radians(point.angle)
         
         p_lidar = np.array([

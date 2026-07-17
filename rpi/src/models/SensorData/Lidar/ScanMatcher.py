@@ -109,23 +109,24 @@ class ScanMatcher:
                         best_pose = (pose_x + dx, pose_y + dy, pose_theta + dtheta)
                     elif score > second_best:
                         second_best = score
+        MIN_SCORE = 200
 
         if best_score < MIN_SCORE:
             self._logger.warning(f"Skipping scan matching as best score ({best_score}) was worse than the minimum score ({MIN_SCORE})")
-            return predicted_pose
+            return pose, 0
     
         if best_score < second_best * 1.05:
             self._logger.warning(f"Skipping scan matching as best score ({best_score}) was not significantly better than second best score ({second_best})")
-            return predicted_pose
+            return pose, 0
         
         if abs(best_pose[2] - pose[2]) > 5:
             self._logger.warning(f"Skipping scan matching as the change in orientation ({(best_pose[2] - pose[2])*180/np.pi} deg) was too large.")
-            return predicted_pose
+            return pose, 0
         
         if np.hypot(best_pose[0] - pose[0], best_pose[1] - pose[1]) > 0.1:
             self._logger.warning(f"Skipping scan matching as the change in position ({np.hypot(best_pose[0] - pose[0], best_pose[1] - pose[1])} m) was too large.")
-            return predicted_pose
-    
+            return pose, 0
+        self._logger.info(f"Scan matching successful, best score: {best_score}, dx: {best_pose[0] - pose[0]}, dy: {best_pose[1] - pose[1]}, dtheta: {(best_pose[2] - pose[2])*180/np.pi} ")    
         # return best pose and score
         return best_pose, best_score
         

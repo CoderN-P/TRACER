@@ -17,13 +17,14 @@ class Deskewer:
         if any([not point for point in deskewed_points]):
             return None 
             
+        reference_pose, reference_idx = self.state_estimator.snapshot_history.interpolate_pose(scan.points[-1].timestamp_ns, self.latest_snapshot_index)
         self.latest_snapshot_index = 0
-        
+
         # Returns point cloud and associated robot pose
         return PointCloud(
             timestamp=scan.end_time_ns,
             points=deskewed_points
-        )
+        ), reference_pose
     
     def deskew_point(self, point: LidarPoint):
         # state[0] = x, state[1] = y, state[2] = theta

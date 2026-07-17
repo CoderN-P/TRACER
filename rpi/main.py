@@ -36,12 +36,7 @@ async def main(p):
     port = p if p else SerialManager.find_port()
     if not port:
         logging.error("No serial port found. Please connect the robot.")
-        
-    logging.basicConfig(
-        level=logging.DEBUG,
-        format='%(asctime)s | %(threadName)s | %(name)s | %(levelname)s | %(message)s',
-        handlers=[logging.StreamHandler(sys.stdout)] # Explicitly add StreamHandler
-    )
+    
     serial_manager = SerialManager(port, 921600)
     robot = Robot(serial_manager, socketio)
     
@@ -60,7 +55,16 @@ async def main(p):
 
 if __name__ == "__main__":
     hostname = os.uname().nodename
-    print(f"Running on hostname: {hostname}")
+    
+    logging.basicConfig(
+        level=logging.DEBUG,
+        format='%(asctime)s | %(threadName)s | %(name)s | %(levelname)s | %(message)s',
+        handlers=[logging.StreamHandler(sys.stdout)] # Explicitly add StreamHandler
+    )
+    
+    main_logger = logging.getLogger("System")
+    main_logger.setLevel(logging.INFO)
+    main_logger.info(f"Running on hostname: {hostname}")
     
     args = parser.parse_args()
         
@@ -85,4 +89,4 @@ if __name__ == "__main__":
         try:
             asyncio.run(main(args.port))
         except KeyboardInterrupt:
-            logging.info("Robot shutting down...")
+            main_logger.info("Robot shutting down...")

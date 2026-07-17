@@ -8,7 +8,7 @@ from .PathFollowing import PathManager
 from .Communication import LidarReader, SerialManager, SocketManager, EmitManager
 from .Bus import EventBus
 from .StateEstimation import StateEstimator
-from .SensorData import SensorDataManager, Deskewer
+from .SensorData import SensorDataManager, Deskewer, ScanMatcher
 from .Mapping import WorldModel
 from .Manual import ManualManager
 from . import RobotConfig, Mode, LoopMonitoring, ConfigManager, StateManager, ROBOT_CONFIG
@@ -34,6 +34,8 @@ class Robot:
         self.socket_manager = SocketManager(self.socketio, self.state_manager, self.config_manager, self.manual_manager, self.world_model, self.bus)
         self.path_manager = PathManager(self.command_manager, self.world_model, self.state_manager, self.bus)
         self.emit_manager = EmitManager(self.socket_manager, self.state_manager, self.manual_manager, self.loop_monitoring)
+        self.scan_matcher = ScanMatcher(self.world_model)
+        
         self.latest_scan = None
         self.running: bool = False
         self._logger: logging.Logger = logging.getLogger("Robot")
@@ -115,14 +117,21 @@ class Robot:
     
         while not self.sensor_data_manager.lidar_queue.empty():
             latest_scan = self.sensor_data_manager.lidar_queue.get()
-            point_cloud = self.deskewer.deskew(latest_scan)
+            data = self.deskewer.deskew(latest_scan)
             
-            if not point_cloud: 
+            if not data: 
                 break
                 
+            point_cloud, reference_pose = data
             latest_scan = point_cloud  
             
             if await self.state_manager.get_state() != Mode.STOPPED and ROBOT_CONFIG.USE_LIDAR: # Only update the world model if not stopped
+                best_pose, score = self.scan_matcher.match(point_cloud, reference_pose)
+                
+                self.state_estimator.pose_filter.state[0] = best_pose[0]
+                self.state_estimator.pose_filter.state[1] = best_pose[1]
+                self.state_estimator.heading_filter.state[0] = best_pose[2]
+                
                 self.world_model.update(
                     point_cloud
                 )

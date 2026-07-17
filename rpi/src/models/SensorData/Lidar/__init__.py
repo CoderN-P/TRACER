@@ -4,3 +4,4 @@ from .Point import Point
 from .PointCloud import PointCloud
 from .Deskewer import Deskewer
 from .ScanAssembler import ScanAssembler
+from .ScanMatcher import ScanMatcher

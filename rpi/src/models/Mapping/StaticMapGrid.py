@@ -9,6 +9,7 @@ from .. import ROBOT_CONFIG
 class StaticMapGrid(OccupancyGrid):
     def __init__(self):
         super().__init__(ROBOT_CONFIG.MAX_WORLD_WIDTH, ROBOT_CONFIG.MAX_WORLD_HEIGHT, ROBOT_CONFIG.GRID_RES)
+        self.scans_inserted = 0
         self._logger = logging.getLogger("Robot.WorldModel.StaticMap")
                 
     def load(self, name):
@@ -21,6 +22,7 @@ class StaticMapGrid(OccupancyGrid):
             return False
 
     def update(self, point_cloud: PointCloud):
+        self.scans_inserted += 1
         rays = self.raycast(point_cloud)
 
         free_cells = []

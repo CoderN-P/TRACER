@@ -109,7 +109,7 @@ class Robot:
             sensor_data = self.sensor_data_manager.sensor_queue.get()
             self.state_estimator.update(sensor_data, self.sensor_data_manager.previous_sensor_data)
             self.sensor_data_manager.previous_sensor_data = sensor_data
-        
+
         return sensor_data
 
     async def process_lidar_queue(self):

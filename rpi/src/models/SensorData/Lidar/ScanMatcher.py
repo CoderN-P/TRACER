@@ -1,6 +1,7 @@
 import numpy as np
 import logging
 from . import PointCloud
+from ... import ROBOT_CONFIG
 
 class ScanMatcher:
     def __init__(self, world_model):
@@ -13,6 +14,8 @@ class ScanMatcher:
         self.n_theta = 11
         self.n_xy = 5
         # cache for probability grid will be refreshed each match call
+        
+        self.MIN_SCORE = 200
         
         self._logger = logging.getLogger("Robot.ScanMatcher")
         
@@ -40,6 +43,7 @@ class ScanMatcher:
         grid = static_map.grid  # log-odds grid
         # Precompute probability grid once (vectorized access is much faster than calling method per point)
         prob_grid = 1.0 / (1.0 + np.exp(-grid))
+        score_grid = np.where(prob_grid > ROBOT_CONFIG.LOG_ODDS_OCC, 1.0, 0.0)
 
         res = static_map.resolution
         origin_x = static_map.origin_x
@@ -91,8 +95,8 @@ class ScanMatcher:
 
                     # mask valid indices
                     valid = (
-                        (cell_x >= 0) & (cell_x < prob_grid.shape[1]) &
-                        (cell_y >= 0) & (cell_y < prob_grid.shape[0])
+                        (cell_x >= 0) & (cell_x < score_grid.shape[1]) &
+                        (cell_y >= 0) & (cell_y < score_grid.shape[0])
                     )
 
                     if not np.any(valid):
@@ -100,7 +104,7 @@ class ScanMatcher:
                         score = -np.inf
                     else:
                         # sample probabilities and sum as score (higher is better)
-                        sampled = prob_grid[cell_y[valid], cell_x[valid]]
+                        sampled = score_grid[cell_y[valid], cell_x[valid]]
                         score = float(np.sum(sampled))
 
                     if score > best_score:
@@ -109,7 +113,6 @@ class ScanMatcher:
                         best_pose = (pose_x + dx, pose_y + dy, pose_theta + dtheta)
                     elif score > second_best:
                         second_best = score
-        MIN_SCORE = 200
 
         if best_score < MIN_SCORE:
             self._logger.warning(f"Skipping scan matching as best score ({best_score}) was worse than the minimum score ({MIN_SCORE})")
@@ -126,7 +129,7 @@ class ScanMatcher:
         if np.hypot(best_pose[0] - pose[0], best_pose[1] - pose[1]) > 0.1:
             self._logger.warning(f"Skipping scan matching as the change in position ({np.hypot(best_pose[0] - pose[0], best_pose[1] - pose[1])} m) was too large.")
             return pose, 0
-        self._logger.info(f"Scan matching successful, best score: {best_score}, dx: {best_pose[0] - pose[0]}, dy: {best_pose[1] - pose[1]}, dtheta: {(best_pose[2] - pose[2])*180/np.pi} ")    
+            
         # return best pose and score
         return best_pose, best_score
         

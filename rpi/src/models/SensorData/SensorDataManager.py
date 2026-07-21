@@ -54,10 +54,13 @@ class SensorDataManager:
             
             
     def add_sensor_data(self, sensor_data: SensorData):
-        if not self.timing_offset_ns:
+        if self.timing_offset_ns is None:
             rpi_start_ns = time.perf_counter_ns()
             esp_start_us = sensor_data.timestamp
             self.timing_offset_ns = rpi_start_ns - esp_start_us*1000
+            self._logger.info(
+                f"ESP->RPi timing offset: {self.timing_offset_ns/1e9:.3f}s"
+            )
             
         # TODO: Handle microsecond rollover
         sensor_data.timestamp = sensor_data.timestamp*1000 + self.timing_offset_ns

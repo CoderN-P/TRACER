@@ -169,7 +169,7 @@ class StateEstimator:
         
         if len(self.snapshot_history.history) == 0:
             self.snapshot_history.add(EKFSnapshot(
-                timestamp=sensor_data.timestamp,
+                timestamp=previous_sensor_data.timestamp,
                 robot_state=self.state.model_copy(),
                 sensor_data=previous_sensor_data.model_copy(),
                 heading_covariance=self.heading_filter.P,

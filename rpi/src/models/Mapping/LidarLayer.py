@@ -84,8 +84,8 @@ class LidarLayer(OccupancyGrid):
             self.grid[ys, xs] / self.CELL_MAX * 255
         ).astype(np.uint8)
 
-        world_x = (xs * self.resolution) * self.origin_x
-        world_y = (ys * self.resolution) * self.origin_y
+        world_x = (xs * self.resolution) + self.origin_x
+        world_y = (ys * self.resolution) + self.origin_y
 
         data = np.column_stack(
             (

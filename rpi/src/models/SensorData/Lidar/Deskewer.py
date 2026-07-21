@@ -19,7 +19,7 @@ class Deskewer:
             
         reference_pose, reference_idx = await self.state_estimator.interpolate_pose(scan.points[-1].timestamp_ns, self.latest_snapshot_index)
         self.latest_snapshot_index = 0
-
+                
         # Returns point cloud and associated robot pose
         return PointCloud(
             timestamp=scan.end_time_ns,
@@ -33,7 +33,6 @@ class Deskewer:
         
         state, idx = data
         # 1. Convert local polar point to local Cartesian (LiDAR sensor frame)
-        
         self.latest_snapshot_index = idx
         
         point_theta = np.radians(point.angle)

@@ -44,6 +44,14 @@ class SensorDataManager:
     def process_raw_sensor_data(self, raw_data: bytes):
         try:
             sensor_data = SensorData.from_bytes(raw_data)
+            if self.timing_offset_ns is None:
+                rpi_start_ns = time.perf_counter_ns()
+                esp_start_us = sensor_data.timestamp
+                self.timing_offset_ns = rpi_start_ns - esp_start_us*1000
+                print(esp_start_us)
+                self._logger.info(
+                    f"ESP->RPi timing offset: {self.timing_offset_ns/1e9:.3f}s"
+                )
             distance_left = self.filter_distance(sensor_data.ultrasonic.distance_left)
             distance_right = self.filter_distance(sensor_data.ultrasonic.distance_right, left=False)
             sensor_data.ultrasonic.distance_left = distance_left
@@ -54,16 +62,10 @@ class SensorDataManager:
             
             
     def add_sensor_data(self, sensor_data: SensorData):
-        if self.timing_offset_ns is None:
-            rpi_start_ns = time.perf_counter_ns()
-            esp_start_us = sensor_data.timestamp
-            self.timing_offset_ns = rpi_start_ns - esp_start_us*1000
-            self._logger.info(
-                f"ESP->RPi timing offset: {self.timing_offset_ns/1e9:.3f}s"
-            )
-            
         # TODO: Handle microsecond rollover
         sensor_data.timestamp = sensor_data.timestamp*1000 + self.timing_offset_ns
+        if abs(sensor_data.timestamp - time.perf_counter_ns()) > 1e9:
+            self.timing_offset_ns += time.perf_counter_ns() - sensor_data.timestamp
         self.sensor_queue.put(sensor_data)
         with self.receive_time_lock:
             self.last_sensor_receive_time = time.monotonic()

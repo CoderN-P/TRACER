@@ -48,7 +48,7 @@ class VelocityProfileManager:
             t += 0.02
 
         self.velocity_profile_start = None
-        self.command_manager.pending_motor_command = Command.stop()
+        await self.command_manager.set_pending_motor_command(Command.stop())
 
 
     async def execute_velocity_command(self, v1: float, v2: float, mode: str = 'wheel'):
@@ -56,7 +56,7 @@ class VelocityProfileManager:
             return
 
         if mode == 'twist':
-            self.pending_motor_command = Command(
+            await self.command_manager.set_pending_motor_command(Command(
                 ID="",
                 command_type=CommandType.TWIST,
                 command=TwistCommand(
@@ -65,10 +65,10 @@ class VelocityProfileManager:
                 ),
                 pause_duration=0,
                 duration=0,
-            )
+            ))
 
         elif mode == 'pwm':
-            self.command_manager.pending_motor_command = Command(
+            await self.command_manager.set_pending_motor_command(Command(
                 ID="",
                 command_type=CommandType.PWM,
                 command=MotorPWMCommand(
@@ -77,9 +77,9 @@ class VelocityProfileManager:
                 ),
                 pause_duration=0,
                 duration=0,
-            )
+            ))
         else:
-            self.command_manager.pending_motor_command = Command(
+            await self.command_manager.set_pending_motor_command(Command(
                 ID="",
                 command_type=CommandType.MOTOR,
                 command=MotorCommand(
@@ -88,4 +88,4 @@ class VelocityProfileManager:
                 ),
                 pause_duration=0,
                 duration=0,
-            )
+            ))

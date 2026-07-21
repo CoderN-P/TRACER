@@ -31,7 +31,7 @@ def setup_routes(robot):
     
     for event in EVENTS:
         async def handler(sid, data, event=event):
-            await robot.socket_manager.process_socketio_command(event, data)
+            await on_robot_loop(robot.socket_manager.process_socketio_command(event, data))
             
         sio.on(event, handler)
             

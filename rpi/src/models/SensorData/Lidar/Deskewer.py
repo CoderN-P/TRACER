@@ -7,17 +7,17 @@ class Deskewer:
         self.state_estimator = state_estimator
         self.latest_snapshot_index = 0
         
-    def deskew(self, scan: LidarScan):
+    async def deskew(self, scan: LidarScan):
         deskewed_points = []
         for point in scan.points:
-            deskewed_point = self.deskew_point(point)
+            deskewed_point = await self.deskew_point(point)
             if not point: return None
             deskewed_points.append(deskewed_point)
             
         if any([not point for point in deskewed_points]):
             return None 
             
-        reference_pose, reference_idx = self.state_estimator.snapshot_history.interpolate_pose(scan.points[-1].timestamp_ns, self.latest_snapshot_index)
+        reference_pose, reference_idx = await self.state_estimator.interpolate_pose(scan.points[-1].timestamp_ns, self.latest_snapshot_index)
         self.latest_snapshot_index = 0
 
         # Returns point cloud and associated robot pose
@@ -26,9 +26,9 @@ class Deskewer:
             points=deskewed_points
         ), reference_pose
     
-    def deskew_point(self, point: LidarPoint):
+    async def deskew_point(self, point: LidarPoint):
         # state[0] = x, state[1] = y, state[2] = theta
-        data = self.state_estimator.snapshot_history.interpolate_pose(point.timestamp_ns, self.latest_snapshot_index)
+        data = await self.state_estimator.interpolate_pose(point.timestamp_ns, self.latest_snapshot_index)
         if not data: return None
         
         state, idx = data

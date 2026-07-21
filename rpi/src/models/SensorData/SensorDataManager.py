@@ -1,16 +1,19 @@
 import logging
 import queue
 import time
+import threading
 from collections import deque
 import asyncio
 from .. import ROBOT_CONFIG, Mode
 from .SensorData import SensorData
-from .Lidar.LidarScan import LidarScan
+from .Lidar import LidarScan, PointCloud
 
 class SensorDataManager:
     def __init__(self, state_manager, command_manager):
         self.sensor_queue = queue.Queue()
         self.lidar_queue = queue.Queue()
+        self.receive_time_lock = threading.Lock()
+        self.previous_data_lock = asyncio.Lock()
         self.last_sensor_receive_time = time.monotonic()
         self._logger = logging.getLogger("Robot.SensorDataManager")
 
@@ -19,6 +22,7 @@ class SensorDataManager:
         self.right_distance_history: deque = deque(maxlen=50)
         
         self.previous_sensor_data: SensorData | None = None
+        self.previous_lidar_data: PointCloud | None = None
         self.state_manager = state_manager
         self.command_manager = command_manager
 
@@ -48,20 +52,46 @@ class SensorDataManager:
             
     def add_sensor_data(self, sensor_data: SensorData):
         self.sensor_queue.put(sensor_data)
-        self.last_sensor_receive_time = time.monotonic()
+        with self.receive_time_lock:
+            self.last_sensor_receive_time = time.monotonic()
         
     def process_lidar_data(self, lidar_data: LidarScan):
         self.lidar_queue.put(lidar_data)
 
+    def get_last_sensor_receive_time(self):
+        with self.receive_time_lock:
+            return self.last_sensor_receive_time
+
+    async def get_previous_sensor_data(self):
+        async with self.previous_data_lock:
+            return self.previous_sensor_data
+
+    async def set_previous_sensor_data(self, sensor_data: SensorData | None):
+        async with self.previous_data_lock:
+            self.previous_sensor_data = sensor_data
+
+    async def get_previous_lidar_data(self):
+        async with self.previous_data_lock:
+            return self.previous_lidar_data
+
+    async def set_previous_lidar_data(self, lidar_data: PointCloud | None):
+        async with self.previous_data_lock:
+            self.previous_lidar_data = lidar_data
+
+    async def get_previous_data_snapshot(self):
+        async with self.previous_data_lock:
+            return self.previous_sensor_data, self.previous_lidar_data
+
     async def debug_stall(self, start):
-        no_data_for = start - self.last_sensor_receive_time
+        no_data_for = start - self.get_last_sensor_receive_time()
         freeze_log = f"No sensor data received for {no_data_for:.2f} seconds"
 
-        since_last_cmd = start - self.command_manager.last_command_sent_at if self.command_manager.last_command_sent_at > 0 else None
-        if since_last_cmd is not None and since_last_cmd <= self.command_manager.freeze_after_cmd_window_s:
+        command_info = await self.command_manager.get_last_command_info()
+        since_last_cmd = start - command_info["sent_at"] if command_info["sent_at"] > 0 else None
+        if since_last_cmd is not None and since_last_cmd <= command_info["freeze_after_cmd_window_s"]:
             freeze_log += (
-                f" | freeze_after_cmd={self.command_manager.last_command_type}"
-                f" | cmd_id={self.command_manager.last_command_id}"
+                f" | freeze_after_cmd={command_info['type']}"
+                f" | cmd_id={command_info['id']}"
                 f" | cmd_age_ms={since_last_cmd * 1000:.0f}"
             )
 
@@ -69,8 +99,8 @@ class SensorDataManager:
         await self.state_manager.emergency_stop()
         
     async def enforce_timeouts(self, start):
-        dt = 1/ROBOT_CONFIG.MAIN_LOOP_FREQ
-        if (start - self.last_sensor_receive_time) > ROBOT_CONFIG.SENSOR_TIMEOUT and await self.state_manager.get_state() != Mode.STOPPED:
+        dt = 1/ROBOT_CONFIG.EKF_FREQ
+        if (start - self.get_last_sensor_receive_time()) > ROBOT_CONFIG.SENSOR_TIMEOUT and await self.state_manager.get_state() != Mode.STOPPED:
             await self.debug_stall(start)
             elapsed = asyncio.get_event_loop().time() - start
             await asyncio.sleep(max(0.0001, dt - elapsed))
@@ -85,10 +115,11 @@ class SensorDataManager:
 
     async def sync_with_embedded(self, sensor_data: SensorData):
         state = await self.state_manager.get_state()
+        previous_sensor_data = await self.get_previous_sensor_data()
         # Only check this if we have not recently recieved a resume command (since it might take a moment for the ESTOP command to be processed and for the state estimator to reset, we want to avoid immediately switching back to STOPPED mode if we receive sensor data with motors disabled right after a resume command)
-        if state != Mode.STOPPED and sensor_data.motors_enabled == False and self.previous_sensor_data and self.previous_sensor_data.motors_enabled == True:
+        if state != Mode.STOPPED and sensor_data.motors_enabled == False and previous_sensor_data and previous_sensor_data.motors_enabled == True:
             self._logger.warning("Motors manually disabled via ESTOP button, switching to STOPPED mode")
             await self.state_manager.set_state({"state": "STOPPED"})
-        if state == Mode.STOPPED and sensor_data.motors_enabled == True and self.previous_sensor_data and self.previous_sensor_data.motors_enabled == False:
+        if state == Mode.STOPPED and sensor_data.motors_enabled == True and previous_sensor_data and previous_sensor_data.motors_enabled == False:
             self._logger.warning("Motors manually re-enabled via ESTOP button, switching to MANUAL mode")
             await self.state_manager.set_state({"state": "MANUAL"})            

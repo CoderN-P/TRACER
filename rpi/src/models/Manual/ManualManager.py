@@ -37,7 +37,7 @@ class ManualManager:
         else:
             motor_command = Command.from_joystick(left_y, right_x)
 
-        self.command_manager.pending_motor_command = motor_command
+        await self.command_manager.set_pending_motor_command(motor_command)
         """
         if self.obstacle_clear.is_set():
             self.command_manager.pending_motor_command = motor_command

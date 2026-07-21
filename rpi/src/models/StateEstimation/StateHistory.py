@@ -40,7 +40,16 @@ class StateHistory:
 
         if timestamp > self.history[closest_idx].timestamp:
             if closest_idx == len(self.history) - 1:
-                return self.history[-1].robot_state
+                state = self.history[-1].robot_state
+                return (
+                    state.x,
+                    state.y,
+                    state.yaw,
+                    state.linear_velocity,
+                    state.angular_velocity,
+                    state.v_left,
+                    state.v_right
+                ), closest_idx
             prev_snapshot = self.history[closest_idx]
             next_snapshot = self.history[closest_idx + 1]
         else:
@@ -75,13 +84,13 @@ class StateHistory:
         
         # For theta (yaw), clamp both next and prev to be between -pi and pi to avoid wierd effects when interpolating
         
-        prev_snapshot.robot_state.yaw = (prev_snapshot.robot_state.yaw + np.pi) % (2 * np.pi) - np.pi
-        next_snapshot.robot_state.yaw = (next_snapshot.robot_state.yaw + np.pi) % (2 * np.pi) - np.pi
+        prev_yaw = (prev_snapshot.robot_state.yaw + np.pi) % (2 * np.pi) - np.pi
+        next_yaw = (next_snapshot.robot_state.yaw + np.pi) % (2 * np.pi) - np.pi
 
         interpolated_pose = (
             prev_snapshot.robot_state.x + alpha * (next_snapshot.robot_state.x - prev_snapshot.robot_state.x),
             prev_snapshot.robot_state.y + alpha * (next_snapshot.robot_state.y - prev_snapshot.robot_state.y),
-            prev_snapshot.robot_state.yaw + alpha * (next_snapshot.robot_state.yaw - prev_snapshot.robot_state.yaw),
+            prev_yaw + alpha * (next_yaw - prev_yaw),
             prev_snapshot.robot_state.linear_velocity + alpha * (next_snapshot.robot_state.linear_velocity - prev_snapshot.robot_state.linear_velocity),
             prev_snapshot.robot_state.angular_velocity + alpha * (next_snapshot.robot_state.angular_velocity - prev_snapshot.robot_state.angular_velocity),
             prev_snapshot.robot_state.v_left + alpha * (next_snapshot.robot_state.v_left - prev_snapshot.robot_state.v_left),

@@ -1,5 +1,8 @@
 from pathlib import Path
 import logging
+import asyncio
+import json
+from dataclasses import asdict
 from . import EMBEDDED_CONFIG_KEYS, ROBOT_CONFIG
 from .Command import ConfigCommand, Command, CommandType
 
@@ -13,6 +16,7 @@ CONSTANTS_SAVE_FILE = (
 class ConfigManager:
     def __init__(self, command_manager):
         self.command_manager = command_manager
+        self.config_lock = asyncio.Lock()
         self._logger = logging.getLogger("Robot.ConfigManager")
         
     
@@ -33,8 +37,7 @@ class ConfigManager:
         embedded_config = {attr: getattr(ROBOT_CONFIG, attr) for attr in EMBEDDED_CONFIG_KEYS.keys()}
         await self.update_embedded_config(embedded_config)
         
-    @staticmethod
-    def persist_constants():
+    def persist_constants(self):
         try:
             CONSTANTS_SAVE_FILE.parent.mkdir(parents=True, exist_ok=True)
             constants = asdict(ROBOT_CONFIG)
@@ -44,8 +47,7 @@ class ConfigManager:
         except Exception as exc:
             self._logger.warning(f"Failed to persist constants: {exc}")
             
-    @staticmethod
-    def load_persisted_constants():
+    def load_persisted_constants(self):
         if not CONSTANTS_SAVE_FILE.exists():
             return
 
@@ -54,7 +56,7 @@ class ConfigManager:
                 saved = json.load(fh)
     
             if not isinstance(saved, dict):
-                logger.warning("Ignoring malformed constants file: expected object")
+                self._logger.warning("Ignoring malformed constants file: expected object")
                 return
     
             applied = 0
@@ -64,10 +66,10 @@ class ConfigManager:
                         setattr(ROBOT_CONFIG, attr, val)
                         applied += 1
                     except AttributeError:
-                        logger.warning(f"Skipped read-only constant '{attr}' from saved file")
-            logger.info(f"Loaded {applied} persisted constants from {CONSTANTS_SAVE_FILE}")
+                        self._logger.warning(f"Skipped read-only constant '{attr}' from saved file")
+            self._logger.info(f"Loaded {applied} persisted constants from {CONSTANTS_SAVE_FILE}")
         except Exception as exc:
-            logger.warning(f"Failed to load persisted constants: {exc}")
+            self._logger.warning(f"Failed to load persisted constants: {exc}")
             
             
     async def update_constants(self, data):
@@ -78,20 +80,21 @@ class ConfigManager:
         save_requested = bool(data.get("save", False))
         constants_payload = {k: v for k, v in data.items() if k != "save"}
 
-        embedded_keys = []
+        async with self.config_lock:
+            embedded_keys = []
 
-        for attr, val in constants_payload.items():
-            if not hasattr(ROBOT_CONFIG, attr):
-                self._logger.warning(f"Ignoring unknown constant '{attr}'")
-                continue
-            try:
-                if attr in EMBEDDED_CONFIG_KEYS.keys() and val != getattr(ROBOT_CONFIG, attr):
-                    embedded_keys.append(attr)
+            for attr, val in constants_payload.items():
+                if not hasattr(ROBOT_CONFIG, attr):
+                    self._logger.warning(f"Ignoring unknown constant '{attr}'")
+                    continue
+                try:
+                    if attr in EMBEDDED_CONFIG_KEYS.keys() and val != getattr(ROBOT_CONFIG, attr):
+                        embedded_keys.append(attr)
 
-                setattr(ROBOT_CONFIG, attr, val)
+                    setattr(ROBOT_CONFIG, attr, val)
 
-            except AttributeError:
-                self._logger.warning(f"Ignoring read-only constant '{attr}'")
+                except AttributeError:
+                    self._logger.warning(f"Ignoring read-only constant '{attr}'")
 
         # Save embedded keys that are diff than their current values
 

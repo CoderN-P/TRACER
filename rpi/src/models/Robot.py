@@ -38,6 +38,7 @@ class Robot:
         
         self.latest_scan = None
         self.running: bool = False
+        self.lifecycle_lock = threading.Lock()
         self._logger: logging.Logger = logging.getLogger("Robot")
         
         self.lidar_read_task: asyncio.Task | None = None
@@ -49,7 +50,7 @@ class Robot:
     def _run_loop_thread(self):
         asyncio.set_event_loop(asyncio.new_event_loop())
         self.loop = asyncio.get_event_loop()
-        self.main_loop_task = self.loop.create_task(self.main_loop())
+        self.main_loop_task = self.loop.create_task(self.start_loops())
         
         # Run lidar read loop
         lidar_reader = LidarReader(port="/dev/ttyUSB0", baudrate=460800)
@@ -71,22 +72,28 @@ class Robot:
 
     def start(self):
         """Start the robot main loop on its own thread/asyncio loop."""
-        if self.running:
-            return
-        
-        self.running = True
-        self.main_loop_thread = threading.Thread(target=self._run_loop_thread, name="RobotMainLoop", daemon=True)
-        self.main_loop_thread.start()
+        with self.lifecycle_lock:
+            if self.running:
+                return
+            
+            self.running = True
+            self.main_loop_thread = threading.Thread(target=self._run_loop_thread, name="RobotMainLoop", daemon=True)
+            self.main_loop_thread.start()
         self._loop_ready.wait(timeout=2.0)
         self._logger.info("Robot main loop started")
 
     def stop(self):
         """Stop the robot main loop thread."""
-        self.running = False
-        if self.loop and self.main_loop_task:
-            self.loop.call_soon_threadsafe(self.main_loop_task.cancel)
-        if self.main_loop_thread and self.main_loop_thread.is_alive():
-            self.main_loop_thread.join(timeout=2.0)
+        with self.lifecycle_lock:
+            self.running = False
+            loop = self.loop
+            main_loop_task = self.main_loop_task
+            main_loop_thread = self.main_loop_thread
+
+        if loop and main_loop_task:
+            loop.call_soon_threadsafe(main_loop_task.cancel)
+        if main_loop_thread and main_loop_thread.is_alive():
+            main_loop_thread.join(timeout=2.0)
         self._logger.info("Robot main loop stopped")
 
     async def run_on_robot_loop(self, coro):
@@ -101,14 +108,16 @@ class Robot:
         if await self.state_manager.get_state() == Mode.STOPPED: # Only update state estimator if not stopped
             return sensor_data
         
-        self.state_estimator.update(sensor_data, self.sensor_data_manager.previous_sensor_data)
+        previous_sensor_data = await self.sensor_data_manager.get_previous_sensor_data()
+        await self.state_estimator.update(sensor_data, previous_sensor_data)
 
         # Update EKF with missed packets
-        self.sensor_data_manager.previous_sensor_data = sensor_data
+        await self.sensor_data_manager.set_previous_sensor_data(sensor_data)
         while not self.sensor_data_manager.sensor_queue.empty():
             sensor_data = self.sensor_data_manager.sensor_queue.get()
-            self.state_estimator.update(sensor_data, self.sensor_data_manager.previous_sensor_data)
-            self.sensor_data_manager.previous_sensor_data = sensor_data
+            previous_sensor_data = await self.sensor_data_manager.get_previous_sensor_data()
+            await self.state_estimator.update(sensor_data, previous_sensor_data)
+            await self.sensor_data_manager.set_previous_sensor_data(sensor_data)
 
         return sensor_data
 
@@ -117,7 +126,7 @@ class Robot:
     
         while not self.sensor_data_manager.lidar_queue.empty():
             latest_scan = self.sensor_data_manager.lidar_queue.get()
-            data = self.deskewer.deskew(latest_scan)
+            data = await self.deskewer.deskew(latest_scan)
             
             if not data: 
                 break
@@ -126,49 +135,85 @@ class Robot:
             latest_scan = point_cloud  
             
             if await self.state_manager.get_state() != Mode.STOPPED and ROBOT_CONFIG.USE_LIDAR: # Only update the world model if not stopped
-                best_pose, score = self.scan_matcher.match(point_cloud, reference_pose)
+                best_pose, score = await self.scan_matcher.match(point_cloud, reference_pose)
                 
-                self.state_estimator.pose_filter.state[0] = best_pose[0]
-                self.state_estimator.pose_filter.state[1] = best_pose[1]
-                self.state_estimator.heading_filter.state[0] = best_pose[2]
+                await self.state_estimator.apply_lidar_pose_correction(best_pose)
                 
-                self.world_model.update(
+                await self.world_model.update(
                     point_cloud
                 )
                 
-        if latest_scan: self.latest_scan = latest_scan    
-        return self.latest_scan
+        if latest_scan: await self.sensor_data_manager.set_previous_lidar_data(latest_scan)
         
-    
-    async def main_loop(self):
-        """Main loop to continuously read sensor data and update state estimator."""
-        dt = 1/ROBOT_CONFIG.MAIN_LOOP_FREQ
-        
-        self._logger.info("Running main loop: " + str(self.running))
-
-        await self.config_manager.init()
-        
+    async def ekf_loop(self):
+        dt = 1 / ROBOT_CONFIG.EKF_FREQ
         while self.running:
-            start = asyncio.get_event_loop().time()
-            
-            data_available = await self.sensor_data_manager.enforce_timeouts(start) 
-            
+            start = time.monotonic()
+
+            data_available = await self.sensor_data_manager.enforce_timeouts(start)
+
             if not data_available:
                 continue
-                
+
             sensor_data = await self.process_sensor_queue()
-            lidar_data = await self.process_lidar_queue()
-            self.world_model.decay_live_layer()
             await self.sensor_data_manager.sync_with_embedded(sensor_data) # Syncs rpi state to embedded state
-            await self.path_manager.execute_cur_path(self.state_estimator.state) # Follows the current path if available
+            elapsed = time.monotonic() - start
+            await asyncio.sleep(max(0.0001, dt - elapsed)) # 200Hz loop
+
+        self._logger.info("Exited main loop")
+        
+    async def mapping_loop(self):
+        dt = 1 / ROBOT_CONFIG.MAPPING_FREQ
+
+        while self.running:
+            start = time.monotonic()
+            await self.process_lidar_queue()
+            await self.world_model.decay_live_layer()
+
+            elapsed = time.monotonic() - start
+            await asyncio.sleep(max(0.0001, dt - elapsed)) # 200Hz loop
+
+        await self.world_model.shutdown()
+        self._logger.info("Exited mapping loop")
+        
+    async def path_manual_loop(self):
+        dt = 1 / ROBOT_CONFIG.PATH_FOLLOWING_FREQ
+        
+        while self.running:
+            start = time.monotonic()
+            
+            robot_state = await self.state_estimator.get_state_snapshot()
+            await self.path_manager.execute_cur_path(robot_state) # Follows the current path if available
             await self.manual_manager.execute_manual_commands() # Executes manual commands such as joystick or custom velocity profiles
             
-            self.loop_monitoring.update_loop_time(start) # Monitors worst loop times
-            await self.emit_manager.send_sensor_update(sensor_data, self.state_estimator.state, lidar_data)
-            await self.emit_manager.send_map_update()
+            elapsed = time.monotonic() - start
+            await asyncio.sleep(max(0.0001, dt - elapsed))
             
-            elapsed = asyncio.get_event_loop().time() - start
-            await asyncio.sleep(max(0.0001, dt - elapsed)) # 200Hz loop
-          
-        self.world_model.shutdown()  
-        self._logger.info("Exited main loop")
+        self._logger.info("Exited path following / manual control loop")
+        
+    async def emit_loop(self):
+        dt = 1 / ROBOT_CONFIG.EMIT_SENSOR_FREQ
+        
+        while self.running:
+            start = time.monotonic()
+
+            previous_sensor_data, previous_lidar_data = await self.sensor_data_manager.get_previous_data_snapshot()
+            robot_state = await self.state_estimator.get_state_snapshot()
+            await self.emit_manager.send_sensor_update(previous_sensor_data, robot_state, previous_lidar_data)
+            await self.emit_manager.send_map_update()
+
+            elapsed = time.monotonic() - start
+            await asyncio.sleep(max(0.0001, dt - elapsed))
+            
+        self._logger.info("Exited emit loop")
+            
+        
+    async def start_loops(self):
+        """Main loop to continuously read sensor data and update state estimator."""
+        await self.config_manager.init()
+        
+        async with asyncio.TaskGroup() as tg:
+            tg.create_task(self.ekf_loop())
+            tg.create_task(self.mapping_loop())
+            tg.create_task(self.path_manual_loop())
+            tg.create_task(self.emit_loop())

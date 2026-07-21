@@ -43,7 +43,7 @@ class SocketManager:
                 return
             case 'update_virtual_obstacles':
                 objects = [VirtualObstacle.model_validate(obstacle) for obstacle in data]
-                self.world_model.virtual_layer.update(objects)
+                await self.world_model.update_virtual_obstacles(objects)
             case 'update_constants':
                 await self.config_manager.update_constants(data)
                 return

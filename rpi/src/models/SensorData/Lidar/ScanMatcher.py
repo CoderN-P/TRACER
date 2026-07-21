@@ -23,7 +23,7 @@ class ScanMatcher:
     Implements CSM (Correlative scan matching)
     """
     
-    def match(self, point_cloud: PointCloud, pose):
+    async def match(self, point_cloud: PointCloud, pose):
         """
         Fast vectorized correlative scan matcher (CSM).
 
@@ -34,20 +34,20 @@ class ScanMatcher:
         """
 
         # Extract map and quick access values
-        static_map = self.world_model.static_map
+        static_map = await self.world_model.get_static_map_snapshot()
         
-        if static_map.scans_inserted < 5:
+        if static_map["scans_inserted"] < 5:
             self._logger.info("Skipping scan matching as not enough scans have been inserted into the map.")
             return pose, 0.0
         
-        grid = static_map.grid  # log-odds grid
+        grid = static_map["grid"]  # log-odds grid
         # Precompute probability grid once (vectorized access is much faster than calling method per point)
         prob_grid = 1.0 / (1.0 + np.exp(-grid))
         score_grid = np.where(prob_grid > ROBOT_CONFIG.OBSTACLE_PROB_THRESHOLD, 1.0, 0.0)
 
-        res = static_map.resolution
-        origin_x = static_map.origin_x
-        origin_y = static_map.origin_y
+        res = static_map["resolution"]
+        origin_x = static_map["origin_x"]
+        origin_y = static_map["origin_y"]
 
         px = np.array([p.x for p in point_cloud.points], dtype=np.float32)
         py = np.array([p.y for p in point_cloud.points], dtype=np.float32)

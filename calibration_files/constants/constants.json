@@ -13,6 +13,7 @@
   "DWA_Y": 0.4,
   "EMIT_SENSOR_FREQ": 10,
   "EMIT_MAP_FREQ": 2,
+  "MAPPING_FREQ": 10,
   "ENCODER_PPR": 11,
   "END_LOOKAHEAD_MULTIPLIER": 1.1,
   "G": 9.81,
@@ -60,7 +61,7 @@
       1
     ]
   ],
-  "MAIN_LOOP_FREQ": 200,
+  "EKF_FREQ": 200,
   "MANUAL_FREQ": 50,
   "MAX_ALPHA": 6,
   "MAX_ENCODER_MARGIN": 1,
@@ -98,7 +99,8 @@
   "TRAJECTORY_DT": 0.01,
   "USE_ADAPTIVE_WHEEL_BASE": true,
   "USE_GYRO_CORRECTION": true,
-  "USE_LIDAR": true,
+  "USE_LIDAR": true, 
+  "MAPPING_FREQ": 10,
   "V_SAMPLES": 7,
   "WHEEL_BASE_MAX": 0.265,
   "WHEEL_BASE_MIN": 0.255,

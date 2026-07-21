@@ -74,8 +74,9 @@ class RobotConfig:
     CLEAR_FRAMES_THRESHOLD: float
     EMIT_SENSOR_FREQ: float
     EMIT_MAP_FREQ: float
+    MAPPING_FREQ: float
     SENSOR_TIMEOUT: float
-    MAIN_LOOP_FREQ: float
+    EKF_FREQ: float
     PATH_FOLLOWING_FREQ: float
     MANUAL_FREQ: float
     ENCODER_PPR: int

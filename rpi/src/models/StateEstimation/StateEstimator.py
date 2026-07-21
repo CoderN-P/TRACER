@@ -1,7 +1,6 @@
 import math
-import numpy as np
+import asyncio
 import time
-from collections import deque
 import logging
 from ..PathFollowing.utils import get_ekf_track_width
 from . import RobotState, HeadingFilter, PoseFilter, EKFSnapshot, StateHistory
@@ -22,6 +21,7 @@ class StateEstimator:
             v_left=0.0,
             v_right=0.0
         )
+        self.state_lock = asyncio.Lock()
         
         self.snapshot_history = StateHistory()
         # Pre state estimations
@@ -38,15 +38,19 @@ class StateEstimator:
             self.on_state_change
         )
         
-    def on_state_change(self, event: StateChange):
+    async def on_state_change(self, event: StateChange):
         if event.new_state == Mode.STOPPED or event.prev_state == Mode.STOPPED:
-            self.reset()
+            await self.reset()
 
     
     def initialize(self, sensor_data: SensorData):
         self.initial_mag_heading = math.radians(sensor_data.magnetometer.heading)
         
-    def reset(self):
+    async def reset(self):
+        async with self.state_lock:
+            self._reset_unlocked()
+
+    def _reset_unlocked(self):
         self.state = RobotState(
             x=0.0,
             y=0.0,
@@ -63,6 +67,23 @@ class StateEstimator:
         self.heading_filter.reset()
         self.pose_filter.reset()
         self.snapshot_history.clear()
+
+    async def get_state_snapshot(self):
+        async with self.state_lock:
+            return self.state.model_copy()
+
+    async def interpolate_pose(self, timestamp, index=0):
+        async with self.state_lock:
+            return self.snapshot_history.interpolate_pose(timestamp, index)
+
+    async def apply_lidar_pose_correction(self, best_pose):
+        async with self.state_lock:
+            self.pose_filter.state[0] = best_pose[0]
+            self.pose_filter.state[1] = best_pose[1]
+            self.heading_filter.state[0] = best_pose[2]
+            self.state.x = best_pose[0]
+            self.state.y = best_pose[1]
+            self.state.yaw = best_pose[2]
 
     # Python logic to find how many packets were missed
     @staticmethod
@@ -142,7 +163,11 @@ class StateEstimator:
             return delta_x * math.cos(theta_c), delta_x * math.sin(theta_c)
 
 
-    def update(self, sensor_data: SensorData, previous_sensor_data: SensorData):
+    async def update(self, sensor_data: SensorData, previous_sensor_data: SensorData):
+        async with self.state_lock:
+            return self._update_unlocked(sensor_data, previous_sensor_data)
+
+    def _update_unlocked(self, sensor_data: SensorData, previous_sensor_data: SensorData):
         # Previous sensor data is needed to determine dt
         if not previous_sensor_data: return
         
@@ -206,39 +231,8 @@ class StateEstimator:
         
         return
         
-    def correct(self, timestamp, measurement):
-        closest_idx = self.snapshot_history.get_closest_idx(timestamp)
-        
-        if closest_idx < 1:
-            return
-        
-        # Repeat all the steps from closest_idx to the end of history, but with the lidar update at closest_idx
-        # Run once with injected lidar measurement then call update for the following snapshots
-        closest = self.history[closest_idx]
-        self.heading_filter.P = closest.heading_covariance
-        self.heading_filter.state = np.array([closest.robot_state.yaw, closest.gyro_bias])
-        self.pose_filter.P = closest.pose_covariance
-
-        self.pose_filter.state = np.array([closest.robot_state.x, closest.robot_state.y])
-        self.theta_encoders = closest.theta_encoders
-        self.state = closest.robot_state
-
-        # Clear outdated snapshots 
-        removed = 0
-        sensor_data_history = []
-        while len(self.snapshot_history.history) > closest_idx + 1:
-            removed += 1
-            sensor_data_history.append(self.snapshot_history.history.pop().sensor_data)
-
-        # update the closest snapshot with scan matching measurement
-        self.pose_filter.update(lidar_data.camera.x, lidar_data.camera.y, self.pose_filter.state, self.pose_filter.P)
-
-        # re run by calling update for the number of snapshots we removed
-        for i in range(0, removed):
-            if i == 0:
-                self.update(sensor_data_history[removed - 1 - i], self.snapshot_history.history[-1].sensor_data)
-            else:
-                self.update(sensor_data_history[removed - 1 - i], sensor_data_history[removed - i])
+    async def correct(self, timestamp, measurement):
+        raise NotImplementedError("Historical EKF correction needs to be updated for locked async state access.")
 
 
 

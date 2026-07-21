@@ -466,6 +466,12 @@
           min: 0,
         },
         {
+          key: "MAPPING_FREQ",
+          label: "MAPPING_FREQ",
+          step: "1",
+          min: 1,
+        },
+        {
           key: "DWA_FREQ",
           label: "DWA_FREQ",
           step: "1",
@@ -477,7 +483,7 @@
           step: "0.001",
           min: 0,
         },
-        { key: "MAIN_LOOP_FREQ", label: "MAIN_LOOP_FREQ", step: "1", min: 1 },
+        { key: "EKF_FREQ", label: "EKF_FREQ", step: "1", min: 1 },
         {
           key: "PATH_FOLLOWING_FREQ",
           label: "PATH_FOLLOWING_FREQ",

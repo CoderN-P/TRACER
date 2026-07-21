@@ -15,6 +15,7 @@ class SerialManager:
         self.running = False
         self.robot = None  # Reference to the robot instance
         self._buffer = bytearray()  # Buffer to store incoming data
+        self._write_lock = threading.Lock()
         self._logger = logging.getLogger("SerialManager")
         self._START_BYTE = 0xAA
         self._PACKET_LENGTH = 37  # Start byte (1) + Sensor data (35) + Checksum (1)
@@ -88,6 +89,11 @@ class SerialManager:
         if not self.running:
             self._logger.warning("SerialManager is not running, cannot send command")
             return
+
+        with self._write_lock:
+            self._send_locked(data)
+
+    def _send_locked(self, data: Command):
         # Check if data is a string or pydantic model
         if data.command_type == CommandType.MOTOR:
             left = max(-32767, min(32767, int(data.command.left_motor * 1000))) # Convert from m/s to mm/s to fit in int16

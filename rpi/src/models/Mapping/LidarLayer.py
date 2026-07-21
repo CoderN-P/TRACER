@@ -64,13 +64,13 @@ class LidarLayer(OccupancyGrid):
         np.clip(self.grid, self.CELL_MIN, self.CELL_MAX, out=self.grid)
                 
     def decay(self):
-        if not asyncio.get_event_loop().time() - self.last_decay_time >= self.decay_dt:
+        if not time.monotonic() - self.last_decay_time >= self.decay_dt:
             return
         
         now = time.perf_counter_ns()
         mask = (now - self.last_seen) > ROBOT_CONFIG.LIDAR_TIMEOUT_NS
         self.grid[mask] = 0
-        self.last_decay_time = asyncio.get_event_loop().time()
+        self.last_decay_time = time.monotonic()
         
     def serialize_visualization(self):
         mask = self.grid > 0
@@ -84,8 +84,8 @@ class LidarLayer(OccupancyGrid):
             self.grid[ys, xs] / self.CELL_MAX * 255
         ).astype(np.uint8)
 
-        world_x = (xs - self.origin_x) * self.resolution
-        world_y = (ys - self.origin_y) * self.resolution
+        world_x = (xs * self.resolution) * self.origin_x
+        world_y = (ys * self.resolution) * self.origin_y
 
         data = np.column_stack(
             (

@@ -64,7 +64,7 @@ class SensorDataManager:
         self.sensor_queue.put(sensor_data)
         with self.receive_time_lock:
             self.last_sensor_receive_time = time.monotonic()
-        
+    
     def process_lidar_data(self, lidar_data: LidarScan):
         self.lidar_queue.put(lidar_data)
 

@@ -14,6 +14,8 @@
   export type LidarPoint = {
     x: number;
     y: number;
+    origin_x?: number;
+    origin_y?: number;
     quality: number;
   };
 

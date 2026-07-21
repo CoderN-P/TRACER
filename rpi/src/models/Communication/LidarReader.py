@@ -50,9 +50,3 @@ class LidarReader:
             
             if scan is not None:
                 callback(scan)
-        
-            
-                    
-    
-                
-            

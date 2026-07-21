@@ -213,6 +213,16 @@
         {
           x,
           y,
+          origin_x:
+            typeof candidate.origin_x === "number" &&
+            Number.isFinite(candidate.origin_x)
+              ? candidate.origin_x
+              : undefined,
+          origin_y:
+            typeof candidate.origin_y === "number" &&
+            Number.isFinite(candidate.origin_y)
+              ? candidate.origin_y
+              : undefined,
           quality: Math.max(0, Math.min(63, quality)),
         },
       ];
@@ -504,6 +514,7 @@
                 onRunPath={runPath}
                 onStopRun={stopPathRun}
                 {mapUpdate}
+                {latestLidarScan}
               />
             </div>
             <div class="col-span-5 row-span-6 min-h-0">

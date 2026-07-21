@@ -14,6 +14,7 @@
     CircleIcon,
     Square,
     Layers2,
+    Radar,
   } from "lucide-svelte";
   import { Stage, Layer, Line, Circle, Rect, Text } from "svelte-konva";
   import {
@@ -40,11 +41,23 @@
     static: MapCell[];
     lidar: MapCell[];
   };
+  export type LidarPoint = {
+    x: number;
+    y: number;
+    origin_x?: number;
+    origin_y?: number;
+    quality: number;
+  };
+  export type LidarPointCloud = {
+    timestamp: number;
+    points: LidarPoint[];
+  };
 
   /** Robot position in meters, updated at ~10 Hz. Pass null to hide the robot. */
   let {
     robotPos = null,
     mapUpdate = { static: [], lidar: [] },
+    latestLidarScan = null,
     freehandPath: freehandPathProp = $bindable([]),
     pathComplete = false,
     onRunPath = (_payload: RunPathPayload) => {},
@@ -52,6 +65,7 @@
   }: {
     robotPos?: { x: number; y: number; theta: number } | null;
     mapUpdate?: MapUpdatePayload;
+    latestLidarScan?: LidarPointCloud | null;
     freehandPath?: { x: number; y: number }[];
     /** Set to true by the parent when the robot confirms path completion. */
     pathComplete?: boolean;
@@ -240,6 +254,8 @@
   // ── Occupancy map layers ─────────────────────────────────────────────────
   let showStaticMap = $state(true);
   let showLidarLayer = $state(true);
+  let showRawLidarLayer = $state(true);
+  const LIDAR_QUALITY_MAX = 63;
 
   function clampIntensity(intensity: number) {
     return Math.max(0, Math.min(255, Math.round(intensity)));
@@ -256,6 +272,51 @@
   function mapCellFill(intensity: number, opacity: number) {
     return `rgba(${255 - intensity}, ${255 - intensity}, ${255 - intensity}, ${opacity})`;
   }
+
+  function pointQuality(point: LidarPoint) {
+    return Math.max(
+      0,
+      Math.min(
+        LIDAR_QUALITY_MAX,
+        Number.isFinite(point.quality) ? point.quality : 0,
+      ),
+    );
+  }
+
+  function lidarPointDistance(point: LidarPoint) {
+    const originX =
+      typeof point.origin_x === "number" && Number.isFinite(point.origin_x)
+        ? point.origin_x
+        : robotPos?.x ?? 0;
+    const originY =
+      typeof point.origin_y === "number" && Number.isFinite(point.origin_y)
+        ? point.origin_y
+        : robotPos?.y ?? 0;
+
+    return Math.hypot(point.x - originX, point.y - originY);
+  }
+
+  function rawLidarPointFill(point: LidarPoint) {
+    const qualityAmount = pointQuality(point) / LIDAR_QUALITY_MAX;
+    const distance = lidarPointDistance(point);
+    const rangeAmount = Math.max(0, Math.min(1, distance / 12));
+    const alpha = 0.35 + qualityAmount * 0.55;
+
+    if (rangeAmount < 0.18) return `rgba(220, 38, 38, ${alpha})`;
+    if (rangeAmount < 0.34) return `rgba(234, 88, 12, ${alpha})`;
+    if (rangeAmount < 0.58) return `rgba(202, 138, 4, ${alpha})`;
+    return `rgba(14, 165, 233, ${alpha})`;
+  }
+
+  function rawLidarPointRadius(point: LidarPoint) {
+    return (1.5 + (pointQuality(point) / LIDAR_QUALITY_MAX) * 2.3) / zoom;
+  }
+
+  let rawLidarPoints = $derived(
+    latestLidarScan?.points?.filter(
+      (point) => Number.isFinite(point.x) && Number.isFinite(point.y),
+    ) ?? [],
+  );
 
   // ── Robot interpolation ──────────────────────────────────────────────────
   // Sensor updates arrive at 10 Hz (every 100 ms). We lerp between the last
@@ -1291,13 +1352,26 @@
           onclick={() => {
             showLidarLayer = !showLidarLayer;
           }}
-          class="flex items-center gap-1 px-3 py-2 text-xs transition-colors {showLidarLayer
+          class="flex items-center gap-1 border-r border-gray-200 px-3 py-2 text-xs transition-colors {showLidarLayer
             ? 'bg-sky-700 text-white'
             : 'bg-gray-50 text-black hover:bg-gray-100'}"
-          title="Toggle live lidar layer"
+          title="Toggle mapped lidar occupancy layer"
         >
           <Layers2 class="h-3.5 w-3.5" /> Lidar
           <span class="text-[10px] opacity-70">{mapUpdate.lidar.length}</span>
+        </button>
+        <button
+          type="button"
+          onclick={() => {
+            showRawLidarLayer = !showRawLidarLayer;
+          }}
+          class="flex items-center gap-1 px-3 py-2 text-xs transition-colors {showRawLidarLayer
+            ? 'bg-cyan-600 text-white'
+            : 'bg-gray-50 text-black hover:bg-gray-100'}"
+          title="Toggle raw lidar point cloud"
+        >
+          <Radar class="h-3.5 w-3.5" /> Raw
+          <span class="text-[10px] opacity-70">{rawLidarPoints.length}</span>
         </button>
       </div>
 
@@ -1636,6 +1710,20 @@
                 />
               {/each}
             {/if}
+          </Layer>
+        {/if}
+
+        <!-- Raw lidar scan points -->
+        {#if showRawLidarLayer && rawLidarPoints.length > 0}
+          <Layer listening={false}>
+            {#each rawLidarPoints as point}
+              <Circle
+                x={point.x * SCALE}
+                y={-point.y * SCALE}
+                radius={rawLidarPointRadius(point)}
+                fill={rawLidarPointFill(point)}
+              />
+            {/each}
           </Layer>
         {/if}
 

@@ -32,6 +32,11 @@ class StateHistory:
 
         return closest_idx
     
+    @staticmethod
+    def interp_angle(a, b, alpha):
+        diff = (b - a + np.pi) % (2*np.pi) - np.pi
+        return a + alpha * diff
+    
     def interpolate_pose(self, timestamp, index=0):
         if len(self.history) < 2:
             return None
@@ -83,14 +88,11 @@ class StateHistory:
         alpha = (timestamp - t0) / (t1 - t0)
         
         # For theta (yaw), clamp both next and prev to be between -pi and pi to avoid wierd effects when interpolating
-        
-        prev_yaw = (prev_snapshot.robot_state.yaw + np.pi) % (2 * np.pi) - np.pi
-        next_yaw = (next_snapshot.robot_state.yaw + np.pi) % (2 * np.pi) - np.pi
 
         interpolated_pose = (
             prev_snapshot.robot_state.x + alpha * (next_snapshot.robot_state.x - prev_snapshot.robot_state.x),
             prev_snapshot.robot_state.y + alpha * (next_snapshot.robot_state.y - prev_snapshot.robot_state.y),
-            prev_yaw + alpha * (next_yaw - prev_yaw),
+            self.interp_angle(prev_snapshot.robot_state.yaw, next_snapshot.robot_state.yaw, alpha),
             prev_snapshot.robot_state.linear_velocity + alpha * (next_snapshot.robot_state.linear_velocity - prev_snapshot.robot_state.linear_velocity),
             prev_snapshot.robot_state.angular_velocity + alpha * (next_snapshot.robot_state.angular_velocity - prev_snapshot.robot_state.angular_velocity),
             prev_snapshot.robot_state.v_left + alpha * (next_snapshot.robot_state.v_left - prev_snapshot.robot_state.v_left),

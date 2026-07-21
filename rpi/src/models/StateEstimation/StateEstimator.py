@@ -93,16 +93,12 @@ class StateEstimator:
         return diff - 1 # If diff is 1, 0 packets were missed
     
     @staticmethod
-    def calculate_dt(cur_raw: float, previous_raw: float):
-        current_time = cur_raw / 1_000_000.0
-        previous_time = previous_raw / 1_000_000.0
+    def calculate_dt(cur_raw: int, previous_raw: int):
+        # Timestamps in ns
+        current_time = cur_raw / 1_000_000_000.0 
+        previous_time = previous_raw / 1_000_000_000.0
         
-        if current_time < previous_time:
-            dt = (current_time + (4294.967295 - previous_time))  # Handle rollover (4.294967295 seconds for 32-bit microsecond timer)
-        else:
-            dt = current_time - previous_time
-            
-        return dt
+        return current_time - previous_time
 
     @staticmethod
     def estimate_linear_velocity(v_left, v_right):
@@ -173,7 +169,7 @@ class StateEstimator:
         
         if len(self.snapshot_history.history) == 0:
             self.snapshot_history.add(EKFSnapshot(
-                timestamp=time.perf_counter_ns(),
+                timestamp=sensor_data.timestamp,
                 robot_state=self.state.model_copy(),
                 sensor_data=previous_sensor_data.model_copy(),
                 heading_covariance=self.heading_filter.P,
@@ -220,7 +216,7 @@ class StateEstimator:
         self.state.x, self.state.y = self.pose_filter.step(position_delta_x, position_delta_y, None)
 
         self.snapshot_history.add(EKFSnapshot(
-            timestamp=time.perf_counter_ns(),
+            timestamp=sensor_data.timestamp,
             robot_state=self.state.model_copy(),
             sensor_data=sensor_data.model_copy(),
             pose_covariance=self.pose_filter.P,

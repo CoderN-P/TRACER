@@ -16,7 +16,7 @@ class SensorData(BaseModel):
     left_encoder: int = Field(..., description="Left wheel encoder delta ticks")
     right_encoder: int = Field(..., description="Right wheel encoder delta ticks")
     battery: int = Field(..., description="Battery level in percentage (0-100)")
-    timestamp: int = Field(..., description="Timestamp of the sensor data in microseconds since epoch") 
+    timestamp: int = Field(..., description="Timestamp of the sensor data in (microseconds for raw and nanoseconds when converted) since epoch") 
     packet_num: int = Field(..., description="Packet number for tracking sensor data updates")
     motors_enabled: bool = Field(..., description="Whether the motors are currently enabled")
     

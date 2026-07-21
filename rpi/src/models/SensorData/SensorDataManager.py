@@ -21,6 +21,9 @@ class SensorDataManager:
         self.left_distance_history: deque = deque(maxlen=50)  # Store last 10 distance readings for smoothing
         self.right_distance_history: deque = deque(maxlen=50)
         
+        # Timing synchronization
+        self.timing_offset_ns = None
+        
         self.previous_sensor_data: SensorData | None = None
         self.previous_lidar_data: PointCloud | None = None
         self.state_manager = state_manager
@@ -51,6 +54,13 @@ class SensorDataManager:
             
             
     def add_sensor_data(self, sensor_data: SensorData):
+        if not self.timing_offset_ns:
+            rpi_start_ns = time.perf_counter_ns()
+            esp_start_us = sensor_data.timestamp
+            self.timing_offset_ns = rpi_start_ns - esp_start_us*1000
+            
+        # TODO: Handle microsecond rollover
+        sensor_data.timestamp = sensor_data.timestamp*1000 + self.timing_offset_ns
         self.sensor_queue.put(sensor_data)
         with self.receive_time_lock:
             self.last_sensor_receive_time = time.monotonic()

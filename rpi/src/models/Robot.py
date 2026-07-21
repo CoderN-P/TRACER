@@ -142,7 +142,7 @@ class Robot:
                 await self.world_model.update(
                     point_cloud
                 )
-                
+        
         if latest_scan: await self.sensor_data_manager.set_previous_lidar_data(latest_scan)
         
     async def ekf_loop(self):
@@ -157,6 +157,7 @@ class Robot:
 
             sensor_data = await self.process_sensor_queue()
             await self.sensor_data_manager.sync_with_embedded(sensor_data) # Syncs rpi state to embedded state
+            self.loop_monitoring.update_loop_time(start)
             elapsed = time.monotonic() - start
             await asyncio.sleep(max(0.0001, dt - elapsed)) # 200Hz loop
 

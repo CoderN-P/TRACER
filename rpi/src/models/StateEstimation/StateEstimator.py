@@ -205,7 +205,14 @@ class StateEstimator:
         else:
             mag_heading_rad = None
             
-        self.state.yaw = (self.heading_filter.step(self.theta_encoders, sensor_data.imu.gyroscope_z, dt, mag_heading_rad)) % (2 * math.pi)
+        self.state.yaw = self._wrap_to_pi(
+            self.heading_filter.step(
+                self.theta_encoders,
+                sensor_data.imu.gyroscope_z,
+                dt,
+                mag_heading_rad,
+            )
+        )
     
         self.state.v_left, self.state.v_right = self.get_wheel_velocities(delta_left_ticks, delta_right_ticks, dt)
         self.state.linear_velocity = self.estimate_linear_velocity(self.state.v_left, self.state.v_right)
@@ -249,3 +256,15 @@ class StateEstimator:
         return (delta_right - delta_left) / w_eff
 
         
+
+    @staticmethod
+    def _unwrap_angle(reference: float, angle: float) -> float:
+        """
+        Return `angle` shifted by +/- 2*pi so that it is closest to `reference`.
+        Useful when interpolating headings across the -pi/pi discontinuity.
+        """
+        while angle - reference > math.pi:
+            angle -= 2 * math.pi
+        while angle - reference < -math.pi:
+            angle += 2 * math.pi
+        return angle

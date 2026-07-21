@@ -34,8 +34,21 @@ class StateHistory:
     
     @staticmethod
     def interp_angle(a, b, alpha):
-        diff = (b - a + np.pi) % (2*np.pi) - np.pi
-        return a + alpha * diff
+        # Normalize both input angles to [-pi, pi]
+        a = np.arctan2(np.sin(a), np.cos(a))
+        b = np.arctan2(np.sin(b), np.cos(b))
+
+        # Compute shortest angular distance.
+        diff = np.arctan2(
+            np.sin(b - a),
+            np.cos(b - a)
+        )
+
+        # Interpolate and normalize the result back to [-pi, pi].
+        return np.arctan2(
+            np.sin(a + alpha * diff),
+            np.cos(a + alpha * diff)
+        )
     
     def interpolate_pose(self, timestamp, index=0):
         if len(self.history) < 2:
@@ -87,7 +100,8 @@ class StateHistory:
 
         alpha = (timestamp - t0) / (t1 - t0)
         
-        # For theta (yaw), clamp both next and prev to be between -pi and pi to avoid wierd effects when interpolating
+        # Interpolate heading on the unit circle to avoid wraparound artifacts
+        # when crossing the 0/2π (±π) boundary.
 
         interpolated_pose = (
             prev_snapshot.robot_state.x + alpha * (next_snapshot.robot_state.x - prev_snapshot.robot_state.x),

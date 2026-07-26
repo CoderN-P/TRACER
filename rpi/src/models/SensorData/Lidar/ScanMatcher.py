@@ -47,7 +47,8 @@ class ScanMatcher:
         
         grid = static_map["grid"]  # log-odds grid
         # Precompute probability grid once (vectorized access is much faster than calling method per point)
-        score_grid = 1.0 / (1.0 + np.exp(-grid))
+        prob_grid = 1.0 / (1.0 + np.exp(-grid))
+        score_grid = np.where(prob_grid > ROBOT_CONFIG.OBSTACLE_PROB_THRESHOLD, 1, 0)
 
         res = static_map["resolution"]
         origin_x = static_map["origin_x"]
@@ -102,13 +103,12 @@ class ScanMatcher:
             origin_y,
             res
         )
-
+        print(f"Best: {best_score}, second_best: {second_best}")
         if best_score < self.MIN_SCORE:
             self._logger.warning(f"Skipping scan matching as best score ({best_score}) was worse than the minimum score ({self.MIN_SCORE})")
             return pose, 0
     
         if best_score < second_best * 1.01:
-            self._logger.warning(f"Skipping scan matching as best score ({best_score}) was not significantly better than second best score ({second_best})")
             return pose, 0
         
         if abs(best_pose[2] - pose[2]) > np.deg2rad(5):
@@ -136,7 +136,7 @@ class ScanMatcher:
         if px.size == 0:
             return center_pose, 0.0, -np.inf
 
-        center_x, center_y, center_theta = center_pose
+        center_x, center_y, center_theta = center_pose[0], center_pose[1], center_pose[2]
 
         cos_theta = np.cos(center_theta)
         sin_theta = np.sin(center_theta)

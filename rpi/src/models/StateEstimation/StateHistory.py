@@ -100,8 +100,9 @@ class StateHistory:
 
         alpha = (timestamp - t0) / (t1 - t0)
         
-        # Interpolate heading on the unit circle to avoid wraparound artifacts
-        # when crossing the 0/2π (±π) boundary.
+        # Yaw values are stored in [-pi, pi]. Interpolate on the unit circle so
+        # transitions across the ±pi boundary remain continuous (e.g. -3.13 rad
+        # to +3.13 rad is treated as a small rotation, not a 6.26 rad jump).
 
         interpolated_pose = (
             prev_snapshot.robot_state.x + alpha * (next_snapshot.robot_state.x - prev_snapshot.robot_state.x),

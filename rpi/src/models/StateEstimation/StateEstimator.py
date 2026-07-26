@@ -237,8 +237,6 @@ class StateEstimator:
     async def correct(self, timestamp, measurement):
         raise NotImplementedError("Historical EKF correction needs to be updated for locked async state access.")
 
-
-
     @staticmethod
     def heading_delta_from_encoders(left_ticks, right_ticks, v_prev, omega_prev):
         delta_left = left_ticks * (
@@ -254,8 +252,6 @@ class StateEstimator:
         
         w_eff = get_ekf_track_width(v_prev, omega_prev)
         return (delta_right - delta_left) / w_eff
-
-        
 
     @staticmethod
     def _unwrap_angle(reference: float, angle: float) -> float:

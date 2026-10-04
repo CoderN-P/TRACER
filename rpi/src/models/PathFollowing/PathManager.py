@@ -17,6 +17,7 @@ class PathManager:
         self.world_model = world_model
         self.bus = bus
         self.last_dwa_time: float = 0.0
+        self.last_ramsete_time: float = 0.0
         
         self._logger = logging.getLogger("Robot.PathManager")
         
@@ -49,6 +50,9 @@ class PathManager:
                 self.dwa = DWA((event.data["path"]["x"], event.data["path"]["y"]), world_model=self.world_model)
             else:
                 path_error = f"Unknown path type: {event.data['type']}"
+                
+            if not self.spline_path:
+                self.last_ramsete_time = 0
 
         if path_error:
             await self.bus.publish(PathError(reason=path_error))
@@ -99,8 +103,9 @@ class PathManager:
                     if self.spline_path.complete():
                         exit_path = True
                     else:
-                        await self.command_manager.send_safe_command(self.spline_path.get_command(robot_state, time.monotonic() - self.last_dwa_time))
-
+                        await self.command_manager.send_safe_command(self.spline_path.get_command(robot_state, time.monotonic() - self.last_ramsete_time if self.last_ramsete_time > 0 else 0))
+                        self.last_ramsete_time = time.monotonic()
+                        
             elif self.pure_pursuit:
                 # Run pure pursuit
                 command = self.pure_pursuit.calculate_control_command(robot_state)
